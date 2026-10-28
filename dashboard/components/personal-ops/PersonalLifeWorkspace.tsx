@@ -176,6 +176,11 @@ export default function PersonalLifeWorkspace({
   const [listPageOpen, setListPageOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState(initialState.lists[0]?.id || "");
   const [listDraft, setListDraft] = useState<PersonalList | null>(initialState.lists[0] || null);
+  useEffect(() => {
+    const listId = new URLSearchParams(window.location.search).get("list");
+    const list = initialState.lists.find(item => item.id === listId);
+    if (list) { setSelectedListId(list.id); setListDraft(list); setListPageOpen(true); }
+  }, [initialState.lists]);
   const [listColumnType, setListColumnType] = useState<PersonalListColumnType>("text");
   const [tripFilters, setTripFilters] = useState<Set<TripStatus>>(() => new Set(["been", "want", "lived", "planned"]));
   const [selectedTripId, setSelectedTripId] = useState(initialState.trips[0]?.id || "");

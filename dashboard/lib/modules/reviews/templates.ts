@@ -364,6 +364,13 @@ const MONTHLY_CHECKLIST_V2 = withEvidence(MONTHLY_CHECKLIST_V1, "resources-clean
   relationship: "evidence"
 });
 
+// New runs include these areas; existing runs retain their saved template version.
+const CONNECTED_LIFE_CHECKS: ReviewTemplateChecklistDefinition[] = [
+  { id: "calendar-reviewed", label: "Calendar and time reviewed", description: "Look back at commitments and time spent. Adjust the next period in Calendar.", required: false, ownerModule: "calendar", action: "review", carryForwardAllowed: true, waiverAllowed: true },
+  { id: "routines-reviewed", label: "Personal routines reviewed", description: "Keep useful routines, revise what did not work, and connect the next actions to your goals.", required: false, ownerModule: "personal_ops", action: "review", carryForwardAllowed: true, waiverAllowed: true }
+];
+const WEEKLY_CHECKLIST_V3 = [...WEEKLY_CHECKLIST_V2, ...CONNECTED_LIFE_CHECKS];
+const MONTHLY_CHECKLIST_V3 = [...MONTHLY_CHECKLIST_V2, ...CONNECTED_LIFE_CHECKS];
 const REVIEW_TEMPLATE_HISTORY: Readonly<Record<ReviewCadence, readonly ReviewTemplateDefinition[]>> = {
   weekly: [
     {
@@ -379,7 +386,8 @@ const REVIEW_TEMPLATE_HISTORY: Readonly<Record<ReviewCadence, readonly ReviewTem
       cadence: "weekly",
       title: "Weekly Review",
       checklist: WEEKLY_CHECKLIST_V2
-    }
+    },
+    { id: "reviews-weekly-v1", version: 3, cadence: "weekly", title: "Weekly Review", checklist: WEEKLY_CHECKLIST_V3 }
   ],
   monthly: [
     {
@@ -395,24 +403,25 @@ const REVIEW_TEMPLATE_HISTORY: Readonly<Record<ReviewCadence, readonly ReviewTem
       cadence: "monthly",
       title: "Monthly Review",
       checklist: MONTHLY_CHECKLIST_V2
-    }
+    },
+    { id: "reviews-monthly-v1", version: 3, cadence: "monthly", title: "Monthly Review", checklist: MONTHLY_CHECKLIST_V3 }
   ]
 };
 
 export const REVIEW_TEMPLATES: Readonly<Record<ReviewCadence, ReviewTemplateDefinition>> = {
   weekly: {
     id: "reviews-weekly-v1",
-    version: 2,
+    version: 3,
     cadence: "weekly",
     title: "Weekly Review",
-    checklist: WEEKLY_CHECKLIST_V2
+    checklist: WEEKLY_CHECKLIST_V3
   },
   monthly: {
     id: "reviews-monthly-v1",
-    version: 2,
+    version: 3,
     cadence: "monthly",
     title: "Monthly Review",
-    checklist: MONTHLY_CHECKLIST_V2
+    checklist: MONTHLY_CHECKLIST_V3
   }
 };
 

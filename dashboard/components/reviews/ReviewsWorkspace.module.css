@@ -692,6 +692,10 @@
   gap: 12px;
 }
 
+.summaryFields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.summaryFields > :first-child { grid-column:1 / -1; }
+@media(max-width:700px) { .summaryFields {grid-template-columns:minmax(0,1fr);} }
+
 .formGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1262,3 +1266,64 @@
 .scroll :global(.work-header), .scroll :global(.work-toolbar), .scroll :global(.work-filters) { padding-inline:0; }
 .scroll :global(.work-header) { padding-top:0; }
 .scroll :global(.work-toolbar) { flex-wrap:wrap; }
+.reviewCards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding-block:12px; }
+.reviewCards article { min-width:0; }
+.reviewCards article > button { display:grid; grid-template-columns:44px minmax(0,1fr) auto; gap:10px 12px; align-items:center; width:100%; height:100%; padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--surface); text-align:left; color:var(--text-strong); transition:background .22s,border-color .22s; }
+.reviewCards article > button:is(:hover,[aria-pressed=true]) { background:var(--module-primary-50); border-color:var(--module-accent); }
+.reviewCardIcon { width:44px; height:44px; display:grid; place-items:center; background:var(--module-primary-50); border-radius:50%; color:var(--module-accent); }
+.reviewCardIdentity { display:grid; min-width:0; gap:5px; }
+.reviewCardIdentity strong {font-size:15px;overflow-wrap:anywhere;}
+.reviewCardIdentity small {font-size:12px;color:var(--text-muted);}
+.reviewCardSummary {grid-column:2/-1;font-size:13px;color:var(--text-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.reviewCardProgress {grid-column:2/-1;display:flex;align-items:center;gap:10px;font-size:12px;}
+.reviewCardProgress progress {width:90px;height:5px;accent-color:var(--module-accent);}
+.reviewCards[data-view=grid] {grid-template-columns:repeat(auto-fill,minmax(250px,1fr));}
+.reviewCards[data-view=grid] article > button {grid-template-columns:44px minmax(0,1fr);align-content:start;}
+.reviewCards[data-view=grid] .stateChip {grid-column:1/-1;justify-self:start;}
+.reviewCards[data-view=grid] :is(.reviewCardSummary,.reviewCardProgress) {grid-column:1/-1;}
+.reviewCards[data-view=compact] article > button {padding:12px;grid-template-columns:32px minmax(0,1fr) auto;gap:8px;}
+.reviewCards[data-view=compact] .reviewCardIcon {width:32px;height:32px;}
+.reviewCards[data-view=compact] .reviewCardSummary {display:none;}
+.periodOverview {grid-column:1/-1;display:grid;gap:14px;padding:18px;border:1px solid var(--border);border-radius:14px;background:var(--surface);}
+.periodOverview > header {display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+.periodOverview h2 {font-size:17px;margin:0 0 4px;}
+.periodOverview p,.periodOverview > small {font-size:12px;color:var(--text-muted);margin:0;}
+.periodGroups {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;}
+.periodGroups article {display:flex;flex-direction:column;gap:10px;min-width:0;padding:14px;border:1px solid var(--border);border-radius:12px;}
+.periodGroups header {display:flex;gap:8px;align-items:center;}
+.periodGroups h3 {font-size:14px;flex:1;margin:0;}
+.periodGroups strong {font-size:20px;}
+.periodGroups ul {list-style:none;margin:0;padding:0;display:grid;gap:9px;}
+.periodGroups li {display:grid;gap:3px;font-size:12px;}
+.periodGroups li span {overflow-wrap:anywhere;}
+.periodGroups li small {color:var(--text-muted);}
+.periodGroups a {display:flex;gap:6px;align-items:center;font-size:12px;margin-top:auto;padding-top:8px;color:var(--module-accent);}
+.startReviewSheet {width:min(600px,calc(100vw - 24px));border-radius:20px;}
+.startReviewSheet .formGrid {gap:14px;}
+.startReviewSheet input {border:1px solid var(--border);border-radius:10px;min-width:0;}
+@media(min-width:1800px) {.reviewCards[data-view=compact]{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:700px) {
+ .reviewCards {grid-template-columns:minmax(0,1fr);}
+ .reviewCards[data-view=grid] {grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+ .reviewCards[data-view=grid] article > button {grid-template-columns:minmax(0,1fr);padding:10px;gap:8px;}
+ .reviewCards[data-view=grid] .reviewCardIdentity {grid-column:1;}
+ .reviewCards[data-view=grid] .reviewCardIdentity strong {font-size:13px;}
+ .reviewCards[data-view=grid] .reviewCardProgress {flex-wrap:wrap;}
+ .periodOverview {padding:12px;}
+}
+@media(prefers-reduced-motion:reduce) {.reviewCards article > button {transition:none;}}
+.reviewStartAreas { display:flex; flex-wrap:wrap; gap:8px; }
+.reviewStartAreas span { display:flex; align-items:center; gap:6px; border-radius:9px; background:var(--module-primary-50); padding:8px; font-size:12px; }
+.reviewStartOptions { padding:12px; border:1px solid var(--border); border-radius:12px; }
+.reviewStartOptions summary { cursor:pointer; font-size:13px; }
+.reviewStartOptions[open] .formGrid { margin-top:12px; }
+.reviewCards article > button { font-family:var(--font-body); }
+.earlierReview { max-width:1600px; margin:0 auto; padding:20px; }
+.earlierReview :global(.review-form-grid) { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.earlierReview :global(.review-field) { min-width:0; padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--surface); }
+.earlierReview :global(.review-field) > span { font-size:14px; font-weight:600; }
+.earlierReview :global(.review-field-help) { font-size:12px; line-height:1.5; }
+.earlierReview :is(textarea,input) { width:100%; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text-strong); padding:10px; font-family:var(--font-body); }
+.earlierReview :global(.review-editor-meta) { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding-block:16px; }
+.earlierReview :global(.review-delete-btn) { display:inline-flex; align-items:center; gap:6px; }
+@media(max-width:700px) { .earlierReview {padding:12px;} .earlierReview :global(.review-form-grid) {grid-template-columns:minmax(0,1fr);} }

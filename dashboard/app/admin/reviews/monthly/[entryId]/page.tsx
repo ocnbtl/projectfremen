@@ -12,30 +12,5 @@ export default async function MonthlyReviewEntryPage({
   await requireAdminSession();
   const { entryId } = await params;
 
-  return (
-    <main className="shell admin-chrome-main">
-      <AdminChrome
-        sidebarTitle="Monthly Form"
-        sidebarSummary="Autosaved monthly review entry."
-        sidebarItems={[
-          { label: "Cadence", value: "Monthly" },
-          { label: "Entry", value: entryId }
-        ]}
-        sidebarActions={[
-          { label: "Monthly List", href: "/admin/reviews/monthly" },
-          { label: "Home", href: "/admin" }
-        ]}
-      />
-      <header className="topbar">
-        <div>
-          <h1 style={{ margin: 0 }}>Monthly Review Form</h1>
-          <p className="muted" style={{ margin: "8px 0 0" }}>
-            Fill this out directly in the app. Changes auto-save while you edit.
-          </p>
-        </div>
-      </header>
-
-      <ReviewEntryEditor kind="monthly" entryId={entryId} />
-    </main>
-  );
+  return (<main className="shell admin-chrome-main module-ref-shell reviews-module-shell native-module-shell"><AdminChrome showCommandSearch={false} showPageSidebar={false} showLocalAi={false} sidebarTitle="Reviews"/><ReviewEntryEditor kind="monthly" entryId={entryId}/></main>);
 }

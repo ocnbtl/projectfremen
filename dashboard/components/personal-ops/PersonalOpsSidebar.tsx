@@ -208,7 +208,7 @@ export default function PersonalOpsSidebar({
   const dataSection: ModuleSidebarSection =
     {
       id: "data",
-      label: "Data",
+      label: "Tools",
       items: [
         viewItem({
           id: "inbox",
@@ -245,7 +245,7 @@ export default function PersonalOpsSidebar({
     <ModuleSidebar
       title="Personal"
       description="Daily command, durable records, and personal systems."
-      sections={sections}
+      sections={activeView === "command" ? [commandSection, dataSection] : sections}
       className={styles.sidebar}
       mobileOpen={mobileOpen}
       onClose={onClose}

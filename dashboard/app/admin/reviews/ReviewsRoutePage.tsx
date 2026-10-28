@@ -18,7 +18,7 @@ export const FINANCE_REVIEW_BRIDGE: FinanceReviewBridge = {
   label: "Finance Monthly Review",
   href: "/admin/finance/monthly-review",
   reason:
-    "Finance currently renders disclosed client fixtures. Reviews can open that source preview, but cannot verify or complete the Finance close."
+    "Review recorded transactions and complete your monthly close in Finance. Link supporting records here when they inform your review."
 };
 
 export default async function ReviewsRoutePage({

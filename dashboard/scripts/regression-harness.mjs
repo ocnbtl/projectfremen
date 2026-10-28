@@ -19473,13 +19473,13 @@ async function main() {
       createWeeklyReviewRun.response.ok &&
         createWeeklyReviewRun.payload?.ok &&
         createWeeklyReviewRun.payload.item?.cadence === "weekly" &&
-        createWeeklyReviewRun.payload.item.templateVersion === 2 &&
-        createWeeklyReviewRun.payload.item.checklist?.length === 10 &&
+        createWeeklyReviewRun.payload.item.templateVersion === 3 &&
+        createWeeklyReviewRun.payload.item.checklist?.length === 12 &&
         createWeeklyReviewRun.payload.item.evidence?.some(
           (item) => item.requirementId === "weekly-resource-cleanup" && item.required === false && item.blocksCompletion === false
         ) &&
         createWeeklyReviewRun.payload.view?.counts?.requiredChecks === 8,
-      `Weekly ReviewRun did not instantiate the versioned ten-check template with optional Resource evidence: ${JSON.stringify(createWeeklyReviewRun.payload)}`
+      `Weekly ReviewRun did not instantiate the versioned twelve-check template with optional Resource, Calendar and routine checks: ${JSON.stringify(createWeeklyReviewRun.payload)}`
     );
     let weeklyReviewRun = createWeeklyReviewRun.payload.item;
     let weeklyReviewView = createWeeklyReviewRun.payload.view;
@@ -20879,12 +20879,12 @@ async function main() {
     assert(
       createMonthlyReviewRun.response.ok &&
         createMonthlyReviewRun.payload?.item?.cadence === "monthly" &&
-        createMonthlyReviewRun.payload.item.templateVersion === 2 &&
-        createMonthlyReviewRun.payload.item.checklist?.length === 13 &&
+        createMonthlyReviewRun.payload.item.templateVersion === 3 &&
+        createMonthlyReviewRun.payload.item.checklist?.length === 15 &&
         createMonthlyReviewRun.payload.item.evidence?.some(
           (item) => item.requirementId === "monthly-resource-cleanup" && item.required === false && item.blocksCompletion === false
         ),
-      `Monthly ReviewRun did not instantiate the versioned thirteen-check template with optional Resource evidence: ${JSON.stringify(createMonthlyReviewRun.payload)}`
+      `Monthly ReviewRun did not instantiate the versioned fifteen-check template with optional Resource, Calendar and routine checks: ${JSON.stringify(createMonthlyReviewRun.payload)}`
     );
     let monthlyReviewRun = createMonthlyReviewRun.payload.item;
     let monthlyReviewView = createMonthlyReviewRun.payload.view;

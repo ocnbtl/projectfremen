@@ -1,4 +1,7 @@
 "use client";
+import ViewCycleButton, { type DirectoryView } from "../ui/ViewCycleButton";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import ReviewPeriodOverview from "./ReviewPeriodOverview";
 import SelectField from "../ui/SelectField";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import { weekStart } from "../../lib/calendar-week";
@@ -226,8 +229,8 @@ function dateInputValue(date: Date) {
   return local.toISOString().slice(0, 10);
 }
 
-function defaultPeriod(cadence: ReviewCadence) {
-  const now = new Date();
+function defaultPeriod(cadence: ReviewCadence, scheduledFor?: string | null) {
+  const now = scheduledFor && /^\d{4}-\d{2}-\d{2}$/.test(scheduledFor) && Number.isFinite(Date.parse(scheduledFor)) ? new Date(scheduledFor + "T12:00:00") : new Date();
   if (cadence === "monthly") {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -610,6 +613,9 @@ export default function ReviewsWorkspace({
   const urlState = useMemo(() => parseReviewsUrlState(searchParams), [searchParams]);
   const sourceHandoff = useMemo(() => parseReviewSourceHandoff(searchParams), [searchParams]);
   const [state, setState] = useState(initialState);
+  const [directoryView, setDirectoryView] = useState<DirectoryView>("comfortable");
+  useEffect(() => { try { const saved = localStorage.getItem("reviews-directory-view"); if (["compact","comfortable","grid"].includes(saved || "")) setDirectoryView(saved as DirectoryView); } catch {} }, []);
+  function changeDirectoryView(view: DirectoryView) {setDirectoryView(view);try {localStorage.setItem("reviews-directory-view",view);}catch{}}
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialLoadError);
   const [notice, setNotice] = useState("");
@@ -833,7 +839,7 @@ export default function ReviewsWorkspace({
   ], [directoryItems, legacyRuns.length, needsEvidence.length, openNative.length, selectDirectoryScope, state.runs, urlState.cadence, urlState.view]);
 
   function openCreate(cadence: ReviewCadence) {
-    const period = defaultPeriod(cadence);
+    const period = defaultPeriod(cadence, searchParams.get("scheduledFor"));
     const hasCurrentCadence = state.runs.some(
       (run) =>
         run.cadence === cadence &&
@@ -1295,7 +1301,7 @@ export default function ReviewsWorkspace({
       <div className={styles.panelHeader}>
         <div>
           <h2>Structured summary</h2>
-          <p>{reviewIsReadOnly(run) ? "Saved summary from this review." : "Saved explicitly; a failed write leaves your draft intact."}</p>
+          <p>{reviewIsReadOnly(run) ? "Saved summary from this review." : "Capture outcomes, lessons, and what you want to change."}</p>
         </div>
         <span className={styles.chip}>{JSON.stringify(summaryDraft) === summaryInitial ? "Saved" : "Unsaved"}</span>
       </div>
@@ -1322,8 +1328,8 @@ export default function ReviewsWorkspace({
     <div className={styles.panel} data-span="full">
       <div className={styles.panelHeader}>
         <div>
-          <h2>{run.cadence === "weekly" ? "10" : "13"}-check completion ledger</h2>
-          <p>Each check carries its owner and evidence rule. Counts are literal, never weighted.</p>
+          <h2>Review checklist</h2>
+          <p>Work through each area and carry unfinished actions forward.</p>
         </div>
       </div>
       <ul className={styles.list}>
@@ -1653,13 +1659,14 @@ export default function ReviewsWorkspace({
     return (
       <div className={styles.panelGrid}>
         {initialMode !== "detail" && !reviewIsReadOnly(run) && <p className={styles.reviewProgress}>{counts.resolved} of {counts.required} required checks complete · {counts.blockers.length} completion blocker{counts.blockers.length === 1 ? "" : "s"}</p>}
+        <ReviewPeriodOverview start={run.periodStart} end={run.periodEnd}/>
         {renderSummary(run)}
         <section className={styles.panel} data-span="full">
           <div className={styles.panelHeader}>
-            <div><h2>Linked source context</h2><p>Manual selection is the safe boundary: no inferred context is saved without acceptance.</p></div>
+            <div><h2>Linked source context</h2><p>Keep the records that support your conclusions together.</p></div>
             <button type="button" className={styles.button} onClick={() => setEditor({ kind: "context", relationship: "context", ...defaultSourceDraft() })} disabled={busy || reviewIsReadOnly(run)}>Link source…</button>
           </div>
-          {activeLinks.length === 0 ? <SystemState variant="empty" title="No source context linked" description="Link only records you have reviewed. Automatic source selection remains disabled." compact /> : (
+          {activeLinks.length === 0 ? <SystemState variant="empty" title="No source context linked" description="Link a record after reviewing it in its own module." compact /> : (
             <ul className={styles.list}>{activeLinks.map((link) => (
               <ContextLinkRow
                 link={link}
@@ -1810,8 +1817,8 @@ export default function ReviewsWorkspace({
     <div className={styles.panelGrid}>
       <section className={styles.panel} data-span="full">
         <div className={styles.panelHeader}><div><h2>Finance-owned monthly close</h2><p>{financeBridge.reason}</p></div><span className={styles.stateChip} data-tone="attention">Read-only bridge</span></div>
-        <p className={styles.ownershipBanner}>Reviews can hold a link to Finance evidence and coordinate completion. It cannot close the ledger, reconcile accounts, or present fixture values as live facts.</p>
-        <div className={styles.inlineActions}><Link className={styles.textLink} href={financeBridge.href}>{financeBridge.label}</Link><button type="button" className={styles.button} disabled title="Finance close mutations belong to Finance and are not connected from Reviews.">Close Finance month</button></div>
+        <p className={styles.ownershipBanner}>Keep financial evidence with this review. Reconciliation and closing the month stay in Finance.</p>
+        <div className={styles.inlineActions}><Link className={styles.textLink} href={financeBridge.href}>{financeBridge.label}</Link></div>
       </section>
       <section className={styles.panel} data-span="full"><div className={styles.panelHeader}><div><h2>Linked Finance sources</h2><p>Only explicit Finance-owned references appear here.</p></div></div>{run.contextLinks.filter((link) => link.sourceRef.module === "finance" && link.state !== "removed").length === 0 ? <SystemState variant="empty" title="No Finance source linked" description="Use Overview or Evidence to link a Finance-owned record after reviewing it." compact /> : <ul className={styles.list}>{run.contextLinks.filter((link) => link.sourceRef.module === "finance" && link.state !== "removed").map((link) => <ContextLinkRow link={link} run={run} busy={busy} selected={urlState.item === link.id} onRepair={() => openContextRepair(link)} onReport={(state) => openContextHealth(link, state)} onUnlink={() => setConfirmation({ kind: "unlink", reviewId: run.id, contextLinkId: link.id })} key={link.id} />)}</ul>}</section>
     </div>
@@ -1958,53 +1965,21 @@ export default function ReviewsWorkspace({
 
   const directory = (
     <DirectoryPane className={styles.directory} ariaLabel="Review directory" busy={busy}>
-      <div className={styles.mobileToolbar}><button type="button" className={styles.iconButton} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Reviews navigation">Menu</button><span className={styles.chip}>{visibleItems.length} shown</span></div>
+
       <div className={styles.scroll}>
         <WorkspaceHeader title="Reviews" count={visibleItems.length}>
-          <WorkspaceButton onClick={() => openCreate("weekly")}>Start weekly</WorkspaceButton><WorkspaceButton intent="primary" onClick={() => openCreate("monthly")}>Start monthly</WorkspaceButton>
+          <WorkspaceButton icon="plus" intent="primary" onClick={() => openCreate("weekly")}>Weekly review</WorkspaceButton><WorkspaceButton icon="plus" onClick={() => openCreate("monthly")}>Monthly review</WorkspaceButton>
         </WorkspaceHeader>
         {!selectedRun && renderSourceHandoff(null)}
         {initialLoadError && <SystemState variant="error" description={initialLoadError} action={{ label: "Retry", onSelect: () => void refreshState() }} />}
         <WorkspaceToolbar query={queryDraft} onQuery={value=>{setQueryDraft(value); if(queryTimer.current)clearTimeout(queryTimer.current);queryTimer.current=setTimeout(()=>updateUrl({query:value}),180);}} placeholder="Search reviews" activeFilters={urlState.filter === "all" ? 0 : 1}
           filters={<>{(Object.keys(FILTER_LABELS) as ReviewsFilter[]).map(filter=><WorkspaceButton key={filter} aria-pressed={urlState.filter===filter} onClick={()=>updateUrl({filter})}>{FILTER_LABELS[filter]}</WorkspaceButton>)}</>}>
           <SelectField className="work-compact-select" value={urlState.sort} onChange={event=>updateUrl({sort:event.target.value as ReviewsSort})} aria-label="Sort reviews">{(Object.keys(SORT_LABELS) as ReviewsSort[]).map(sort=><option key={sort} value={sort}>{SORT_LABELS[sort]}</option>)}</SelectField>
-        </WorkspaceToolbar>
+        <ViewCycleButton data-toolbar-view value={directoryView} onChange={changeDirectoryView}/></WorkspaceToolbar>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
         {visibleItems.length === 0 ? <SystemState variant="empty" title={directoryItems.length ? "No reviews match this scope" : "Start your first review"} description={directoryItems.length ? "Clear the filter to see your reviews." : "A weekly review gives you a place to collect evidence, decisions and follow-up work."} action={directoryItems.length ? { label: "Clear filters", onSelect: () => updateUrl({ query: "", filter: "all", view: "all", cadence: "all" }) } : {label:"Start weekly review",onSelect:()=>openCreate("weekly")}} /> : (
-          <div className={styles.rows} role="list" aria-label="Reviews">
-            {visibleItems.map((item) => {
-              if (item.source === "legacy") {
-                return (
-                  <DenseObjectRow
-                    id={item.id}
-                    title={item.run.title}
-                    description={item.run.summary || "Legacy review record"}
-                    leading={<span className={styles.monogram}>{monogram(item.run.cadence)}</span>}
-                    metadata={<span className={styles.rowMeta}><span>{displayLabel(item.run.cadence)}</span><span>Legacy read-only</span><span>{item.run.legacyReviewEntryId}</span></span>}
-                    trailing={<span className={styles.stateChip} data-tone="attention">Read-only</span>}
-                    selected={selectedId === item.id}
-                    onSelect={() => selectItem(item)}
-                    key={item.id}
-                  />
-                );
-              }
-              const counts = runCounts(item.run);
-              return (
-                <DenseObjectRow
-                  id={item.id}
-                  title={item.run.title}
-                  description={item.run.summary.summary || `${displayLabel(item.run.cadence)} review for ${formatDate(item.run.periodStart)} – ${formatDate(item.run.periodEnd)}`}
-                  leading={<span className={styles.monogram}>{monogram(item.run.cadence)}</span>}
-                  metadata={<span className={styles.rowMeta}><span>{displayLabel(item.run.cadence)}</span><span>{displayLabel(item.run.lifecycle)}</span><span>{counts.blockers.length} blockers</span></span>}
-                  trailing={<span className={styles.stateChip} data-tone={item.run.lifecycle === "completed" ? "positive" : counts.blockers.length > 0 ? "danger" : "attention"}>{counts.blockers.length ? "Blocked" : displayLabel(item.run.lifecycle)}</span>}
-                  selected={selectedId === item.id}
-                  onSelect={() => selectItem(item)}
-                  key={item.id}
-                />
-              );
-            })}
-          </div>
+          <div className={styles.reviewCards} data-view={directoryView} role="list" aria-label="Reviews">{visibleItems.map(item => { const native = item.source === "native" ? item.run : null; const counts = native ? runCounts(native) : null; return <article key={item.id} role="listitem"><button type="button" onClick={() => selectItem(item)} aria-label={"Open " + item.run.title} aria-pressed={selectedId === item.id}><span className={styles.reviewCardIcon}><UnigentamosIcon role={item.run.cadence === "monthly" ? "calendar" : "review"}/></span><span className={styles.reviewCardIdentity}><strong>{item.run.title}</strong><small>{displayLabel(item.run.cadence)}{native ? " · " + formatDate(native.periodStart) + " – " + formatDate(native.periodEnd) : " · Earlier review"}</small></span><span className={styles.stateChip} data-tone={native?.lifecycle === "completed" ? "positive" : "attention"}>{native ? displayLabel(native.lifecycle) : "Read-only"}</span><span className={styles.reviewCardSummary}>{native ? native.summary.summary || "Capture outcomes, decisions, and your next focus." : item.source === "legacy" ? item.run.summary || "Open this earlier review." : ""}</span>{counts && <span className={styles.reviewCardProgress}><progress max={Math.max(1,counts.required)} value={counts.resolved}/><small>{counts.resolved}/{counts.required} checks</small></span>}</button></article>;})}</div>
         )}
       </div>
     </DirectoryPane>
@@ -2163,7 +2138,7 @@ function EditorSheet({ editor, setEditor, busy, errorMessage, onConfirm }: { edi
   const title = editor.kind === "create" ? `Start ${editor.cadence} review` : editor.kind === "context" ? "Link source context" : editor.kind === "repair-context" ? "Repair source reference" : editor.kind === "context-health" ? "Report source issue" : editor.kind === "evidence" ? editor.originalSourceRef ? "Refresh or replace evidence" : "Link evidence source" : editor.kind === "review-evidence-replacement" ? "Review replacement evidence" : editor.kind === "waive-evidence" ? "Waive evidence requirement" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" ? "Add decision candidate" : editor.kind === "follow-up" ? "Add follow-up candidate" : editor.kind === "reconcile-decision" ? "Link filed Personal Decision" : "Link created Personal Follow-up";
   const confirmLabel = editor.kind === "create" ? "Start review" : editor.kind === "repair-context" ? "Repair reference" : editor.kind === "context-health" ? "Update link state" : editor.kind === "review-evidence-replacement" ? "Confirm replacement" : editor.kind === "waive-evidence" ? "Record waiver" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" || editor.kind === "follow-up" ? "Add candidate" : editor.kind === "reconcile-decision" ? "Link Decision" : editor.kind === "reconcile-follow-up" ? "Link Follow-up" : editor.kind === "evidence" && editor.originalSourceRef ? "Save evidence source" : "Link source";
   let invalid = false;
-  if (editor.kind === "create") invalid = !editor.title?.trim() || !editor.periodStart || !editor.periodEnd;
+  if (editor.kind === "create") invalid = !editor.title?.trim() || !editor.periodStart || !editor.periodEnd || editor.periodEnd < editor.periodStart;
   else if (editor.kind === "context-health") invalid = !editor.reason.trim();
   else if (editor.kind === "waive-evidence") invalid = !editor.reason.trim() || !editor.riskNote.trim();
   else if (editor.kind === "carry-forward") invalid = !editor.ownerId.trim() || !editor.reason.trim() || !editor.nextAction.trim();
@@ -2177,9 +2152,9 @@ function EditorSheet({ editor, setEditor, busy, errorMessage, onConfirm }: { edi
     if (editor.kind === "reconcile-follow-up") invalid ||= editor.module !== "personal_ops" || editor.objectType.trim() !== "follow_up";
   }
   return (
-    <ConfirmationSheet open onOpenChange={(open) => { if (!open) setEditor(null); }} onConfirm={onConfirm} title={title} description={editor.kind === "create" ? "Creates a native ReviewRun. It does not migrate or mutate legacy Review entries." : editor.kind === "repair-context" ? "Updates this Review-owned reference only. The source object and original audit history remain unchanged." : editor.kind === "context-health" ? "Records the observed link condition and reason. The source object remains unchanged." : editor.kind === "evidence" && editor.originalSourceRef ? "Keeping the same native identity records a reviewed refresh. Choosing another source creates a pending replacement that must be reviewed separately." : editor.kind === "review-evidence-replacement" ? "Confirm that the replacement satisfies this Reviews-owned requirement. The previous source stays in the audit history." : editor.kind === "waive-evidence" ? "Waivers are explicit audit events and require both a reason and a risk note." : "The source remains owned by its native module; Reviews stores a route-aware reference."} confirmLabel={confirmLabel} busy={busy} confirmDisabled={invalid} confirmDisabledReason={invalid ? "Complete every required field." : undefined}>
+    <ConfirmationSheet open onOpenChange={(open) => { if (!open) setEditor(null); }} onConfirm={onConfirm} title={title} className={editor.kind === "create" ? styles.startReviewSheet : undefined} eyebrow={editor.kind === "create" ? null : "Confirm action"} iconRole={editor.kind === "create" ? "review" : undefined} description={editor.kind === "create" ? "Choose your period. Review activity across your modules, capture what changed, and decide what comes next." : editor.kind === "repair-context" ? "Updates this Review-owned reference only. The source object and original audit history remain unchanged." : editor.kind === "context-health" ? "Records the observed link condition and reason. The source object remains unchanged." : editor.kind === "evidence" && editor.originalSourceRef ? "Keeping the same native identity records a reviewed refresh. Choosing another source creates a pending replacement that must be reviewed separately." : editor.kind === "review-evidence-replacement" ? "Confirm that the replacement satisfies this Reviews-owned requirement. The previous source stays in the audit history." : editor.kind === "waive-evidence" ? "Waivers are explicit audit events and require both a reason and a risk note." : "The source remains owned by its native module; Reviews stores a route-aware reference."} confirmLabel={confirmLabel} busy={busy} confirmDisabled={invalid} confirmDisabledReason={invalid ? "Complete every required field." : undefined}>
       {errorMessage && <p ref={errorRef} className={styles.error} role="alert" tabIndex={-1}>{errorMessage}</p>}
-      {editor.kind === "create" && <div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Title</span><input value={editor.title || ""} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label className={styles.field}><span>Period start</span><input type="date" value={editor.periodStart} onChange={(event) => setEditor({ ...editor, periodStart: event.target.value })} /></label><label className={styles.field}><span>Period end</span><input type="date" value={editor.periodEnd} onChange={(event) => setEditor({ ...editor, periodEnd: event.target.value })} /></label><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueAt || ""} onChange={(event) => setEditor({ ...editor, dueAt: event.target.value })} /></label><label className={styles.field}><span>Owner</span><input value={editor.ownerId || ""} onChange={(event) => setEditor({ ...editor, ownerId: event.target.value })} /></label><label className={styles.field} data-span="full"><span><input type="checkbox" checked={editor.current ?? false} onChange={(event) => setEditor({ ...editor, current: event.target.checked })} /> Make this the current {editor.cadence} review</span><small>Only one open current run is allowed per cadence. Scheduled runs remain fully usable.</small></label></div>}
+      {editor.kind === "create" && <div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Review name</span><input value={editor.title || ""} onChange={event => setEditor({...editor,title:event.target.value})}/></label><label className={styles.field}><span>From</span><input type="date" value={editor.periodStart} onChange={event => setEditor({...editor,periodStart:event.target.value})}/></label><label className={styles.field}><span>Through</span><input type="date" min={editor.periodStart} value={editor.periodEnd} onChange={event => setEditor({...editor,periodEnd:event.target.value})}/></label><div className={styles.reviewStartAreas} data-span="full">{["Calendar","People","Projects","Finance","Personal"].map(area => <span key={area}><UnigentamosIcon role={`module-${area.toLowerCase()}`}/>{area}</span>)}</div><details className={styles.reviewStartOptions} data-span="full"><summary>Scheduling and ownership</summary><div className={styles.formGrid}><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueAt || ""} onChange={event => setEditor({...editor,dueAt:event.target.value})}/></label><label className={styles.field}><span>Owner</span><input value={editor.ownerId || ""} onChange={event => setEditor({...editor,ownerId:event.target.value})}/></label></div></details><label className={styles.field} data-span="full"><span><input type="checkbox" checked={editor.current ?? false} onChange={event => setEditor({...editor,current:event.target.checked})}/> Keep as current {editor.cadence} review</span></label></div>}
       {editor.kind === "context" && <><SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} /><label className={styles.field}><span>Relationship</span><SelectField value={editor.relationship} onChange={(event) => setEditor({ ...editor, relationship: event.target.value as ReviewContextRelationship })}><option value="context">Context</option><option value="blocker_source">Blocker source</option><option value="decision_source">Decision source</option><option value="follow_up_source">Follow-up source</option><option value="summary_source">Summary source</option></SelectField></label></>}
       {editor.kind === "repair-context" && <div className={styles.formGrid}><p className={styles.ownershipBanner}>Confirm the current source identity. Keeping the same identity records a reviewed refresh; choosing another identity records a replacement without deleting the prior audit trail.</p><SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} /><label className={styles.field} data-span="full"><span>Repair reason</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} placeholder={editor.previousState === "broken" ? "How was the source recovered or replaced?" : "What did you verify or replace?"} /></label></div>}
       {editor.kind === "context-health" && <div className={styles.formGrid}><label className={styles.field}><span>Observed state</span><SelectField value={editor.state} onChange={(event) => setEditor({ ...editor, state: event.target.value as "stale" | "broken" })}><option value="stale">Stale · needs review</option><option value="broken">Broken · source unavailable</option></SelectField><small>Stale sources can still be opened. Broken sources retain only their last-known identity.</small></label><label className={styles.field} data-span="full"><span>Observed issue</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} placeholder="Describe what changed or why the source is unavailable." /></label></div>}

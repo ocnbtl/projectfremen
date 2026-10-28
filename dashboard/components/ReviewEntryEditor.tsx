@@ -1,4 +1,6 @@
 "use client";
+import styles from "./reviews/ReviewsWorkspace.module.css";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 import LogoLoader from "./operational/LogoLoader";
 
 import Link from "next/link";
@@ -161,7 +163,7 @@ export default function ReviewEntryEditor({
     : "";
 
   return (
-    <section className="card review-page-card" style={{ marginTop: 12 }}>
+    <section className={styles.earlierReview}>
       <div className="review-page-header">
         <h2 style={{ marginBottom: 0 }}>{title} Review Entry</h2>
         <Link href={`/admin/reviews/${kind}`} className="review-back-link">
@@ -201,7 +203,7 @@ export default function ReviewEntryEditor({
                 disabled={deleting}
                 title="Delete entry"
               >
-                {deleting ? "Deleting..." : "🗑 Delete"}
+                <UnigentamosIcon role="delete"/>{deleting ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>
@@ -229,7 +231,7 @@ export default function ReviewEntryEditor({
                   />
                 ) : (
                   <textarea
-                    rows={field.rows || 4}
+                    rows={Math.min(field.rows || 4, 4)}
                     value={values[field.id] || ""}
                     placeholder={field.placeholder || ""}
                     onChange={(event) => {

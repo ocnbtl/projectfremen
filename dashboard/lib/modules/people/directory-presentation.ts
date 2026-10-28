@@ -57,3 +57,18 @@ export function currentEmployerPictures(record: PersonalRecord, organizations: r
   }
   return result;
 }
+
+/** Keep each current role and its employer together, including legacy profiles. */
+export function currentOccupationEntries(record: PersonalRecord, organizations: readonly PersonalRecord[]): { title: string; employer?: PersonalRecord }[] {
+  if (record.className !== "person") return [];
+  const available = organizations.filter(org => org.className === "org" && !org.archivedAt);
+  const current = record.profile?.occupations?.filter(job => job.status === "current" && job.title.trim()) || [];
+  const jobs = current.length ? current : [
+    { title: record.profile?.primaryOccupation || "", employer: record.profile?.primaryEmployer, organizationId: undefined },
+    { title: record.profile?.secondaryOccupation || "", employer: record.profile?.secondaryEmployer, organizationId: undefined }
+  ];
+  return jobs.filter(job => job.title.trim()).map(job => {
+    const matches = job.organizationId ? available.filter(org => org.id === job.organizationId) : available.filter(org => job.employer?.trim() && org.title.trim().toLocaleLowerCase() === job.employer.trim().toLocaleLowerCase());
+    return { title: job.title.trim(), employer: matches.length === 1 ? matches[0] : undefined };
+  });
+}

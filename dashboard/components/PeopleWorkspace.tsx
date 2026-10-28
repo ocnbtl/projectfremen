@@ -68,7 +68,7 @@ import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import PeopleInteractions from "./people/PeopleInteractions";
 import { organizationLabels } from "../lib/modules/people/organization-labels";
-import { organizationCategory, occupationLabel, organizationLocationLabel, currentEmployerPictures } from "../lib/modules/people/directory-presentation";
+import { organizationCategory, organizationLocationLabel, currentOccupationEntries } from "../lib/modules/people/directory-presentation";
 import OrganizationAutofill from "./people/OrganizationAutofill";
 import PersonAutofill from "./people/PersonAutofill";
 import { applyPersonAutofill, type PersonAutofillPending, type PersonAutofillResult } from "../lib/modules/people/person-autofill";
@@ -4308,8 +4308,7 @@ export default function PeopleWorkspace({
             {visiblePeople.map((record) => {
               const profile = getProfile(record);
               const category = record.className === "person" ? getPrimaryGroup(record) : "";
-              const employers = currentEmployerPictures(record, people);
-              const occupation = record.className === "person" ? occupationLabel(record) : "";
+              const occupations = currentOccupationEntries(record, people);
               const linkedPeople = directoryOrganizationPeople.get(record.id) || [];
               const location = record.className === "org" ? organizationLocationLabel(record, initialPlaces) : "";
               const classification = organizationLabels(profile);
@@ -4331,7 +4330,7 @@ export default function PeopleWorkspace({
                     />
                     <span className="people-row-content">
                       <span className="people-row-heading">
-                      <span className="people-row-name"><span className="people-row-title"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>, aka {profile.nickname}</em>}</span>{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" /><span className="people-occupation-label">{occupation}</span>{employers.map(org => <span className="people-employer-picture" key={org.id} title={org.title}><PeopleProfileAvatar organization label={org.title} initials={getInitials(org)} photoUrl={org.profile?.photoUrl} photoUpdatedAt={org.profile?.photoUpdatedAt} compact /></span>)}</span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
+                      <span className="people-row-name"><span className="people-row-title"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>, aka {profile.nickname}</em>}</span>{occupations.length > 0 && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" /><span className="people-occupation-pairs">{occupations.map(({title, employer}, index) => <span className="people-occupation-pair" key={`${title}-${employer?.id || index}`}><span>{title}</span>{employer?.profile?.photoUrl && <span className="people-employer-picture" title={employer.title}><PeopleProfileAvatar organization label={employer.title} initials={getInitials(employer)} photoUrl={employer.profile.photoUrl} photoUpdatedAt={employer.profile.photoUpdatedAt} compact /></span>}</span>)}</span></span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
                       <span className="people-row-contact"><span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><span className="people-classification-tags">{record.className === "org" ? <>{classification.type && <em title="Organization type"><PeopleIcon name="organization" />{classification.type}</em>}{classification.industry && <em title="Industry">{classification.industry}</em>}{!classification.type && <em>Not classified</em>}</> : <em title={category}>{category}</em>}</span><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
                       {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
                         {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, latestInteractionDateByParticipant.get(record.id))}</span>}

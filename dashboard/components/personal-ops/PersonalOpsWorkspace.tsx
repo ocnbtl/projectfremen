@@ -1,7 +1,7 @@
 "use client";
+import PersonalHome from "./PersonalHome";
 import SelectField from "../ui/SelectField";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
-import QuickActionBar from "../operational/QuickActionBar";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -1057,7 +1057,6 @@ export default function PersonalOpsWorkspace({
   const urlState = useMemo(() => parsePersonalOpsUrlState(searchParams), [searchParams]);
   const [state, setState] = useState(initialState);
   const [legacyGoals, setLegacyGoals] = useState(initialLegacyGoals);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(Boolean(urlState.selected));
   const [openForm, setOpenForm] = useState<OpenForm | null>(null);
@@ -1483,7 +1482,6 @@ export default function PersonalOpsWorkspace({
     .map((item) => ({ ...item, active: urlState.filter === item.id, onSelect: () => updateUrl({ filter: item.id, selected: "" }) }));
 
   const primaryFamily = VIEW_COPY[initialView].family || "followUps";
-  const isDecisionView = initialView === "decisions";
 
   async function confirmPendingAction() {
     if (!pendingAction) return;
@@ -1540,9 +1538,9 @@ export default function PersonalOpsWorkspace({
         </div>
         <div className={styles.mainScroll}>
           <WorkspaceHeader title={initialView === "command" ? "Personal" : VIEW_COPY[initialView].title} count={scopedItems.length}>
-            <QuickActionBar maxVisible={1} actions={(initialView === "command" ? ["followUps","decisions","obligations","goals"] as const : [primaryFamily]).map((family,index)=>({id:family,label:`Add ${FAMILY_LABELS[family].toLowerCase()}`,onSelect:()=>openCreate(family),intent:index===0?"primary" as const:undefined}))}/>
+            {initialView === "command" ? <SelectField aria-label="Create personal item" value="" onChange={event => {if(event.target.value) openCreate(event.target.value as PersonalOpsFamily);}}><option value="" disabled>Add new</option>{(["goals","followUps","decisions","obligations"] as const).map(family => <option value={family} key={family}>{FAMILY_LABELS[family]}</option>)}</SelectField> : <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate(primaryFamily)}>Add {FAMILY_LABELS[primaryFamily].toLowerCase()}</WorkspaceButton>}
           </WorkspaceHeader>
-          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<>{filterItems.map(item=><WorkspaceButton key={item.id} aria-pressed={item.active} onClick={item.onSelect}>{item.label}</WorkspaceButton>)}</>}>
+          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<>{filterItems.map(item=><WorkspaceButton key={item.id} aria-pressed={item.active} onClick={item.onSelect}>{item.label}</WorkspaceButton>)}<strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
           </WorkspaceToolbar>
 
@@ -1552,6 +1550,7 @@ export default function PersonalOpsWorkspace({
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}
 
+          {initialView === "command" && <PersonalHome state={state} projectGoalCount={legacyGoals.filter(goal=>!goal.done).length} />}
           {initialLoadError ? (
             <SystemState variant="error" title="Personal could not load" description={initialLoadError} />
           ) : scopedItems.length === 0 ? (
@@ -1564,66 +1563,7 @@ export default function PersonalOpsWorkspace({
                 : { label: `Create ${FAMILY_LABELS[primaryFamily]}`, onSelect: () => openCreate(primaryFamily) }}
             />
           ) : (
-            <div className={styles.ledgerFrame}>
-              <div className={styles.ledgerScroller}>
-                <table className={styles.ledger}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: isDecisionView ? "46%" : "45%" }}>{isDecisionView ? "Decision" : "Object"}</th>
-                      {!isDecisionView && <th>Type</th>}
-                      <th>{isDecisionView ? "Decision state" : "State"}</th>
-                      <th>Domain</th>
-                      <th>Due</th>
-                      <th>{isDecisionView ? "Review state" : "Review"}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scopedItems.map((item) => {
-                      const selected = item.id === urlState.selected;
-                      const checked = selectedIds.has(item.id);
-                      return (
-                        <tr className={[styles.ledgerRow, selected && styles.selectedRow].filter(Boolean).join(" ")} key={item.id}>
-                          <td data-primary="true">
-                            <div className={styles.identityCell}>
-                              <label className={styles.rowCheckbox} onClick={(event) => event.stopPropagation()}>
-                                <span className={styles.visuallyHidden}>Select {item.title} for batch actions</span>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => setSelectedIds((current) => {
-                                    const next = new Set(current);
-                                    if (next.has(item.id)) next.delete(item.id);
-                                    else next.add(item.id);
-                                    return next;
-                                  })}
-                                />
-                              </label>
-                              <button type="button" className={styles.rowBody} onClick={() => selectItem(item)} aria-pressed={selected}>
-                                <span className={styles.rowTitle}>{item.title}</span>
-                                {isDecisionView && item.source === "native" && item.objectType === "decision" ? (
-                                  <DecisionPrompts question={item.question} decision={item.finalDecision} compact />
-                                ) : (
-                                  <span className={styles.rowSummary}>{summaryForItem(item)}</span>
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                          {!isDecisionView && <td data-label="Type"><PersonalOpsStatusChip tone={item.source === "legacy-goal" ? "attention" : item.objectType === "follow_up" && item.sourceRefs.some((ref) => ref.module === "people") ? "people" : "neutral"}>{typeLabel(item)}</PersonalOpsStatusChip></td>}
-                          <td data-label={isDecisionView ? "Decision state" : "State"}><PersonalOpsStatusChip tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip></td>
-                          <td data-label="Domain">{item.source === "legacy-goal" ? item.entity : item.domain}</td>
-                          <td data-label="Due" className={styles.mono}>{item.source === "legacy-goal" ? "Not set" : formatDate(item.dueAt)}</td>
-                          <td data-label={isDecisionView ? "Review state" : "Review"}>{item.source === "legacy-goal" ? "Not tracked" : cleanLabel(item.objectType === "decision" ? decisionReviewState(item) : item.review)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <footer className={styles.ledgerFooter}>
-                <span>{selectedIds.size ? `${selectedIds.size} selected` : "Select a record to see its details"}</span>
-                {selectedIds.size > 0 && <button type="button" onClick={() => setSelectedIds(new Set())}>Clear {selectedIds.size} selected</button>}
-              </footer>
-            </div>
+            <section className={styles.personalCards} aria-label="Personal records">{scopedItems.map(item => <article key={item.id} data-selected={item.id === urlState.selected || undefined}><button type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><PersonalOpsIcon name={item.source === "legacy-goal" || item.objectType === "goal" ? "goal" : item.objectType === "decision" ? "decision" : item.objectType === "follow_up" ? "follow-up" : "check"}/><span><strong>{item.title}</strong><small>{item.source === "legacy-goal" ? item.entity : item.domain}</small></span></button><div className={styles.personalCardMeta}><PersonalOpsStatusChip tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip><span>{typeLabel(item)}</span>{item.source === "native" && item.dueAt && <time>{formatDate(item.dueAt)}</time>}</div>{summaryForItem(item) && <p>{summaryForItem(item)}</p>}</article>)}</section>
           )}
         </div>
 
