@@ -12,7 +12,7 @@ import RelatedRecords from "./planning/RelatedRecords";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Children, cloneElement, isValidElement, type ReactNode, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import { mirrorPersonalRecord, removePersonalRecordMirror } from "../lib/local-first/domain-mirror";
 import {
@@ -1536,6 +1536,28 @@ function sortPeople(records: PersonalRecord[], sortMode: PeopleSortMode, interac
     }
     return getLastName(left).localeCompare(getLastName(right));
   });
+}
+
+/** Keep related sections together without tying one column's height to another. */
+function ProfileSectionColumns({ children }: { children: ReactNode }) {
+  const sections: React.ReactElement<{ children?: ReactNode; "data-profile-section"?: string }>[] = [];
+  const collect = (nodes: ReactNode, prefix = "") => Children.forEach(nodes, (node, index) => {
+    if (!isValidElement<{ children?: ReactNode; "data-profile-section"?: string }>(node)) return;
+    const key = `${prefix}${node.key ?? index}`;
+    if (node.type === Fragment) collect(node.props.children, `${key}.`);
+    else sections.push(cloneElement(node, { key }));
+  });
+  collect(children);
+  const columns = ["identity", "contact", "background"].map(key => ({ key, sections: [] as typeof sections }));
+  for (const section of sections) {
+    const name = section.props["data-profile-section"];
+    const column = section.type === OccupationEntriesEditor || section.type === EducationEntriesEditor || section.type === OrganizationObjectsEditor || section.type === QuickObjectsEditor ? 2
+      : section.type === LocationEntriesEditor || name === "communication" || name === "links" ? 1 : 0;
+    columns[column].sections.push(section);
+  }
+  return <div className="people-properties-columns">{columns.filter(column => column.sections.length).map(column =>
+    <div className="people-properties-column" data-profile-column={column.key} key={column.key}>{column.sections}</div>
+  )}</div>;
 }
 
 function BirthdayEditor({ value, onChange, label = "Birthday" }: { value: string; onChange: (value: string) => void; label?: string }) {
@@ -3861,6 +3883,7 @@ export default function PeopleWorkspace({
           <span>{quickPhoto ? "Profile picture ready" : "Add a profile picture"}<small>Saved when you save this profile.</small></span>
         </div>
         <PeopleProfilePhotoDialog open={quickPhotoDialogOpen} personId="" personName={name || "New profile"} hasPhoto={Boolean(quickPhoto)} currentPhotoUrl={quickPhoto} onClose={() => setQuickPhotoDialogOpen(false)} onPrepared={setQuickPhoto} onSaved={async () => true} onRemoved={async () => true} />
+        <ProfileSectionColumns>
         {className === "person" && (
           <>
             <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" data-profile-section="identity" aria-labelledby="people-create-identity-title">
@@ -4048,6 +4071,7 @@ export default function PeopleWorkspace({
           <QuickObjectsEditor targets={quickObjectTargets} selectedIds={quickObjectTargetIds} onChange={setQuickObjectTargetIds} />
           </>
         )}
+        </ProfileSectionColumns>
         <datalist id="people-location-suggestions">
           {locationSuggestions.map((location) => <option value={location} key={location} />)}
         </datalist>
@@ -4498,6 +4522,7 @@ export default function PeopleWorkspace({
             ) : detailMode === "edit" ? (
               <div className="people-edit-layout">
                 <form id="people-profile-properties-form" aria-label={selectedPerson.className === "org" ? "Edit Organization" : "Edit Profile"} className="people-profile-form people-edit-form" onSubmit={saveProfile} onInvalidCapture={(event) => { const field = event.target as HTMLInputElement; setError(`${field.closest("label")?.textContent?.trim() || "A profile field"}: ${field.validationMessage} Your other edits are still here.`); }}>
+                  <ProfileSectionColumns>
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
                     <Fragment key={section.title}>
                     <section className={`people-profile-section people-themed-section module-ref-tone-${section.tone}`} data-profile-section={section.title.toLowerCase().replace(/\s+/g, "-")}>
@@ -4666,6 +4691,7 @@ export default function PeopleWorkspace({
                     )}
                     </Fragment>
                   ))}
+                  </ProfileSectionColumns>
                 </form>
                 <datalist id="people-location-suggestions">
                   {locationSuggestions.map((location) => <option value={location} key={location} />)}
@@ -4945,7 +4971,7 @@ export default function PeopleWorkspace({
                 <article className="people-overview-facts" data-people-overview-card="quick-info">
                   <h3 className="people-visually-hidden">Profile details</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
-                    const facts = overviewFacts.filter((fact) => fact.group === group && Boolean(fact.value));
+                    const facts = overviewFacts.filter((fact) => fact.group === group && Boolean(fact.value) && !["-", "—"].includes(fact.value));
                     if (!facts.length) return null;
                     return <section className={`people-fact-cluster is-${group}`} aria-label={labelize(group)} key={group}>
                       {facts.map(({ label, value, icon }) => {

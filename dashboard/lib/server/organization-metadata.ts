@@ -20,6 +20,29 @@ function attribute(tag: string, name: string) {
 function nameKey(value: unknown) {
   return text(value, 240).toLowerCase().replace(/\b(incorporated|inc|llc|ltd|limited|corporation|corp)\b/g, "").replace(/[^\p{L}\p{N}]/gu, "");
 }
+/** Template social accounts describe the publishing platform, not its customer.
+ * Match complete handles so unrelated names containing e.g. "wix" remain valid.
+ * The provider's own official site may still publish its accounts. */
+const PLATFORM_PROFILES = [
+  { domain: "wix.com", handles: ["wix", "wixcom", "wix-com", "wixstudio", "wixedu"] },
+  { domain: "squarespace.com", handles: ["squarespace", "squarespacehelp"] },
+  { domain: "wordpress.com", handles: ["wordpress", "wordpresscom", "automattic"] },
+  { domain: "webflow.com", handles: ["webflow"] },
+  { domain: "weebly.com", handles: ["weebly"] },
+  { domain: "godaddy.com", handles: ["godaddy", "godaddyhelp"] },
+  { domain: "shopify.com", handles: ["shopify"] },
+  { domain: "duda.co", handles: ["duda", "dudamobile"] },
+];
+function isUnrelatedPlatformProfile(url: string, website: string): boolean {
+  try {
+    const handle = decodeURIComponent(new URL(url).pathname).split("/").filter(Boolean).at(-1)?.replace(/^@/, "").toLowerCase();
+    const provider = PLATFORM_PROFILES.find(item => item.handles.includes(handle || ""));
+    if (!provider) return false;
+    // Tenant subdomains (e.g. a customer's wordpress.com site) are not the provider.
+    return host(website) !== provider.domain;
+  } catch { return true; }
+}
+
 const ORG_TYPES = new Set(["Organization", "Corporation", "LocalBusiness", "NGO", "EducationalOrganization", "School", "CollegeOrUniversity", "GovernmentOrganization", "MedicalOrganization", "SportsOrganization", "ResearchOrganization", "OnlineBusiness", "Store", "Restaurant", "ProfessionalService", "NewsMediaOrganization", "Airline", "Library", "FinancialService", "RealEstateAgent", "TravelAgency"]);
 const TYPE_LABELS: Record<string, string> = { Corporation: "Business", LocalBusiness: "Business", OnlineBusiness: "Business", Store: "Business", Restaurant: "Business", ProfessionalService: "Business", FinancialService: "Business", RealEstateAgent: "Business", TravelAgency: "Agency", Airline: "Business", NGO: "Nonprofit", GovernmentOrganization: "Government", EducationalOrganization: "University / School", School: "University / School", CollegeOrUniversity: "University / School" };
 function organizationType(value: string): string {
@@ -115,6 +138,8 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       if (outbound) resolved = new URL(outbound);
       const link = organizationProfileLink(resolved.toString());
       if (!link) return;
+      const suppliedProfile = social && !identity.website && organizationProfileLink(source)?.url === link.url;
+      if (link.field !== "website" && !suppliedProfile && isUnrelatedPlatformProfile(link.url, identity.website || source)) return;
       if (link.field === "website") {
         if (!social && host(link.url) === host(source)) {
           if (evidence.includes("structured data: website")) add("website", link.url, evidence);
@@ -422,6 +447,8 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     const raw = attribute(match[1], "href");
     if (!raw || /^(?:#|mailto:|tel:|javascript:)/i.test(raw)) continue;
     const label = text(match[2], 160) || text(attribute(match[1], "aria-label"), 160);
+    // A creator/hosting credit is not evidence of an organization social account.
+    if (/\b(?:powered by|(?:website|site) (?:by|built|designed|created)|built (?:with|by)|designed by|template by)\b/i.test(label)) continue;
     if (!social || (socialIdentity && (/\bme\b/.test(attribute(match[1], "rel")) || /website|official|instagram|linkedin|youtube|tiktok|twitter|^x$/i.test(label) || /^https?:\/\/l\.instagram\.com\//i.test(raw) || /^(?:https?:\/\/)?[\w.-]+\.[a-z]{2,}(?:\/|$)/i.test(label)))) {
       addLink(raw, social ? "Public profile: linked website or social profile" : "Organization website: linked social profile", social);
     }

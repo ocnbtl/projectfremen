@@ -1,0 +1,71 @@
+/* Profile pages now own their width; sections stack independently within each column. */
+.workspace-people-pages .people-edit-form { display: block; }
+.people-properties-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 20px; width: 100%; }
+.people-properties-column { display: grid; align-content: start; gap: 18px; min-width: 0; }
+.people-redesign-shell .people-properties-column > :is(.people-profile-section,.people-repeatable-section,.people-themed-section) { min-width: 0; margin: 0; padding: 14px !important; border: 1px solid var(--border-soft,#d8e0e4) !important; border-radius: 14px !important; background: var(--surface-panel,#fff); box-shadow: none; }
+.people-redesign-shell .people-properties-column :is(.people-profile-section-heading,.people-repeatable-heading) { min-height: 34px; margin: 0 0 10px; padding: 0 !important; border: 0 !important; background: transparent !important; }
+.people-redesign-shell .people-properties-column .people-profile-section > :is(.people-profile-field-grid,.people-contact-channel-grid,.people-notes-editor,.people-birthday-field) { margin-inline: 0; }
+.people-redesign-shell .people-properties-column .people-profile-field-grid { grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 10px; }
+.people-redesign-shell .people-properties-column .people-profile-field-fullName { grid-column: 1 / -1; }
+.people-redesign-shell .people-properties-column .people-repeatable-fields-job,
+.people-redesign-shell .people-properties-column .people-repeatable-fields-education { grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 10px; align-items: end; padding: 10px 0 !important; }
+.people-redesign-shell .people-properties-column .people-repeatable-inline-remove { transform: none !important; justify-self: end; grid-column: 2; }
+.people-redesign-shell .people-properties-column .people-contact-channel-grid { grid-template-columns: minmax(0,1fr); }
+.people-redesign-shell .people-properties-column .people-profile-group-picker { padding: 0 !important; }
+.people-redesign-shell .people-properties-column .people-repeatable-empty { margin: 8px 0 0; padding: 0; }
+.people-redesign-shell .people-properties-column [data-profile-section="cadence"] .people-cadence-fields { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+.people-redesign-shell .people-properties-column [data-profile-section="cadence"] .people-profile-field-contactCadence { grid-column: 1 / -1; }
+/* Portalled employer creation cannot inherit the People module's field tokens. */
+.people-inline-org-dialog { --module-focus:#db701f; --module-border:#e8b995; --module-quiet:#fff5ed; --module-icon:#963a08; --people-action:#963a08; --text-strong:#233840; --text-subtle:#586a72; --border-soft:#cbd6dc; --surface-panel:#fff; --surface-panel-soft:#f8fafb; width:min(760px,calc(100vw - 24px)); }
+.people-inline-org-dialog :is(input,textarea,.app-select-trigger) { border:1px solid #b9c8d0; border-radius:9px; background:#fff; color:#233840; }
+.people-inline-org-dialog form > footer { position:sticky; bottom:-20px; z-index:2; padding:12px 0; background:#fff; }
+@layer search-controls {
+ .people-inline-org-dialog :is(input,textarea,.app-select-trigger):focus-visible { outline:2px solid #db701f !important; outline-offset:2px !important; border-radius:9px !important; }
+ .people-redesign-shell :is(.people-properties-column,.people-capture-form,.people-organization-create-fields) :is(input:not([type="checkbox"]):not([type="radio"]),textarea,.app-select-trigger) { border:1px solid var(--border-soft,#cbd6dc) !important; border-radius:9px !important; background:var(--surface-panel,#fff); }
+}
+.workspace-people-pages .people-overview-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); align-items:start; gap:18px; }
+.workspace-people-pages .people-overview-contact-strip { grid-column:1 / -1; }
+.workspace-people-pages .people-overview-about { padding:16px !important; }
+.workspace-people-pages .people-overview-facts { grid-template-columns:repeat(2,minmax(0,1fr)) !important; border-radius:14px; }
+.workspace-people-pages .people-timeline-layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(260px,1fr); align-items:start; gap:20px; }
+.workspace-people-pages .people-links-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr)); align-items:start; gap:16px; }
+.workspace-people-pages .people-links-section { min-width:0; }
+@media(max-width:1150px) {
+ .people-properties-columns { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+ .people-properties-column:last-child:nth-child(3) { grid-column:1 / -1; grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:760px) {
+ .people-properties-columns,.people-properties-column:last-child:nth-child(3) { grid-template-columns:minmax(0,1fr); gap:14px; }
+ .workspace-people-pages .people-overview-grid,.workspace-people-pages .people-timeline-layout { grid-template-columns:minmax(0,1fr); }
+ .workspace-people-pages .people-overview-facts { grid-template-columns:minmax(0,1fr) !important; }
+ .people-redesign-shell .people-properties-column > :is(.people-profile-section,.people-repeatable-section) { padding:12px !important; }
+ .people-inline-org-dialog :is(input,textarea) { font-size:16px; }
+}
+@media(max-width:380px) {
+ .people-inline-org-fields { grid-template-columns:minmax(0,1fr); }
+}
+.people-inline-org-dialog { width:min(940px,calc(100vw - 24px)); }
+.people-inline-org-dialog form > header > div { flex:1; min-width:0; }
+.people-inline-org-dialog form > header > button { flex:0 0 40px; width:40px; height:40px; min-width:40px; padding:0; display:grid; place-items:center; }
+.people-inline-org-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-content:start; min-width:0; }
+.people-inline-org-links-heading .people-autofill { flex:none; }
+.people-inline-org-links-heading button { width:40px; height:40px; min-width:40px; padding:0; }
+.people-inline-org-dialog .people-inline-org-photo { width:fit-content; justify-content:flex-start; }
+.people-inline-org-dialog .people-inline-org-fields { align-items:start; gap:16px 22px; }
+.people-redesign-shell .people-properties-column > :is(.people-profile-section,.people-repeatable-section) { display:grid; align-content:start; gap:10px; }
+.people-redesign-shell .people-properties-column .people-repeatable-entry { margin:0; padding:0; }
+.people-redesign-shell .people-properties-column :is(.people-profile-section-heading,.people-repeatable-heading) { margin-bottom:0; }
+.people-redesign-shell .people-properties-column .people-comes-from-field input { border:0 !important; background:transparent; }
+@media(max-width:760px) {
+ .people-inline-org-dialog .people-inline-org-fields { grid-template-columns:minmax(0,1fr); }
+}
+.workspace-people-pages .people-overview-grid > :is(.people-overview-about,.people-overview-facts) { grid-column:auto !important; min-width:0; }
+.workspace-people-pages .people-overview-contact-strip { border:0; padding-bottom:0; }
+.workspace-people-pages .people-overview-facts .people-inline-object-link { width:fit-content; max-width:100%; }
+@media(max-width:760px) {
+ .workspace-people-pages .people-overview-grid > :is(.people-overview-about,.people-overview-facts) { grid-column:1 / -1 !important; }
+}
+.people-redesign-shell .people-capture-form > .people-properties-columns { grid-column:1 / -1; }
+.people-redesign-shell .people-properties-column .people-create-full-name { grid-column:1 / -1 !important; }
+.people-redesign-shell .people-properties-column .people-create-name-field { grid-row:auto !important; }
+.people-redesign-shell .people-properties-column .people-profile-section > :is(.people-profile-field-grid,.people-contact-channel-grid) { padding:0 !important; }

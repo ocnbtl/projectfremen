@@ -100,7 +100,12 @@ export function organizationProfileLink(raw: string): { field: OrganizationLinkF
   const url = parseOrganizationUrl(raw);
   if (!url.hostname.includes(".")) return null;
   const field = organizationLinkField(url.toString());
-  const path = url.pathname.replace(/\/+$/, "");
+  let path = url.pathname.replace(/\/+$/, "");
+  // Official sites often link to a channel's livestreams/videos tab.
+  if (field === "youtube") {
+    path = path.replace(/^(\/(?:@[\w%.-]+|(?:channel|c|user)\/[\w%.-]+))\/(?:streams|videos|featured|about|shorts|playlists)$/i, "$1");
+    url.pathname = path;
+  }
   if (field === "linkedin" && !/^\/(?:company|school|showcase)\/[\w%.-]+$/i.test(path)) return null;
   if (field === "x" && (!/^\/[\w]{1,30}$/.test(path) || /^\/(?:intent|share|home|search|explore|login|signup|i|settings)$/i.test(path))) return null;
   if (field === "instagram" && (!/^\/[\w.]+$/.test(path) || /^\/(?:p|reel|reels|stories|accounts|explore|direct|about|legal)$/i.test(path))) return null;

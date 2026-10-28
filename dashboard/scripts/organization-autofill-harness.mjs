@@ -91,6 +91,34 @@ try {
   ]) assert.deepEqual(classifyOrganizationServices(description, type), { organizationType: type, industry });
   for (const description of ['We no longer offer boat charters.', 'A guide to private boat charters.', 'Our clients offer yacht charters.', 'Software solutions for boat tours.']) assert.equal(classifyOrganizationServices(description), null);
   const fieldsFor = (html, url='https://barefoot.example', name='Barefoot Antigua') => Object.fromEntries(extractOrganizationMetadata(html, url, name).suggestions.map(item=>[item.field,item.value]));
+
+  // Reproduce the Batavia template: real council streams alongside Wix defaults.
+  const templateHtml = '<title>Village of Batavia</title><a href="https://www.youtube.com/@BataviaOH/streams">Council meetings</a><a href="https://www.linkedin.com/company/wix-com">LinkedIn</a><a href="https://www.twitter.com/WixStudio">X</a><a href="https://www.youtube.com/@WixStudio">YouTube</a>';
+  const templateFields = fieldsFor(templateHtml, 'https://www.bataviaoh.gov', 'Government of Batavia');
+  assert.equal(templateFields.youtube, 'https://www.youtube.com/@BataviaOH');
+  assert.equal(templateFields.linkedin, undefined); assert.equal(templateFields.x, undefined);
+  const { extractOrganizationPage: templatePage } = require(path.join(temporary, 'server/organization-metadata.js'));
+  assert.ok(!templatePage(templateHtml,'https://www.bataviaoh.gov','Government of Batavia').links.some(link => /wix/i.test(link.url)), 'Do not crawl template profiles or import their logos');
+  for (const handle of ['wix','WixStudio','squarespace','wordpress','webflow','weebly','godaddy','shopify','dudamobile']) {
+    assert.equal(fieldsFor('<a href="https://x.com/'+handle+'">Social</a>').x, undefined, handle);
+  }
+  assert.equal(fieldsFor('<a href="https://x.com/WixStudio">Social</a>','https://www.wix.com','Wix').x,'https://x.com/WixStudio');
+  assert.equal(fieldsFor('<a href="https://x.com/webflow">Social</a>','https://webflow.com','Webflow').x,'https://x.com/webflow');
+  assert.equal(fieldsFor('<a href="https://x.com/realStudio">Website designed by realStudio</a>').x,undefined);
+  assert.equal(fieldsFor('<a href="https://x.com/wixford">Social</a>').x,'https://x.com/wixford');
+  assert.equal(fieldsFor('<script type="application/ld+json">'+JSON.stringify({'@type':'Organization',name:'Barefoot Antigua',sameAs:['https://linkedin.com/company/wix-com']})+'</script>').linkedin,undefined);
+  assert.equal(organizationProfileLink('https://youtube.com/@BataviaOH/streams').url,'https://youtube.com/@BataviaOH');
+  assert.equal(organizationProfileLink('https://youtube.com/watch?v=abc'),null);
+  assert.equal(fieldsFor('<title>WixStudio</title>','https://x.com/WixStudio','Wix').x,'https://x.com/WixStudio');
+
+  if (process.env.ORGANIZATION_PAGE_FIXTURE) {
+    const html = await (await import('node:fs/promises')).readFile(process.env.ORGANIZATION_PAGE_FIXTURE,'utf8');
+    const page = templatePage(html,'https://www.bataviaoh.gov','Government of Batavia');
+    assert.ok(!page.links.some(link=>/wix/i.test(link.url)), 'Captured official HTML must not crawl Wix');
+    assert.equal(page.suggestions.find(item=>item.field==='youtube')?.value,'https://www.youtube.com/@BataviaOH');
+    assert.ok(!page.suggestions.some(item=>['linkedin','x'].includes(item.field)), 'Unverified socials stay blank');
+    console.log('Captured Batavia page passed: real council channel retained; Wix accounts excluded.');
+  }
   const barefootHome = '<title>Barefoot Antigua</title><meta property="og:description" content="Charter Options"><h2>Charter Options</h2><h2>Our story</h2><h1>Customized Private Boat Charters</h1><p>Book directly with us.</p><footer>Government sales tax applies. Leave us a review.</footer>';
   for (const route of ['', '/home', '/index.html', '/en', '/en/home', '/en-US/']) {
     const fields = fieldsFor(barefootHome,'https://barefoot.example'+route);
