@@ -1,4 +1,5 @@
 "use client";
+import ViewCycleButton from "../ui/ViewCycleButton";
 import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -20,7 +21,6 @@ const groups = [
   { id: "credit-and-liabilities", label: "Credit & liabilities", detail: "Balances you owe" },
   { id: "investments-and-business", label: "Investments & business", detail: "Investments and business accounts" }
 ];
-const views = [{id:"comfortable",label:"Comfortable",icon:"view-comfortable"},{id:"compact",label:"Compact",icon:"view-compact"},{id:"grid",label:"Grid",icon:"view-grid"}] as const;
 function AccountMenu({ label, icon, value, options, onChange }: {label:string;icon:string;value:string;options:readonly {id:string;label:string;icon?:string}[];onChange:(value:string)=>void}) {
   const [open,setOpen]=useState(false);
   return <Popover.Root open={open} onOpenChange={setOpen}><Popover.Trigger asChild><button className="finance-account-tool" type="button" aria-label={label} title={label} data-icon-button="standard"><UnigentamosIcon role={icon} size={18}/></button></Popover.Trigger><Popover.Portal><Popover.Content className="finance-account-menu" sideOffset={7} align="end" collisionPadding={12} aria-label={label}><strong>{label}</strong><div role="group" aria-label={label}>{options.map(option=><button key={option.id} type="button" aria-pressed={value===option.id} onClick={()=>{onChange(option.id);setOpen(false)}}>{option.icon&&<UnigentamosIcon role={option.icon} size={17}/>}<span>{option.label}</span>{value===option.id&&<Icon name="Check"/>}</button>)}</div></Popover.Content></Popover.Portal></Popover.Root>;
@@ -31,7 +31,7 @@ export default function FinanceAccountsView({ model, state, onAddAccount, onQuer
   function changeView(next:string){if(next!=="comfortable"&&next!=="compact"&&next!=="grid")return;setView(next);try{localStorage.setItem("unigentamos.finance.accounts.view",next)}catch{}}
   return <div className="finance-accounts-directory" data-account-view={view}>
     <div className="finance-summary-grid">{[["Available cash", model.totals.liquid], ["Debt", model.totals.debtOwed], ["Net worth", model.totals.net]].map(([label, value]) => <article key={label}><span>{label}</span><strong>{model.sourceCount ? money(Number(value), { cents: true }) : "—"}</strong><small>{model.query ? "Matching accounts" : "Latest recorded balances"}</small></article>)}</div>
-    <div className="finance-account-toolbar"><AccountMenu label="Sort accounts" icon="sort" value={model.sort} options={[{id:"role",label:"Account type"},{id:"name-asc",label:"Name A–Z"},{id:"balance-desc",label:"Balance high to low"},{id:"balance-asc",label:"Balance low to high"}]} onChange={next=>onSortChange(next==="role"?"default":next as FinanceSort)}/><AccountMenu label="Account view" icon="view-comfortable" value={view} options={views} onChange={changeView}/></div>
+    <div className="finance-account-toolbar"><AccountMenu label="Sort accounts" icon="sort" value={model.sort} options={[{id:"role",label:"Account type"},{id:"name-asc",label:"Name A–Z"},{id:"balance-desc",label:"Balance high to low"},{id:"balance-asc",label:"Balance low to high"}]} onChange={next=>onSortChange(next==="role"?"default":next as FinanceSort)}/><ViewCycleButton label="Account view" value={view} onChange={changeView}/></div>
     {groups.map(group => {
       const rows = model.rows.filter(row => row.group === group.id);
       if (!rows.length) return null;

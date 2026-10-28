@@ -1,4 +1,7 @@
 "use client";
+import ViewCycleButton, { type DirectoryView } from "./ui/ViewCycleButton";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
+import { WorkspaceNavSlot } from "./admin-shell/WorkspaceTopbar";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 
@@ -462,6 +465,8 @@ export default function MediaWorkspace({
         ? initialUrlState.view
         : initialView || initialUrlState.view
   );
+  const [density, setDensity] = useState<DirectoryView>("comfortable");
+  useEffect(() => { try { const value = localStorage.getItem("unigentamos.media.density"); if(value === "comfortable" || value === "compact" || value === "grid") setDensity(value); } catch {} }, []);
   const [sort, setSort] = useState<MediaSort>(initialUrlState.sort);
   const [query, setQuery] = useState(initialUrlState.query);
   const [selectedId, setSelectedId] = useState(
@@ -2189,7 +2194,7 @@ export default function MediaWorkspace({
 
       <DirectoryPane className={styles.directory} ariaLabel="Media asset directory">
         <div className={styles.mainScroll}>
-          <header className={styles.directoryHeader}>
+          <WorkspaceNavSlot kind="actions"><header className={styles.directoryHeader}>
             <div>
               <span className={styles.eyebrow}>Media</span>
               <h1>{VIEW_LABELS[view]}</h1>
@@ -2229,7 +2234,7 @@ export default function MediaWorkspace({
                 </Link>
               </div>
             )}
-          </header>
+          </header></WorkspaceNavSlot>
 
           {isLegacyEvidenceQueue && (
             <div
@@ -2255,22 +2260,7 @@ export default function MediaWorkspace({
             </div>
           )}
 
-          <SearchField ref={searchInputRef} value={query} onChange={(event) => {
-                const next = event.target.value;
-                const partial: Partial<MediaUrlState> = { query: next };
 
-                if (initialMode === "index") {
-                  const nextVisibleAssets = assetsVisibleFor(next, effectiveIssue);
-                  const nextSelectedId = nextVisibleAssets.some((asset) => asset.id === selectedId)
-                    ? selectedId
-                    : nextVisibleAssets[0]?.id || "";
-                  setSelectedId(nextSelectedId);
-                  partial.selected = nextSelectedId;
-                }
-
-                setQuery(next);
-                updateUrl(partial);
-              }} aria-label="Search Media" className={styles.search}><kbd>{isLegacyEvidenceQueue ? "evidence" : "media"}</kbd></SearchField>
 
           {isLegacyEvidenceQueue ? (
             <div
@@ -2331,29 +2321,27 @@ export default function MediaWorkspace({
             </span>
           </details>
 
+          <WorkspaceNavSlot kind="search"><div className="work-toolbar media-directory-toolbar">
+          <SearchField ref={searchInputRef} value={query} onChange={(event) => {
+                const next = event.target.value;
+                const partial: Partial<MediaUrlState> = { query: next };
+
+                if (initialMode === "index") {
+                  const nextVisibleAssets = assetsVisibleFor(next, effectiveIssue);
+                  const nextSelectedId = nextVisibleAssets.some((asset) => asset.id === selectedId)
+                    ? selectedId
+                    : nextVisibleAssets[0]?.id || "";
+                  setSelectedId(nextSelectedId);
+                  partial.selected = nextSelectedId;
+                }
+
+                setQuery(next);
+                updateUrl(partial);
+              }} aria-label="Search Media" className={styles.search}><kbd>{isLegacyEvidenceQueue ? "evidence" : "media"}</kbd></SearchField>
+            <SelectField aria-label="Sort media" className="toolbar-icon-select" triggerContent={<UnigentamosIcon role="sort" size={20}/>} value={sort} onChange={event => {const next = event.target.value as MediaSort; setSort(next); updateUrl({sort:next});}}>{(Object.keys(SORT_LABELS) as MediaSort[]).map(value => <option key={value} value={value} disabled={Boolean(sortUnavailable(value))}>{SORT_LABELS[value]}</option>)}</SelectField>
+            <ViewCycleButton value={density} onChange={next => {setDensity(next);try{localStorage.setItem("unigentamos.media.density",next);}catch{}}}/>
+          </div></WorkspaceNavSlot>
           <div className={styles.sortRow}>
-            <label className={styles.field}>
-              Sort
-              <SelectField
-                value={sort}
-                onChange={(event) => {
-                  const next = event.target.value as MediaSort;
-                  setSort(next);
-                  updateUrl({ sort: next });
-                }}
-              >
-                {(Object.keys(SORT_LABELS) as MediaSort[]).map((sortValue) => (
-                  <option
-                    value={sortValue}
-                    disabled={Boolean(sortUnavailable(sortValue))}
-                    key={sortValue}
-                  >
-                    {SORT_LABELS[sortValue]}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-            <span>View · <strong>Compact rows</strong></span>
             <button
               className={styles.button}
               type="button"
@@ -2455,7 +2443,7 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className="resource-directory is-compact" data-density="compact" role="list">
+                    <div className={`resource-directory is-${density}`} data-density={density} role="list">
                       {group.assets.map((asset) => {
                         const evidence = rightsEvidenceById.get(asset.id) || buildMediaRightsEvidence(asset);
                         return (
@@ -2513,7 +2501,7 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className="resource-directory is-compact" data-density="compact" role="list">
+                    <div className={`resource-directory is-${density}`} data-density={density} role="list">
                       {group.assets.map((asset) => {
                         const checks = legacyReadinessChecks(asset);
                         const supported = checks.filter((check) => check.supported).length;
@@ -2570,7 +2558,7 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className="resource-directory is-compact" data-density="compact" role="list">
+                    <div className={`resource-directory is-${density}`} data-density={density} role="list">
                       {group.assets.map((asset) => {
                         const evidence = metadataEvidenceById.get(asset.id) || buildMediaMetadataEvidence(asset);
                         return (
@@ -2621,7 +2609,7 @@ export default function MediaWorkspace({
               }
             />
           ) : (
-            <div className="resource-directory is-compact" data-density="compact" role="list" aria-label="Media assets">
+            <div className={`resource-directory is-${density}`} data-density={density} role="list" aria-label="Media assets">
               {visibleAssets.map((asset) => (
                 <DirectoryCard icon="module-media" status={displayLabel(asset.lifecycleState)} statusIcon={asset.lifecycleState === "archived" ? "archive" : "information"} tag={displayLabel(asset.type)}
                   id={asset.id}

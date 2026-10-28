@@ -228,3 +228,67 @@ html[data-active-module] :is(.work-search,.people-primary-search,.finance-global
 .workspace-people-pages .people-classification-tags svg { flex:none; width:13px; height:13px; }
 .workspace-people-pages .people-classification-tags em[title="Industry"] { color:var(--text-muted); }
 .workspace-people-pages .people-classification-tags em[title="Industry"]::before { content:"·"; color:var(--module-icon); }
+/* One stable, keyboard-accessible view control across directories. */
+body button.directory-view-cycle,
+body .workspace-topnav button.directory-view-cycle {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:40px !important; min-width:40px !important; max-width:40px; height:40px !important; min-height:40px !important; max-height:40px;
+  flex:0 0 40px; padding:0 !important; margin:0; border:1px solid var(--border-soft,#d6dfe4); border-radius:12px;
+  background:var(--surface-panel,#fff); color:var(--text-strong,#233840);
+  transition:background .18s ease,border-color .18s ease;
+}
+body button.directory-view-cycle:hover { background:var(--module-quiet); border-color:var(--module-border); }
+body button.directory-view-cycle:focus-visible { outline:2px solid var(--module-focus); outline-offset:2px; }
+body button.directory-view-cycle > svg { display:block; width:20px; height:20px; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+/* Creation actions inherit the active module palette, including portaled mobile menus. */
+html[data-active-module] :is(.workspace-topnav,.workspace-actions-menu) :is(.work-button--primary,[data-primary="true"],.quick-action-bar__action.is-primary,.finance-action.is-primary),
+html[data-active-module="people"] :is(.workspace-topnav,.workspace-actions-menu) .people-header-actions > button {
+  background:var(--module-action) !important; border-color:var(--module-action) !important; color:var(--module-action-contrast) !important;
+  transition:background .18s ease,border-color .18s ease;
+}
+html[data-active-module] :is(.workspace-topnav,.workspace-actions-menu) :is(.work-button--primary,[data-primary="true"],.quick-action-bar__action.is-primary,.finance-action.is-primary):hover,
+html[data-active-module="people"] :is(.workspace-topnav,.workspace-actions-menu) .people-header-actions > button:hover { background:var(--module-action-hover) !important; border-color:var(--module-action-hover) !important; }
+/* Identity always begins at the same baseline; missing occupations don't center names. */
+.workspace-people-pages .people-row-name,
+.workspace-people-pages .people-directory-list.is-grid .people-row-name { align-self:start; justify-content:flex-start; }
+.workspace-people-pages .people-row-occupation,
+.workspace-people-pages .people-directory-list.is-grid .people-row-occupation { display:flex; align-items:center; min-width:0; gap:5px; overflow:visible; }
+.people-occupation-label { min-width:0; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.people-employer-picture { display:inline-flex; flex:none; align-items:center; }
+.workspace-people-pages .people-employer-picture .people-profile-photo { width:22px !important; height:22px !important; min-width:22px !important; flex:0 0 22px !important; margin:0; }
+.workspace-topnav .media-directory-toolbar kbd { display:none; }
+.workspace-topnav [class*="directoryHeader"] { padding:0; margin:0; border:0; }
+.workspace-topnav [class*="directoryHeader"] > div:first-child { display:none; }
+@media(min-width:1800px) { .resource-directory.is-compact { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:700px) {
+  body .workspace-topnav .directory-view-cycle { order:2; }
+  .workspace-people-pages .people-directory-list.is-grid,.resource-directory.is-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .workspace-people-pages .people-directory-list.is-grid .people-directory-row-body { grid-template-columns:minmax(0,1fr); grid-template-rows:44px minmax(62px,auto) auto auto; padding:10px !important; gap:8px; }
+  .workspace-people-pages .people-directory-list.is-grid .people-directory-row-body > .people-row-avatar { grid-column:1; grid-row:1; width:44px !important; height:44px !important; min-width:44px !important; }
+  .workspace-people-pages .people-directory-list.is-grid .people-row-name { grid-column:1; grid-row:2; }
+  .workspace-people-pages .people-directory-list.is-grid .people-row-name strong { font-size:13px; }
+  .workspace-people-pages .people-directory-list.is-grid .people-row-contact { grid-column:1; grid-row:3; padding:6px; }
+  .workspace-people-pages .people-directory-list.is-grid .people-row-tags { grid-template-columns:18px minmax(0,1fr) 16px; gap:3px; }
+  .workspace-people-pages .people-directory-list.is-grid .people-row-description { grid-column:1; font-size:11px; }
+  .workspace-people-pages .people-directory-list.is-grid .people-row-occupation { font-size:11px; }
+  .resource-directory.is-grid .resource-directory-card { grid-template-columns:minmax(0,1fr); grid-template-rows:44px minmax(38px,auto) auto auto; padding:10px; gap:8px; }
+  .resource-directory.is-grid .resource-card-picture { grid-column:1; grid-row:1; width:44px; height:44px; }
+  .resource-directory.is-grid .resource-card-title { grid-column:1; grid-row:2; font-size:13px; }
+  .resource-directory.is-grid .resource-card-tags { grid-column:1; grid-row:3; grid-template-columns:18px minmax(0,1fr) 16px; gap:3px; }
+  .resource-directory.is-grid .resource-card-tag { max-width:100%; font-size:10px; padding:3px; }
+  .resource-directory.is-grid [data-gallery] .resource-card-picture { width:100%; height:auto; }
+  .workspace-people-pages .people-directory-list.is-compact .people-directory-row-body { min-height:78px !important; gap:9px; padding:10px !important; }
+  .workspace-people-pages .is-compact .people-directory-row-body > .people-row-avatar { width:40px !important; height:40px !important; min-width:40px !important; }
+  .workspace-people-pages .is-compact .people-row-content { gap:5px; }
+}
+@media(max-width:700px) {
+  .workspace-people-pages .people-directory-list.is-grid [data-record-kind="org"] .people-directory-row-body { grid-template-rows:44px minmax(62px,auto) auto auto; }
+}
+/* Employer thumbnails stay small even when the parent card switches density. */
+.workspace-people-pages .people-directory-list .people-employer-picture .people-profile-photo { width:22px !important; height:22px !important; min-width:22px !important; flex:0 0 22px !important; }
+html[data-active-module] button.workspace-actions-trigger { background:var(--module-action); color:var(--module-action-contrast); border-color:var(--module-action); }
+html[data-active-module] button.workspace-actions-trigger:is(:hover,[data-state="open"]) { background:var(--module-action-hover); }
+.workspace-actions-menu [class*="directoryHeader"] > div:first-child { display:none; }
+@media(max-width:700px) {
+  .resource-directory.is-grid .resource-card-title { -webkit-line-clamp:2; }
+}

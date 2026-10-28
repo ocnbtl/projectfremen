@@ -1,4 +1,5 @@
 "use client";
+import ViewCycleButton from "./ui/ViewCycleButton";
 import SearchField from "./ui/SearchField";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
 
@@ -1180,7 +1181,7 @@ export default function ResourcesWorkspace({
                   ))}
                 </div>
               </details>
-            <button type="button" className="work-button directory-view-button" aria-label={`View: ${density}`} onClick={() => { const next = density === "comfortable" ? "compact" : density === "compact" ? "grid" : "comfortable"; setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }}><UnigentamosIcon role={density === "grid" ? "view-grid" : density === "compact" ? "view-compact" : "view-comfortable"} size={18}/><span>{density[0].toUpperCase()+density.slice(1)}</span></button>
+            <ViewCycleButton value={density} onChange={next => { setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }} />
           </div></WorkspaceNavSlot>
 
           {initialLoadError ? (

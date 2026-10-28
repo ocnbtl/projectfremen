@@ -37,7 +37,7 @@ let browser;const expectedTimes=new Map();
    await page.goto(base+'/admin/people?sidebar='+kind+(kind==='organizations'?'&query=Example&filter=active':''),{waitUntil:'domcontentloaded'});
    const rows=page.locator(kind==='interactions'?'.people-interaction-row':'.people-directory-row');await rows.first().waitFor();
    for(const mode of ['comfortable','compact','grid']) {
-    const cycle=page.locator('.people-view-cycle');for(let i=0;i<3&&!(await cycle.innerText()).toLowerCase().includes(mode);i++)await cycle.click();await page.waitForTimeout(350);
+    const cycle=page.locator('.directory-view-cycle');for(let i=0;i<3&&!(await cycle.getAttribute('aria-label')).toLowerCase().includes(': '+mode+'.');i++)await cycle.click();await page.waitForTimeout(350);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,kind+' page overflow');
     assert(await rows.evaluateAll(rows=>rows.every(row=>row.scrollWidth<=row.clientWidth)),kind+' card overflow');
     if(kind==='interactions') {

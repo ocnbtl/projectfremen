@@ -1,5 +1,6 @@
 "use client";
 import SearchField from "./ui/SearchField";
+import ViewCycleButton from "./ui/ViewCycleButton";
 import PlaceSync from "./planning/PlaceSync";
 import ProfilePlaceField from "./planning/ProfilePlaceField";
 import { planningRequest, type PlanningSnapshot } from "../lib/modules/planning/repository";
@@ -10,7 +11,7 @@ import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/pe
 import RelatedRecords from "./planning/RelatedRecords";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import { mirrorPersonalRecord, removePersonalRecordMirror } from "../lib/local-first/domain-mirror";
@@ -67,7 +68,7 @@ import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import PeopleInteractions from "./people/PeopleInteractions";
 import { organizationLabels } from "../lib/modules/people/organization-labels";
-import { organizationCategory, occupationLabel, organizationLocationLabel } from "../lib/modules/people/directory-presentation";
+import { organizationCategory, occupationLabel, organizationLocationLabel, currentEmployerPictures } from "../lib/modules/people/directory-presentation";
 import OrganizationAutofill from "./people/OrganizationAutofill";
 import PersonAutofill from "./people/PersonAutofill";
 import { applyPersonAutofill, type PersonAutofillPending, type PersonAutofillResult } from "../lib/modules/people/person-autofill";
@@ -244,48 +245,6 @@ function PeopleIcon({ name }: { name: PeopleIconName }) {
     "view-compact": "view-compact", "view-grid": "view-grid"
   };
   return <UnigentamosIcon role={roles[name]} />;
-}
-
-const VIEW_ORDER: PeopleListMode[] = ["list", "compact", "grid"];
-const VIEW_LABELS: Record<PeopleListMode, string> = {
-  list: "Comfortable",
-  compact: "Compact",
-  grid: "Grid"
-};
-const VIEW_MORPH_PATHS: Record<PeopleListMode, string[]> = {
-  list: [
-    "M3 5 L7 5 L7 5 L7 5", "M9 5 L21 5 L21 5 L21 5",
-    "M3 12 L7 12 L7 12 L7 12", "M9 12 L21 12 L21 12 L21 12",
-    "M3 19 L7 19 L7 19 L7 19", "M9 19 L21 19 L21 19 L21 19"
-  ],
-  compact: [
-    "M4 4 L20 4 L20 4 L20 4", "M4 7.2 L20 7.2 L20 7.2 L20 7.2",
-    "M4 10.4 L20 10.4 L20 10.4 L20 10.4", "M4 13.6 L20 13.6 L20 13.6 L20 13.6",
-    "M4 16.8 L20 16.8 L20 16.8 L20 16.8", "M4 20 L20 20 L20 20 L20 20"
-  ],
-  grid: [
-    "M3 3 L9 3 L9 8 L3 8", "M15 3 L21 3 L21 8 L15 8",
-    "M3 9.5 L9 9.5 L9 14.5 L3 14.5", "M15 9.5 L21 9.5 L21 14.5 L15 14.5",
-    "M3 16 L9 16 L9 21 L3 21", "M15 16 L21 16 L21 21 L15 21"
-  ]
-};
-
-function MorphingViewIcon({ mode }: { mode: PeopleListMode }) {
-  const reduceMotion = useReducedMotion();
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" data-view-morph={mode}>
-      {VIEW_MORPH_PATHS[mode].map((path, index) => (
-        <motion.path
-          initial={{ d: reduceMotion ? path : VIEW_MORPH_PATHS.list[index] }}
-          animate={{ d: path }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-          fill="none"
-          vectorEffect="non-scaling-stroke"
-          key={index}
-        />
-      ))}
-    </svg>
-  );
 }
 
 const RELATIONSHIP_STATUS_OPTIONS: ReadonlyArray<{ status: RelationshipStatus; label: string; icon: PeopleIconName }> = [
@@ -4142,7 +4101,7 @@ export default function PeopleWorkspace({
           people={people}
           query={query}
           density={listMode}
-          viewControl={<button type="button" className="people-view-cycle" aria-label={`View: ${VIEW_LABELS[listMode]}. Switch to ${VIEW_LABELS[VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]]}`} onClick={() => { const next = VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]; setListMode(next); updatePeopleUrl({ view: next }, { native: true }); }}><MorphingViewIcon mode={listMode} /><span>{VIEW_LABELS[listMode]}</span></button>}
+          viewControl={<ViewCycleButton value={listMode === "list" ? "comfortable" : listMode} onChange={value => { const next = value === "comfortable" ? "list" : value; setListMode(next); updatePeopleUrl({ view: next }, { native: true }); }} />}
           onQueryChange={value => { setQuery(value); updatePeopleUrl({ query: value }, { native: true }); }}
           onOpenPerson={selectPerson}
           error={initialLoadError}
@@ -4237,20 +4196,7 @@ export default function PeopleWorkspace({
                 </div>
               )}
             </div>
-          <button
-            type="button"
-            className="people-view-cycle"
-            aria-label={`View: ${VIEW_LABELS[listMode]}. Switch to ${VIEW_LABELS[VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]]}`}
-            title={`${VIEW_LABELS[listMode]} view`}
-            onClick={() => {
-              const next = VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length];
-              setListMode(next);
-              updatePeopleUrl({ view: next });
-            }}
-          >
-            <MorphingViewIcon mode={listMode} />
-            <span>{VIEW_LABELS[listMode]}</span>
-          </button>
+          <ViewCycleButton value={listMode === "list" ? "comfortable" : listMode} onChange={value => { const next = value === "comfortable" ? "list" : value; setListMode(next); updatePeopleUrl({ view: next }); }} />
         </div></WorkspaceNavSlot>
 
         {initialLoadError ? (
@@ -4338,6 +4284,7 @@ export default function PeopleWorkspace({
             {visiblePeople.map((record) => {
               const profile = getProfile(record);
               const category = record.className === "person" ? getPrimaryGroup(record) : "";
+              const employers = currentEmployerPictures(record, people);
               const occupation = record.className === "person" ? occupationLabel(record) : "";
               const linkedPeople = directoryOrganizationPeople.get(record.id) || [];
               const location = record.className === "org" ? organizationLocationLabel(record, initialPlaces) : "";
@@ -4360,7 +4307,7 @@ export default function PeopleWorkspace({
                     />
                     <span className="people-row-content">
                       <span className="people-row-heading">
-                      <span className="people-row-name"><span className="people-row-title"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>, aka {profile.nickname}</em>}</span>{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" />{occupation}</span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
+                      <span className="people-row-name"><span className="people-row-title"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>, aka {profile.nickname}</em>}</span>{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" /><span className="people-occupation-label">{occupation}</span>{employers.map(org => <span className="people-employer-picture" key={org.id} title={org.title}><PeopleProfileAvatar organization label={org.title} initials={getInitials(org)} photoUrl={org.profile?.photoUrl} photoUpdatedAt={org.profile?.photoUpdatedAt} compact /></span>)}</span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
                       <span className="people-row-contact"><span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><span className="people-classification-tags">{record.className === "org" ? <>{classification.type && <em title="Organization type"><PeopleIcon name="organization" />{classification.type}</em>}{classification.industry && <em title="Industry">{classification.industry}</em>}{!classification.type && <em>Not classified</em>}</> : <em title={category}>{category}</em>}</span><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
                       {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
                         {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, latestInteractionDateByParticipant.get(record.id))}</span>}

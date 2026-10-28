@@ -41,3 +41,19 @@ export function interactionTimeLabel(start?: string, end?: string): string {
   const from = format(start), to = format(end);
   return from && to ? `${from} – ${to}${end! < start! ? " (+1 day)" : ""}` : from ? `From ${from}` : to ? `Until ${to}` : "";
 }
+
+/** Use explicit employment links, with an unambiguous saved-name fallback for older profiles. */
+export function currentEmployerPictures(record: PersonalRecord, organizations: readonly PersonalRecord[]): PersonalRecord[] {
+  if (record.className !== "person") return [];
+  const available = organizations.filter(org => org.className === "org" && !org.archivedAt);
+  const jobs = record.profile?.occupations?.length ? record.profile.occupations.filter(job => job.status === "current" && job.title.trim()) : [
+    { organizationId: undefined, employer: record.profile?.primaryOccupation ? record.profile.primaryEmployer : undefined },
+    { organizationId: undefined, employer: record.profile?.secondaryOccupation ? record.profile.secondaryEmployer : undefined }
+  ];
+  const result: PersonalRecord[] = [];
+  for (const job of jobs) {
+    const matches = job.organizationId ? available.filter(org => org.id === job.organizationId) : job.employer?.trim() ? available.filter(org => org.title.trim().toLocaleLowerCase() === job.employer!.trim().toLocaleLowerCase()) : [];
+    if (matches.length === 1 && matches[0].profile?.photoUrl && !result.some(org => org.id === matches[0].id)) result.push(matches[0]);
+  }
+  return result;
+}

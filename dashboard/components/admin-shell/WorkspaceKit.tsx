@@ -1,5 +1,6 @@
 "use client";
 
+import ViewCycleButton, { type DirectoryViewMode } from "../ui/ViewCycleButton";
 import SearchField from "../ui/SearchField";
 import {
   Children,
@@ -110,7 +111,7 @@ export function WorkspaceToolbar({
           /></Popover.Trigger><Popover.Portal><Popover.Content className="app-select-menu workspace-filter-menu" sideOffset={8} collisionPadding={12} aria-label="Filters">{filters}</Popover.Content></Popover.Portal></Popover.Root>
         )}
         {sortChoices.map((child, index) => isValidElement<React.ComponentProps<typeof SelectField>>(child) ? cloneElement(child, { key: index, className: "toolbar-icon-select", title: "Sort", triggerContent: <UnigentamosIcon role="sort" size={20}/> }) : child)}
-        {viewChoices}
+        {viewChoices.map((child, index) => isValidElement<React.ComponentProps<typeof SelectField>>(child) && child.type === SelectField ? <ViewCycleButton key={index} options={Children.toArray(child.props.children).filter(isValidElement).map(option => (option as React.ReactElement<{value: DirectoryViewMode}>).props.value)} value={child.props.value as DirectoryViewMode} onChange={value => child.props.onChange?.({target:{value},currentTarget:{value}} as React.ChangeEvent<HTMLSelectElement>)} /> : child)}
         {bar && otherChoices.length ? <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label="View options"><UnigentamosIcon role="sliders" size={18} /></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu workspace-view-options" align="end" sideOffset={8} collisionPadding={12}>{otherChoices}</Popover.Content></Popover.Portal></Popover.Root> : otherChoices}
       </div></WorkspaceNavSlot>
     </>

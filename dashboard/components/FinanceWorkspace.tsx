@@ -242,11 +242,11 @@ function NativeActionBar({
 }) {
   const actions: React.ReactNode[] = [];
   if (view === "overview") actions.push(
-    <HeaderAction key="account" icon="Plus" onClick={() => onOperation("account")}>Add account</HeaderAction>,
+    <HeaderAction key="account" icon="Plus" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
     <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} title={!hasAccounts ? "Add an account first" : undefined} onClick={() => onOperation("transaction")}>Record transaction</HeaderAction>
   );
   if (view === "accounts") actions.push(
-    <HeaderAction key="account" icon="Plus" onClick={() => onOperation("account")}>Add account</HeaderAction>,
+    <HeaderAction key="account" icon="Plus" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
     <HeaderAction key="import" icon="Link" primary disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
   );
   if (view === "transactions") actions.push(

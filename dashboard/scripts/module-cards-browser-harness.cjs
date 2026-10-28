@@ -25,12 +25,12 @@ let browser;
    await page.goto(base+'/admin/'+kind,{waitUntil:'domcontentloaded'});
    const list=page.locator('.resource-directory').first(),rows=list.locator('.resource-directory-card');await rows.first().waitFor();assert((await rows.count())>=6);
    for(const mode of ['comfortable','compact','grid',...(kind==='media'?['gallery']:[])]) {
-    await page.getByRole('combobox',{name:kind==='projects'?'Project layout':kind==='notes'?'Notes layout':'Media view',exact:true}).click();
-    await page.getByRole('option',{name:mode[0].toUpperCase()+mode.slice(1),exact:true}).click();await page.waitForTimeout(350);
+    const cycle=page.locator('.directory-view-cycle');
+    for(let i=0;i<4&&!(await cycle.getAttribute('aria-label')).toLowerCase().includes(': '+mode+'.');i++)await cycle.click();await page.waitForTimeout(350);
     const columns=await list.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
-    assert.equal(columns,view==='desktop'?(['grid','gallery'].includes(mode)?3:2):view==='tablet'&&['grid','gallery'].includes(mode)?2:1);
+    assert.equal(columns,view==='desktop'?(['grid','gallery'].includes(mode)?3:2):['grid','gallery'].includes(mode)?2:1);
     const metrics=await rows.evaluateAll(rows=>rows.map(row=>{const r=row.getBoundingClientRect(),p=row.querySelector('.resource-card-picture').getBoundingClientRect(),t=row.querySelector('.resource-card-tags').getBoundingClientRect();return {picture:[p.width,p.height],tagX:t.x-r.x,tagY:t.y-r.y,overflow:row.scrollWidth>row.clientWidth};}));
-    if(mode!=='gallery')assert(metrics.every(m=>m.picture[0]===(mode==='compact'?56:68)&&m.picture[1]===m.picture[0]),kind+' pictures');
+    if(mode!=='gallery')assert(metrics.every(m=>m.picture[0]===(view==='mobile'&&mode==='grid'?44:mode==='compact'?56:68)&&m.picture[1]===m.picture[0]),kind+' pictures');
     assert(metrics.every(m=>!m.overflow),kind+' card overflow');
     if(view==='desktop'||['grid','gallery'].includes(mode))assert(metrics.every(m=>Math.abs(m.tagX-metrics[0].tagX)<1&&Math.abs(m.tagY-metrics[0].tagY)<1),kind+' fixed slots '+JSON.stringify(metrics));
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,kind+' page overflow');

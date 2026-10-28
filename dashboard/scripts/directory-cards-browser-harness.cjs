@@ -23,14 +23,14 @@ let browser;
    const list=page.locator(kind==='organizations'?'.people-directory-list':'.resource-directory');await list.waitFor();
    const rows=list.locator(kind==='organizations'?'.people-directory-row':'.resource-directory-card');assert.equal(await rows.count(),7);
    for(const mode of ['comfortable','compact','grid']) {
-    const cycle=page.locator(kind==='organizations'?'.people-view-cycle':'.directory-view-button');
-    for(let i=0;i<3&&!(await cycle.innerText()).toLowerCase().includes(mode);i++)await cycle.click();
+    const cycle=page.locator('.directory-view-cycle');
+    for(let i=0;i<3&&!(await cycle.getAttribute('aria-label')).toLowerCase().includes(': '+mode+'.');i++)await cycle.click();
     await page.waitForTimeout(300);
     const columns=await list.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
-    assert.equal(columns,view==='desktop'?(mode==='grid'?3:2):view==='tablet'&&mode==='grid'?2:1);
+    assert.equal(columns,view==='desktop'?(mode==='grid'?3:2):mode==='grid'?2:1);
     const picture=kind==='organizations'?'.people-row-avatar':'.resource-card-picture',tags=kind==='organizations'?'.people-row-tags':'.resource-card-tags';
     const measurements=await rows.evaluateAll((rows,{picture,tags})=>rows.map(row=>{const r=row.getBoundingClientRect(),p=row.querySelector(picture).getBoundingClientRect(),t=row.querySelector(tags).getBoundingClientRect();return {picture:[p.width,p.height],tagX:t.x-r.x,tagY:t.y-r.y,overflow:row.scrollWidth>row.clientWidth};}),{picture,tags});
-    assert(measurements.every(m=>m.picture[0]===(mode==='compact'?56:68)&&m.picture[1]===m.picture[0]),kind+' picture sizes');
+    assert(measurements.every(m=>m.picture[0]===(view==='mobile'&&mode==='grid'?44:view==='mobile'&&kind==='organizations'&&mode==='compact'?40:mode==='compact'?56:68)&&m.picture[1]===m.picture[0]),kind+' picture sizes');
     assert(measurements.every(m=>!m.overflow),kind+' card overflow');
     if(view==='desktop'||mode==='grid')assert(measurements.every(m=>Math.abs(m.tagX-measurements[0].tagX)<1&&Math.abs(m.tagY-measurements[0].tagY)<1),kind+' metadata slots');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
