@@ -1985,3 +1985,66 @@
 }
 
 @media(max-width:760px){.shell[data-mode="directory"] .mainScroll {padding-top:0;}}
+/* Full-page project workspace: a readable canvas, with local context beside the work. */
+.projectHero, .projectBody { width: 100%; max-width: 1320px; margin-inline: auto; }
+.projectHero { padding: 22px 0 18px; border: 0; align-items: center; }
+.projectIdentity { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.projectIdentity :global(.people-profile-photo-trigger), .projectIdentity :global(.people-profile-photo) { width: 76px; height: 76px; min-width: 76px; flex: 0 0 76px; }
+.projectHeading { display: grid; gap: 10px; min-width: 0; }
+.projectHeaderMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--text-muted); font-size: 12px; }
+.projectHeaderMeta > span { display: inline-flex; align-items: center; gap: 5px; }
+.projectHeroActions .button, .panelHeader .button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: auto; white-space: nowrap; }
+.projectBody .tabs { width: fit-content; max-width: 100%; margin-bottom: 14px; }
+.projectBody .overviewGrid { grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr); gap: 22px; padding-top: 16px; align-items: start; }
+.overviewPrimary, .overviewAside { display: grid; gap: 20px; min-width: 0; }
+.overviewPrimary > .panel, .overviewAside > .panel { border: 1px solid var(--border); border-radius: 16px; padding: 20px; background: var(--panel-bg); }
+.overviewAside > .panel { background: var(--panel-bg-subtle); }
+.projectBody .panelHeader { align-items: center; flex-wrap: wrap; gap: 10px; }
+.projectBody .panel h2 { margin: 0; font-size: 16px; }
+.projectBody .panel p { font-size: 14px; overflow-wrap: anywhere; }
+.objectivesPanel .objectiveList { gap: 10px; }
+.objectivesPanel .objectiveList li { border: 1px solid var(--border); border-radius: 10px; padding: 8px; gap: 6px; background: var(--panel-bg); }
+.objectivesPanel .objectiveList input { min-height: 38px; font-weight: 450; }
+.objectivesPanel .addRowButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: fit-content; min-height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg-subtle); transition: background 180ms ease; }
+.objectivesPanel .addRowButton:hover { background: color-mix(in srgb, var(--action-primary) 14%, white); }
+.projectSummaryList { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.projectSummaryList button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 8px; background: transparent; border: 0; border-radius: 8px; color: var(--text); text-align: left; cursor: pointer; }
+.projectSummaryList button:hover { background: var(--panel-bg); }
+.projectSummaryList strong { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.projectSummaryList span { flex-shrink: 0; font-size: 12px; color: var(--text-muted); }
+.projectBody :global(.detail-tab-panel) { animation: projectSectionEnter 200ms ease both; }
+@keyframes projectSectionEnter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media(max-width: 1000px) { .projectBody .overviewGrid { grid-template-columns: minmax(0, 1fr); } .overviewAside { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media(max-width: 600px) {
+  .projectHero { gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+  .projectIdentity { gap: 12px; flex: 1 1 240px; }
+  .projectIdentity :global(.people-profile-photo-trigger), .projectIdentity :global(.people-profile-photo) { width: 60px; height: 60px; min-width: 60px; flex-basis: 60px; }
+  .projectHero h1, .projectHero h2 { font-size: 20px; }
+  .projectHeroActions { margin-left: auto; }
+  .overviewAside { grid-template-columns: minmax(0, 1fr); }
+  .overviewPrimary > .panel, .overviewAside > .panel { padding: 14px; }
+  .projectBody .overviewGrid { gap: 16px; }
+  .objectivesPanel .objectiveList li { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .objectivesPanel .objectiveDate { grid-column: 2; width: 150px; }
+  .objectivesPanel .removeObjectiveButton { grid-column: 3; grid-row: 1 / span 2; }
+  .projectBody .tabs { width: 100%; }
+}
+@media(prefers-reduced-motion: reduce) { .projectBody :global(.detail-tab-panel) { animation: none; } }
+.detailShell .mainScroll { padding-top: 0; }
+.detailShell .mainScroll .mobileToolbar { max-width: 1320px; margin-inline: auto; padding: 12px 0 0; }
+.projectBody :global(.quick-action-bar__actions) { display: flex; flex-wrap: wrap; flex: 0 1 auto; gap: 8px; }
+.projectBody :global(.quick-action-bar__action), .projectBody :global(.quick-action-bar__actions > .work-button) { width: auto; flex: 0 0 auto; padding-inline: 12px; gap: 6px; }
+.projectBody :global(.quick-action-bar) { margin: 0; padding: 0; }
+.projectBody .activityFilters { border: 0; }
+.projectBody .activityFilters button { width: auto; flex: 0 0 auto; min-height: 34px; }
+.projectBody .timelineLayout { gap: 22px; }
+.projectBody .timelineLayout .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--panel-bg); }
+@media(max-width:600px) { .projectBody :global(.quick-action-bar__actions) { width: 100%; } }
+.projectLinks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; padding-top: 12px; }
+.projectLinks > .overviewGrid { display: contents; }
+.projectBody .projectLinks .panel { grid-column: auto; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-bg); }
+.projectLinks > :last-child { grid-column: 1 / -1; }
+.projectLinks :global(.system-state) { padding: 14px; border: 0; background: var(--panel-bg-subtle); border-radius: 9px; }
+.projectLinks :global(.system-state__title) { font-size: 14px; }
+.projectLinks :global(.system-state__description) { font-size: 13px; }
+@media(max-width:760px) { .projectLinks { grid-template-columns: minmax(0, 1fr); gap: 14px; } .projectBody .projectLinks .panel { padding: 14px; } }

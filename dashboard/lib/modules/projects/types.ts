@@ -73,6 +73,7 @@ export type ProjectObjectiveInput = {
 };
 
 export type Project = {
+  photoUpdatedAt?: string;
   id: string;
   uuid?: string;
   objectType: "project";
@@ -372,6 +373,7 @@ export type ProjectUpdateInput = Partial<
   Pick<
     Project,
     | "name"
+    | "photoUpdatedAt"
     | "slug"
     | "description"
     | "objective"

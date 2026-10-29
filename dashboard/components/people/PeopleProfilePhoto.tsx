@@ -154,7 +154,9 @@ export default function PeopleProfilePhotoDialog({
   onClose,
   onSaved,
   onRemoved,
-  onPrepared
+  onPrepared,
+  photoEndpoint,
+  cropDescription = "Drag to reposition and adjust the zoom. Your saved crop is used across People, Calendar, and Map."
 }: {
   open: boolean;
   personId: string;
@@ -165,7 +167,10 @@ export default function PeopleProfilePhotoDialog({
   onSaved: (photo: PhotoMetadata) => Promise<boolean>;
   onRemoved: () => Promise<boolean>;
   onPrepared?: (dataUrl: string) => void;
+  photoEndpoint?: string;
+  cropDescription?: string;
 }) {
+  const endpoint = photoEndpoint || `/api/people/photos/${encodeURIComponent(personId)}`;
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -265,7 +270,7 @@ export default function PeopleProfilePhotoDialog({
         const blob = await response.blob();
         if (version === loadVersionRef.current) await beginEditing(blob);
       } else {
-        const response = await fetch(`/api/people/photos/${encodeURIComponent(personId)}?edit=1`, { cache: "no-store" });
+        const response = await fetch(`${endpoint}?edit=1`, { cache: "no-store" });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "The current picture could not be loaded.");
         const blob = await (await fetch(payload.source)).blob();
@@ -299,7 +304,7 @@ export default function PeopleProfilePhotoDialog({
         formData.append("source", await preparePhotoSource(photoDraft.source), "profile-source.webp");
         formData.append("crop", JSON.stringify(crop));
       }
-      const response = await fetch(`/api/people/photos/${encodeURIComponent(personId)}`, {
+      const response = await fetch(endpoint, {
         method: photoDraft.savedVersion ? "PATCH" : "POST",
         headers: photoDraft.savedVersion ? buildJsonHeadersWithCsrf() : csrfHeadersWithoutJson(),
         body: photoDraft.savedVersion ? JSON.stringify({ crop, expectedUpdatedAt: photoDraft.savedVersion }) : formData
@@ -339,7 +344,7 @@ export default function PeopleProfilePhotoDialog({
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/people/photos/${encodeURIComponent(personId)}`, {
+      const response = await fetch(endpoint, {
         method: "DELETE",
         headers: buildJsonHeadersWithCsrf()
       });
@@ -401,7 +406,7 @@ export default function PeopleProfilePhotoDialog({
           </div>
           <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving} data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button>
         </header>
-        <p>{photoDraft ? "Drag to reposition and adjust the zoom. Your saved crop is used across People, Calendar, and Map." : "Adjust your current picture or choose a new one."}</p>
+        <p>{photoDraft ? cropDescription : "Adjust your current picture or choose a new one."}</p>
         {!photoDraft && hasPhoto && <button type="button" className="people-photo-adjust" onClick={() => void editCurrentPhoto()} disabled={saving || loading}>
           <UnigentamosIcon role="edit" size={20} /><span><strong>{loading ? "Opening picture…" : "Adjust crop"}</strong><small>Zoom and reposition the current picture</small></span>
         </button>}

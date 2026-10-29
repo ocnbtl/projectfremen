@@ -1283,6 +1283,7 @@ function applyProjectPatch(
   if (hasOwn(patch, "name")) next.name = requiredText(patch.name, "name", 240);
   if (hasOwn(patch, "slug")) next.slug = normalizeSlug(patch.slug, next.name);
   if (hasOwn(patch, "description")) next.description = optionalText(patch.description, "description") || "";
+  if (hasOwn(patch, "photoUpdatedAt")) next.photoUpdatedAt = optionalDate(patch.photoUpdatedAt, "photoUpdatedAt");
   if (hasOwn(patch, "objectives")) {
     next.objectives = normalizeObjectives(patch.objectives, "objectives", now, current.objectives);
     next.objective = objectiveSummary(next.objectives);

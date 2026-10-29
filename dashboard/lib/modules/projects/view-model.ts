@@ -35,6 +35,7 @@ export type ProjectsSourceAvailability = {
 };
 
 export type ProjectDisplayRecord = {
+  photoUpdatedAt?: string;
   id: string;
   uuid: string;
   nativeRef: NativeObjectRef;
@@ -107,6 +108,7 @@ function excerpt(value: string, limit = 180) {
 
 function displayFromNative(project: Project): ProjectDisplayRecord {
   return {
+    photoUpdatedAt: project.photoUpdatedAt,
     id: project.id,
     uuid: projectUuid(project.uuid, project.id),
     nativeRef: createNativeObjectRef({

@@ -1,4 +1,5 @@
 "use client";
+import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "../people/PeopleProfilePhoto";
 import SelectField from "../ui/SelectField";
 import { workspaceReturnUrl } from "../admin-shell/useWorkspaceReturn";
 import RelatedRecords from "../planning/RelatedRecords";
@@ -474,6 +475,7 @@ function useMediaQuery(query: string) {
 
 function projectDisplayFromNative(project: Project): ProjectDisplayRecord {
   return {
+    photoUpdatedAt: project.photoUpdatedAt,
     id: project.id,
     uuid: projectUuid(project.uuid, project.id),
     nativeRef: createNativeObjectRef({
@@ -838,7 +840,7 @@ function ProjectObjectivesEditor({
 }) {
   const signature = objectives.map((item) => `${item.id}:${item.text}:${item.targetAt || ""}:${item.completedAt || ""}`).join("|");
   const [drafts, setDrafts] = useState<EditorObjectiveDraft[]>(() =>
-    objectives.map((item) => ({ id: item.id, text: item.text, targetAt: item.targetAt || "", completed: false }))
+    objectives.map((item) => ({ id: item.id, text: item.text, targetAt: item.targetAt || "", completed: Boolean(item.completedAt) }))
   );
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -846,7 +848,7 @@ function ProjectObjectivesEditor({
   onSaveRef.current = onSave;
 
   useEffect(() => {
-    setDrafts(objectives.map((item) => ({ id: item.id, text: item.text, targetAt: item.targetAt || "", completed: false })));
+    setDrafts(objectives.map((item) => ({ id: item.id, text: item.text, targetAt: item.targetAt || "", completed: Boolean(item.completedAt) })));
     setDirty(false);
     setSaveState("idle");
   }, [signature]);
@@ -858,7 +860,7 @@ function ProjectObjectivesEditor({
       id: item.id,
       text: item.text.trim(),
       targetAt: item.targetAt || undefined,
-      completed: false
+      completed: item.completed
     })));
     setSaveState(saved ? "saved" : "error");
     if (saved) setDirty(false);
@@ -916,7 +918,7 @@ function ProjectObjectivesEditor({
                     const next = drafts.filter((item) => item.id !== objective.id);
                     setDrafts(next);
                     setDirty(true);
-                    queueMicrotask(() => void onSaveRef.current(next.filter((item) => item.text.trim()).map((item) => ({ id: item.id, text: item.text.trim(), targetAt: item.targetAt || undefined, completed: false }))).then((saved) => { setSaveState(saved ? "saved" : "error"); if (saved) setDirty(false); }));
+                    queueMicrotask(() => void onSaveRef.current(next.filter((item) => item.text.trim()).map((item) => ({ id: item.id, text: item.text.trim(), targetAt: item.targetAt || undefined, completed: item.completed }))).then((saved) => { setSaveState(saved ? "saved" : "error"); if (saved) setDirty(false); }));
                   }}
                   data-objective-delete="true"
                   disabled={busy}
@@ -1899,6 +1901,17 @@ export default function ProjectsWorkspace({
     }
   }
 
+  const [photoProjectId, setPhotoProjectId] = useState<string | null>(null);
+  const photoItem = snapshot.projects.find(item => item.project.id === photoProjectId);
+
+  async function saveProjectPhoto(item: ProjectDirectoryItem, updatedAt: string) {
+    if (!item.project.updatedAt) return false;
+    const result = await repository.update("projects", item.project.id, { photoUpdatedAt: updatedAt }, item.project.updatedAt);
+    if (!result.ok) { setMutationError(result.error.message); return false; }
+    applyMutationEnvelope(result.data);
+    return true;
+  }
+
   async function toggleStar(item: ProjectDirectoryItem) {
     if (!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle) || !item.project.updatedAt || mutationBusy) return;
     clearFeedback();
@@ -2150,8 +2163,13 @@ export default function ProjectsWorkspace({
     const Heading = headingLevel;
     return (
       <header className={styles.projectHero}>
-        <Heading>{item.project.name}</Heading>
+        <div className={styles.projectIdentity}>
+          <PeopleProfileAvatar initials={initials(item.project.name)} label={item.project.name} photoUrl={item.project.photoUpdatedAt ? `/api/projects/photos/${encodeURIComponent(item.project.id)}` : undefined} photoUpdatedAt={item.project.photoUpdatedAt}
+            onSelect={item.project.editable && !["complete", "archived"].includes(item.project.lifecycle) ? () => setPhotoProjectId(item.project.id) : undefined} />
+          <div className={styles.projectHeading}><Heading>{item.project.name}</Heading><div className={styles.projectHeaderMeta}>{renderStateChip(item.project.lifecycle)}<span><UnigentamosIcon role="clock" size={14} /> Updated {formatDate(item.project.updatedAt)}</span></div></div>
+        </div>
         <div className={styles.projectHeroActions}>
+          {item.project.editable && <button type="button" className={styles.button} onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)}><UnigentamosIcon role="edit" size={16} />Edit</button>}
         {item.project.editable && (
           <button type="button" className={styles.iconButton} onClick={() => void toggleStar(item)} disabled={mutationBusy || ["complete", "archived"].includes(item.project.lifecycle)} title={item.project.starred ? "Remove star" : "Star project"} aria-label={item.project.starred ? "Remove star" : "Star project"} aria-pressed={item.project.starred} data-icon-button="standard">
             <UnigentamosIcon role="star" size={20} />
@@ -2160,6 +2178,7 @@ export default function ProjectsWorkspace({
         <details className={styles.projectMenu}>
           <summary className={styles.iconButton} aria-label="More project options" data-icon-button="standard"><UnigentamosIcon role="more" size={20} /></summary>
           <div className={styles.projectMenuPanel} role="menu">
+            {initialDetail && <button type="button" role="menuitem" onClick={() => setInspectorOpen(true)}>Project summary</button>}
             {item.project.editable ? <>
               <button type="button" role="menuitem" onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)}>Edit project</button>
               <button type="button" role="menuitem" data-danger="true" disabled={item.project.lifecycle === "archived"} onClick={() => {
@@ -2331,30 +2350,31 @@ export default function ProjectsWorkspace({
     return (
       <>
         <QuickActionBar
-          actions={projectQuickActions(item)}
+          actions={projectQuickActions(item).map(action => ({ ...action, icon: <UnigentamosIcon role={action.id === "interaction" ? "plus" : action.id === "milestone" ? "calendar" : "link"} size={16} /> }))}
           maxVisible={2}
           ariaLabel={`${item.project.name} quick actions`}
         />
         <div className={styles.overviewGrid}>
-          <section className={`${styles.panel} ${styles.contextPanel}`} data-wide="true">
-            <div className={styles.panelHeader}>
-              <h2>Project context</h2>
-            </div>
-            <p>{item.project.description || "No project description yet."}</p>
-          </section>
-          <ProjectObjectivesEditor
-            objectives={item.project.objectives}
-            readOnly={readOnly}
-            busy={mutationBusy}
-            onSave={(objectives) => saveObjectives(item, objectives)}
-          />
-          <section className={styles.panel} data-wide="true">
-            <div className={styles.panelHeader}>
-              <h2>Recent work</h2>
-              <button type="button" className={styles.button} onClick={() => openEditor("interaction-create", item)} disabled={readOnly}>Log update</button>
-            </div>
-            {activity.length ? renderActivityList(activity, true) : <p>No work logged yet.</p>}
-          </section>
+          <div className={styles.overviewPrimary}>
+            <ProjectObjectivesEditor key={item.project.id} objectives={item.project.objectives} readOnly={readOnly} busy={mutationBusy} onSave={(objectives) => saveObjectives(item, objectives)} />
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}><h2>Recent work</h2><button type="button" className={styles.button} onClick={() => openEditor("interaction-create", item)} disabled={readOnly}><UnigentamosIcon role="plus" size={16} />Log update</button></div>
+              {activity.length ? renderActivityList(activity.slice(0, 6)) : <p>Log an update to keep track of your progress.</p>}
+              {activity.length > 6 && <button type="button" className={styles.button} onClick={() => selectTab("activity")}>View all activity</button>}
+            </section>
+          </div>
+          <aside className={styles.overviewAside} aria-label="Project context">
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}><h2>About this project</h2>{!readOnly && <button type="button" className={styles.iconButton} aria-label="Edit project description" onClick={() => openEditor("project-edit", item)}><UnigentamosIcon role="edit" size={16} /></button>}</div>
+              <p>{item.project.description || "Add a description to explain what you’re working toward."}</p>
+            </section>
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.iconButton} aria-label="Add milestone" disabled={readOnly} onClick={() => openEditor("milestone-create", item)}><UnigentamosIcon role="plus" size={16} /></button></div>
+              {activeMilestones(item).length ? <ul className={styles.projectSummaryList}>{activeMilestones(item).slice(0, 4).map(milestone => <li key={milestone.id}><button type="button" onClick={() => selectChild(milestone.id, "activity")}><strong>{milestone.title}</strong><span>{formatDate(milestone.dueAt)}</span></button></li>)}</ul> : <p>No upcoming milestones.</p>}
+              {activeMilestones(item).length > 4 && <button type="button" className={styles.button} onClick={() => selectTab("activity")}>View all milestones</button>}
+            </section>
+            {blockers.length > 0 && <section className={styles.panel}><div className={styles.panelHeader}><h2>Open blockers</h2><span>{blockers.length}</span></div><ul className={styles.projectSummaryList}>{blockers.map(blocker => <li key={blocker.id}><button type="button" onClick={() => selectChild(blocker.id, "activity")}><strong>{blocker.title}</strong><span>{displayLabel(blocker.severity)}</span></button></li>)}</ul></section>}
+          </aside>
         </div>
       </>
     );
@@ -2458,7 +2478,7 @@ export default function ProjectsWorkspace({
                 </li>
               ))}
             </ul>
-          ) : <SystemState variant="empty" compact title="No linked people" description="Add an existing People identity and record their role when useful." />}
+          ) : <SystemState variant="empty" compact title="No linked people" description="Link the people working on this project." />}
         </section>
       </div>
     );
@@ -2777,7 +2797,7 @@ export default function ProjectsWorkspace({
   function renderProjectBody(item: ProjectDirectoryItem) {
     const tabsId = `project-${item.project.id}`;
     return (
-      <>
+      <div className={styles.projectBody}>
         <DetailTabs id={tabsId} tabs={PROJECT_TABS} activeTab={visibleProjectTab(activeTab)} onTabChange={selectTab} ariaLabel={`${item.project.name} detail sections`} className={styles.tabs} />
         {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
         {notice && <p className={styles.successBanner} role="status">{notice}</p>}
@@ -2785,10 +2805,10 @@ export default function ProjectsWorkspace({
         <DetailTabPanel tabsId={tabsId} tabId="overview" active={activeTab === "overview"}>{renderOverview(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="activity" active={visibleProjectTab(activeTab) === "activity"}>{renderTimeline(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="links" active={visibleProjectTab(activeTab) === "links"}>
-          {renderPeople(item)}{renderNotesDecisions(item)}{renderFilesLinks(item)}<RelatedRecords module="projects" type="project" id={item.project.id} />
+          <div className={styles.projectLinks}>{renderPeople(item)}{renderNotesDecisions(item)}{renderFilesLinks(item)}<RelatedRecords module="projects" type="project" id={item.project.id} /></div>
         </DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="properties" active={activeTab === "properties"}>{renderProperties(item)}</DetailTabPanel>
-      </>
+      </div>
     );
   }
 
@@ -3134,7 +3154,7 @@ export default function ProjectsWorkspace({
               </span>;
               return <DirectoryCard
                 key={item.project.id} id={item.project.id} title={item.project.name}
-                picture={<span aria-hidden="true">{initials(item.project.name)}</span>}
+                picture={item.project.photoUpdatedAt ? <PeopleProfileAvatar initials={initials(item.project.name)} label={item.project.name} photoUrl={`/api/projects/photos/${encodeURIComponent(item.project.id)}`} photoUpdatedAt={item.project.photoUpdatedAt} /> : <span aria-hidden="true">{initials(item.project.name)}</span>}
                 status={displayLabel(item.project.lifecycle)}
                 statusIcon={item.project.lifecycle === "archived" ? "archive" : "active"}
                 tag={displayLabel(item.project.lifecycle)}
@@ -3247,7 +3267,6 @@ export default function ProjectsWorkspace({
         />}
       >
         {initialDetail && <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation" data-icon-button="standard"><UnigentamosIcon role="menu" size={18} /></button>}
-        {initialDetail && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
         {initialDetail ? (
           <div className={styles.mainScroll}>
             <div className={styles.mobileToolbar}><Link className={styles.textLink} href={workspaceReturnUrl("projects", getModuleRoute("projects"))}>Back to projects</Link></div>
@@ -3262,6 +3281,7 @@ export default function ProjectsWorkspace({
         else setInspectorOpen(false);
       }} aria-label="Close open Projects panel" />}
 
+      {photoItem && <PeopleProfilePhotoDialog open personId={photoItem.project.id} personName={photoItem.project.name} hasPhoto={Boolean(photoItem.project.photoUpdatedAt)} photoEndpoint={`/api/projects/photos/${encodeURIComponent(photoItem.project.id)}`} cropDescription="Drag to reposition and adjust the zoom. This crop appears on your project and its directory card." onClose={() => setPhotoProjectId(null)} onSaved={photo => saveProjectPhoto(photoItem, photo.updatedAt)} onRemoved={() => saveProjectPhoto(photoItem, "")} />}
       <ConfirmationSheet
         open={discardOpen}
         onOpenChange={setDiscardOpen}
