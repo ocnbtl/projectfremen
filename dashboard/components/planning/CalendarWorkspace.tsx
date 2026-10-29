@@ -445,10 +445,10 @@ export default function CalendarWorkspace() {
     setEditor((current) => {
       if (!current) return current;
       const fields = { ...current.fields, [key]: value };
-      if ((key === "start" || key === "end") && value !== current.fields[key] && !fields.allDay && typeof value === "string" && value.includes("T")) {
-        // These fields store wall-clock values, so keep the displayed times one hour apart,
-        // including the repeated hour when daylight saving time ends.
-        fields[key === "start" ? "end" : "start"] = Temporal.PlainDateTime.from(value).add({ hours: key === "start" ? 1 : -1 }).toString({ smallestUnit: "minute" });
+      if (key === "start" && value !== current.fields.start && !fields.allDay && typeof value === "string" && value.includes("T")) {
+        // Start changes suggest a one-hour end in wall-clock time. End edits are
+        // independent so choosing a longer event never moves its start.
+        fields.end = Temporal.PlainDateTime.from(value).add({ hours: 1 }).toString({ smallestUnit: "minute" });
       }
       return { ...current, fields };
     });
