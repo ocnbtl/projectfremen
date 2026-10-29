@@ -132,14 +132,14 @@ export default async function PersonalOpsRoutePage({
   // Reuse records already loaded for this page; never fetch identities per card.
   const identityRecords = recordsResult.ok ? recordsResult.records.filter(record => !record.archivedAt && !record.mediaProfile?.archivedAt) : [];
   const recordsById = new Map(identityRecords.map(record => [record.id, record]));
-  const linkedPreviews: Record<string, { imageUrl?: string; imageUpdatedAt?: string }> = {};
+  const linkedPreviews: Record<string, { imageUrl?: string; imageUpdatedAt?: string; detail?: string }> = {};
   if (nativeResult.ok) {
     for (const item of [...nativeResult.state.goals, ...nativeResult.state.decisions, ...nativeResult.state.obligations, ...nativeResult.state.followUps]) {
       for (const ref of [...item.sourceRefs, ...item.linkedRefs]) {
         const record = recordsById.get(ref.objectId);
         if (!record) continue;
         const matches = ref.module === "people" && ((ref.objectType === "person" && record.className === "person") || (ref.objectType === "organization" && record.className === "org")) || ref.module === "resources" && record.className === "resource";
-        if (matches) linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`] = { imageUrl:record.profile?.photoUrl || record.resourceProfile?.metadata?.imageUrl, imageUpdatedAt:record.profile?.photoUpdatedAt };
+        if (matches) linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`] = { imageUrl:record.profile?.photoUrl || record.resourceProfile?.metadata?.imageUrl, imageUpdatedAt:record.profile?.photoUpdatedAt, detail:record.body?.slice(0, 320) };
       }
     }
   }
@@ -152,6 +152,7 @@ export default async function PersonalOpsRoutePage({
           projectLabel: result.hub.projectLabel,
           text: goal.text,
           done: goal.done,
+          organizationId: identityRecords.find(record => record.className === "org" && record.title.toLowerCase() === result.hub.entity.toLowerCase())?.id,
           imageUrl: identityRecords.find(record => record.className === "org" && record.title.toLowerCase() === result.hub.entity.toLowerCase())?.profile?.photoUrl,
           imageUpdatedAt: identityRecords.find(record => record.className === "org" && record.title.toLowerCase() === result.hub.entity.toLowerCase())?.profile?.photoUpdatedAt,
           index

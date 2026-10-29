@@ -1,6 +1,6 @@
 "use client";
 import SelectField from "../ui/SelectField";
-import { WorkspaceHeader, WorkspaceButton } from "../admin-shell/WorkspaceKit";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 
 import { useMemo, useState, type FormEvent } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
@@ -50,6 +50,7 @@ function draftFor(kind: DogCareKind, event?: DogCareEvent): DogDraft {
 }
 
 export default function DogTrackerWorkspace({ initialState, sidebarCounts, initialLoadError }: { initialState: DogTrackerState; sidebarCounts: PersonalOpsSidebarCounts; initialLoadError?: string }) {
+  const [query, setQuery] = useState("");
   const [state, setState] = useState(initialState);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [editor, setEditor] = useState<DogDraft | null>(null);
@@ -62,6 +63,10 @@ export default function DogTrackerWorkspace({ initialState, sidebarCounts, initi
     pee: state.events.find((event) => event.peed),
     poop: state.events.find((event) => event.pooped)
   }), [state.events]);
+
+  const filteredEvents = state.events.filter(item => [item.kind, item.notes, item.peed ? "pee" : "", item.pooped ? "poop" : "", new Date(item.occurredAt).toLocaleDateString()].join(" ").toLowerCase().includes(query.trim().toLowerCase()));
+  const dayKey = (value: string) => new Date(value).toLocaleDateString("en-CA");
+  const days = [...new Set(filteredEvents.map(item => dayKey(item.occurredAt)))];
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -100,6 +105,7 @@ export default function DogTrackerWorkspace({ initialState, sidebarCounts, initi
       <main className={baseStyles.directory} aria-label="Dog care">
         <div className={[baseStyles.mainScroll, styles.utilityScroll].join(" ")}>
           <WorkspaceHeader title="Dog"><WorkspaceButton intent="primary" icon="walk" onClick={() => setEditor(draftFor("walk"))}>Walk</WorkspaceButton><WorkspaceButton icon="feed" onClick={() => setEditor(draftFor("feed"))}>Feed</WorkspaceButton></WorkspaceHeader>
+          <WorkspaceToolbar query={query} onQuery={setQuery} placeholder="Search dog care" />
           {error && <div className={styles.error} role="alert">{error}</div>}
           {notice && <div className={styles.notice} role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label="Dismiss" data-icon-button="standard"><PersonalOpsIcon name="close" /></button></div>}
 
@@ -112,7 +118,7 @@ export default function DogTrackerWorkspace({ initialState, sidebarCounts, initi
 
           <section className={[styles.guideSection, styles.careLog].join(" ")}>
             <header><div className={styles.sectionIcon}><PersonalOpsIcon name="today" /></div><div><h2>Care log</h2><p>{state.events.length} entr{state.events.length === 1 ? "y" : "ies"}</p></div></header>
-            {state.events.length ? <div className={styles.careTimeline}>{state.events.map((item) => <article key={item.id}><div className={styles.timelineMark}><PersonalOpsIcon name={item.kind === "walk" ? "walk" : "feed"} /></div><div className={styles.timelineCopy}><div><strong>{item.kind === "walk" ? "Walk" : "Fed"}</strong><time dateTime={item.occurredAt}>{formatTime(item.occurredAt)}</time></div>{item.kind === "walk" && (item.peed || item.pooped) && <div className={styles.careTags}>{item.peed && <span><PersonalOpsIcon name="droplet" /> Pee</span>}{item.pooped && <span><PersonalOpsIcon name="dog" /> Poop</span>}</div>}{item.notes && <p>{item.notes}</p>}</div><div className={styles.cardActions}><button type="button" onClick={() => setEditor(draftFor(item.kind, item))} aria-label={`Edit ${item.kind}`} data-icon-button="standard"><PersonalOpsIcon name="edit" /></button><button type="button" className={styles.deleteIcon} onClick={() => remove(item)} aria-label={`Delete ${item.kind}`} data-icon-button="standard"><PersonalOpsIcon name="delete" /></button></div></article>)}</div> : <div className={styles.emptyState}><PersonalOpsIcon name="dog" /><strong>No care logged yet</strong><span>Log a walk or a feeding from the actions above.</span></div>}
+            {filteredEvents.length ? <div className={styles.careTimeline}>{days.map(day => <section className={styles.careDay} key={day}><h3><PersonalOpsIcon name="today"/>{new Date(`${day}T12:00:00`).toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric",year:"numeric"})}</h3><div>{filteredEvents.filter(item => dayKey(item.occurredAt) === day).map((item) => <article key={item.id}><div className={styles.timelineMark}><PersonalOpsIcon name={item.kind === "walk" ? "walk" : "feed"} /></div><div className={styles.timelineCopy}><div><strong>{item.kind === "walk" ? "Walk" : "Fed"}</strong><time dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}</time></div>{item.kind === "walk" && (item.peed || item.pooped) && <div className={styles.careTags}>{item.peed && <span><PersonalOpsIcon name="droplet" /> Pee</span>}{item.pooped && <span><PersonalOpsIcon name="dog" /> Poop</span>}</div>}{item.notes && <p>{item.notes}</p>}</div><div className={styles.cardActions}><button type="button" onClick={() => setEditor(draftFor(item.kind, item))} aria-label={`Edit ${item.kind}`} data-icon-button="standard"><PersonalOpsIcon name="edit" /></button><button type="button" className={styles.deleteIcon} onClick={() => remove(item)} aria-label={`Delete ${item.kind}`} data-icon-button="standard"><PersonalOpsIcon name="delete" /></button></div></article>)}</div></section>)}</div> : <div className={styles.emptyState}><PersonalOpsIcon name="dog" /><strong>{query ? "No matching entries" : "No care logged yet"}</strong><span>{query ? "Try a date, walk, feeding, or a word from your notes." : "Log a walk or a feeding from the actions above."}</span></div>}
           </section>
         </div>
       </main>

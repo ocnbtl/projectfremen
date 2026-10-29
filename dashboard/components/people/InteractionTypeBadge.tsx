@@ -7,6 +7,10 @@ const types: Record<string, { label: string; icon: string }> = {
   meeting: { label: "Meeting", icon: "interaction-meeting" },
   "catch-up": { label: "Catch-up", icon: "interaction-catch-up" },
   "ran-into": { label: "Ran into", icon: "interaction-meeting" },
+  hired: { label: "Hired", icon: "briefcase" },
+  service: { label: "Service appointment", icon: "interaction-meeting" },
+  introduction: { label: "Introduction", icon: "person" },
+  interview: { label: "Interview", icon: "interaction-call" },
   note: { label: "Note", icon: "interaction-note" },
   memory: { label: "Memory", icon: "interaction-memory" },
   milestone: { label: "Milestone", icon: "interaction-milestone" }

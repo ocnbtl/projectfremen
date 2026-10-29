@@ -250,3 +250,43 @@
  .people-interaction-dialog .people-participant-search input { font-size:16px; }
  .people-interaction-toolbar .people-approach-switch button { font-size:11px; min-height:38px; }
 }
+
+/* A compact composer with independent, readable participant choices. */
+.people-interaction-toolbar {grid-template-columns:270px 190px minmax(0,1fr);gap:16px;}
+.people-interaction-toolbar .people-interaction-checkbox {justify-self:start;}
+.people-interaction-toolbar .people-approach-switch button {white-space:nowrap;padding:6px;font-size:12px;}
+.people-interaction-when {gap:16px;justify-content:flex-start;}
+.people-interaction-when .people-interaction-range {width:320px;}
+.people-interaction-dialog .people-time-inline input {border:1px solid var(--border-soft);border-radius:9px;padding-left:10px;}
+.people-interaction-dialog .people-time-inline input:focus-visible {outline:2px solid var(--module-focus);outline-offset:1px;box-shadow:none;}
+.people-interaction-dialog .people-participant-box {height:300px;border:0;border-radius:0;overflow:visible;gap:10px;}
+.people-interaction-dialog .people-participant-search {margin:0;height:40px;background:var(--surface-panel);border:1px solid var(--border-soft);}
+.people-interaction-dialog .people-participant-box .people-participant-scroll {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:6px;padding:3px;}
+.people-interaction-dialog .people-participant-scroll label {display:flex;align-items:center;gap:7px;padding:8px;border:1px solid var(--border-soft);border-radius:10px;min-width:0;min-height:54px;cursor:pointer;transition:background .18s,border-color .18s;}
+.people-interaction-dialog .people-participant-scroll label:has(input:checked) {background:var(--module-primary-100);border-color:var(--module-border);}
+.people-interaction-dialog .people-participant-scroll label > input {flex:none;width:15px;height:15px;min-height:15px;margin:0;accent-color:var(--module-accent);}
+.people-interaction-dialog .people-participant-scroll label > span {font-size:12px;line-height:1.4;}
+.people-participant-empty {grid-column:1/-1;}
+@media(max-width:760px) {
+ .people-interaction-toolbar {grid-template-columns:minmax(0,1fr);gap:10px;}
+ .people-interaction-approach {max-width:300px;}
+ .people-interaction-toolbar .people-interaction-checkbox {grid-column:auto;}
+ .people-interaction-dialog .people-participant-columns {grid-template-columns:minmax(0,1fr);gap:18px;}
+ .people-interaction-dialog .people-participant-box {height:230px;}
+ .people-interaction-when {flex-wrap:wrap;gap:10px;}
+ .people-interaction-when .people-interaction-range {width:min(320px,100%);}
+}
+@media(prefers-reduced-motion:reduce) {.people-interaction-dialog .people-participant-scroll label {transition:none;}}
+@media(min-width:1000px) {
+ .people-interaction-fields .people-interaction-when {grid-column:1;}
+ .people-interaction-fields .people-interaction-title {grid-column:2;align-self:end;}
+ .people-interaction-when .people-interaction-date {flex-basis:150px;}
+ .people-interaction-when .people-interaction-range {width:310px;}
+}
+.people-interaction-dialog .people-dialog-actions {display:flex;justify-content:flex-end;gap:8px;border:0;}
+.people-interaction-dialog .people-dialog-action {width:auto;min-width:96px;min-height:40px;font-size:13px;font-weight:500;}
+.people-interaction-dialog .people-dialog-action.is-primary {background:var(--module-action);color:var(--module-action-contrast);}
+.people-interaction-dialog .people-participant-box {height:auto;max-height:300px;}
+.people-interaction-dialog .people-participant-box .people-participant-scroll {flex:0 1 auto;max-height:250px;}
+.people-interaction-dialog .people-participant-columns {align-items:start;}
+@media(max-width:760px) {.people-interaction-dialog .people-participant-box{height:auto;max-height:240px;}.people-interaction-dialog .people-participant-box .people-participant-scroll{max-height:190px;}}

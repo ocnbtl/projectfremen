@@ -36,7 +36,7 @@ export function interactionTimeLabel(start?: string, end?: string): string {
   const format = (value?: string) => {
     if (!value || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return "";
     const [hour, minute] = value.split(":").map(Number);
-    return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
+    return `${hour % 12 || 12}${minute ? `:${String(minute).padStart(2, "0")}` : ""}${hour >= 12 ? "pm" : "am"}`;
   };
   const from = format(start), to = format(end);
   return from && to ? `${from} – ${to}${end! < start! ? " (+1 day)" : ""}` : from ? `From ${from}` : to ? `Until ${to}` : "";

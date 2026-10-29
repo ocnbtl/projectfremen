@@ -48,6 +48,7 @@ import type {
   PersonalEmailEntry,
   PersonalEducationEntry,
   PersonalInteractionApproach,
+  PersonalInteractionKind,
   PersonalLocationEntry,
   PersonalMemoryEntry,
   PersonalOccupationEntry,
@@ -160,7 +161,7 @@ type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up";
 type PeopleListMode = "list" | "compact" | "grid";
 type RelationshipStatus = "active" | "idea" | "inactive";
 type PeopleLastContactFilter = "any" | "7d" | "30d" | "90d" | "none";
-type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "ran-into" | "note" | "memory" | "milestone";
+type InteractionKind = PersonalInteractionKind;
 type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin" | "youtube";
 
 type ContactMethod = {
@@ -984,6 +985,7 @@ const INTERACTION_KIND_LABELS = new Set([
   "catch-up",
   "catch up",
   "ran-into",
+  "hired", "service", "service appointment", "introduction", "interview",
   "ran into",
   "note",
   "memory",
@@ -3048,7 +3050,7 @@ export default function PeopleWorkspace({
     if (!interactionDate || !interactionTitle.trim() || interactionParticipantIds.length === 0) return;
     setError("");
     setInteractionSaving(true);
-    const kindLabel = interactionKind === "catch-up" ? "Catch-up" : labelize(interactionKind);
+    const kindLabel = interactionKind === "catch-up" ? "Catch-up" : interactionKind === "service" ? "Service appointment" : labelize(interactionKind);
     try {
       const response = await fetch("/api/personal/records", {
         method: "POST",
@@ -5086,6 +5088,10 @@ export default function PeopleWorkspace({
                   <option value="meeting">Meeting</option>
                   <option value="catch-up">Catch-up</option>
                   <option value="ran-into">Ran into</option>
+                  <option value="hired">Hired</option>
+                  <option value="service">Service appointment</option>
+                  <option value="introduction">Introduction</option>
+                  <option value="interview">Interview</option>
                   <option value="note">Note</option>
                   <option value="memory">Memory</option>
                   <option value="milestone">Milestone</option>
@@ -5098,7 +5104,7 @@ export default function PeopleWorkspace({
               <div className="people-interaction-range"><TimeField label="Start Time" value={interactionStartTime} onChange={value=>changeInteractionTime("startTime",value)}/><span className="people-interaction-to">to</span><TimeField label="End Time" value={interactionEndTime} onChange={value=>changeInteractionTime("endTime",value)}/></div>
               {interactionStartTime && interactionEndTime && interactionEndTime < interactionStartTime && <span className="people-interaction-overnight">Ends next day</span>}
               </div>
-              <label className="is-wide">
+              <label className="is-wide people-interaction-title">
                 Title
                 <input value={interactionTitle} onChange={(event) => setInteractionTitle(event.target.value)} placeholder="Coffee, call, introduction, or shared moment" required />
               </label>
@@ -5116,7 +5122,7 @@ export default function PeopleWorkspace({
                   <SearchField aria-label={`Search ${name}`} autoComplete="off" value={interactionParticipantSearch[kind]} onChange={event=>{
                     setInteractionParticipantSearch(current=>({...current,[kind]:event.target.value}));
                     event.currentTarget.closest("section")?.querySelector(".people-participant-scroll")?.scrollTo({top:0});
-                  }} onKeyDown={event=>{if(event.key === "Enter") event.preventDefault();}} className="people-participant-search">{interactionParticipantSearch[kind] && <button type="button" aria-label={`Clear ${name} search`} onClick={event=>{setInteractionParticipantSearch(current=>({...current,[kind]:""}));event.currentTarget.parentElement?.querySelector("input")?.focus();}}><UnigentamosIcon role="close" size={14}/></button>}</SearchField>
+                  }} onKeyDown={event=>{if(event.key === "Enter") event.preventDefault();}} className="people-participant-search" placeholder={`Search ${name}`}>{interactionParticipantSearch[kind] && <button type="button" aria-label={`Clear ${name} search`} onClick={event=>{setInteractionParticipantSearch(current=>({...current,[kind]:""}));event.currentTarget.parentElement?.querySelector("input")?.focus();}}><UnigentamosIcon role="close" size={14}/></button>}</SearchField>
                   <div className="people-participant-scroll">
                   {matches.map((record) => (
                     <label key={record.id}>

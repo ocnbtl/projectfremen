@@ -9,6 +9,8 @@
 .shortcuts a > span { display:grid; place-items:center; width:60px; height:60px; border:1px solid var(--border); border-radius:50%; background:var(--module-primary-50,var(--surface)); color:var(--module-accent); transition:transform .24s,background .24s; }
 .shortcuts a:is(:hover,:focus-visible) > span { transform:translateY(-3px); background:var(--module-primary-100); }
 .shortcuts svg { width:24px; height:24px; }
+.shortcuts a:focus {outline:none;box-shadow:none;}
+.shortcuts a:focus-visible > span {outline:2px solid var(--module-focus);outline-offset:4px;}
 .operations { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
 .operations a { display:flex; align-items:center; gap:12px; padding:14px; border:1px solid var(--border); border-radius:14px; text-decoration:none; color:var(--text-strong); background:var(--surface); transition:background .2s; }
 .operations a:is(:hover,:focus-visible) { background:var(--module-primary-100); }

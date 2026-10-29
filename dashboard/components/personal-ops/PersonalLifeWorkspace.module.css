@@ -463,3 +463,39 @@
 .vehicleTabs button span {font-size:11px;text-transform:capitalize;}
 .vehicleTabs button strong {font-size:14px;}
 .modComposer :global(.app-select-trigger) {min-height:42px;height:42px;font-size:13px;}
+
+/* Match the workspace typography without changing credential storage or privacy. */
+.credentialAccountHeading {font:500 13px/1.4 var(--font-body);letter-spacing:0;text-transform:none;}
+.keyringCount {min-width:36px;height:32px;font:500 14px/1 var(--font-body);color:var(--text-strong);background:var(--module-primary-50);}
+.editor {padding:22px;gap:16px 18px;}
+.editor header {border:0;align-items:center;padding-bottom:4px;}
+.editor header h2 {display:flex;align-items:center;gap:10px;font:600 18px/1.4 var(--font-body);}
+.editor header h2 svg {width:22px;height:22px;flex:none;color:var(--module-accent);}
+.editor label,.editorField {font:500 13px/1.4 var(--font-body);color:var(--text-strong);gap:7px;}
+.editor :is(input,textarea):focus-visible {outline:2px solid var(--module-focus);outline-offset:1px;box-shadow:none;}
+.editor footer {border:0;padding-top:4px;gap:8px;}
+.editor footer button {min-height:40px;border-radius:9px;font:500 13px/1.4 var(--font-body);}
+.loadoutLanes {gap:16px;}
+.loadoutLanes > section {border-radius:14px;background:var(--module-primary-50);}
+.loadoutLanes section > header {border:0;padding:14px;}
+.loadoutLanes h2 {font:500 15px/1.4 var(--font-body);}
+.loadoutLanes header span {font:500 13px/1.4 var(--font-body);}
+.loadoutLanes section > div {padding:0 10px 10px;gap:10px;}
+.loadoutLanes article {gap:8px;border-radius:11px;padding:14px;}
+.loadoutLanes article strong {font:500 15px/1.4 var(--font-body);}
+.loadoutLanes article small {font:400 12px/1.5 var(--font-body);}
+.loadoutLanes article > span {justify-self:start;background:var(--module-primary-50);border-radius:999px;padding:3px 8px;font:400 12px/1.4 var(--font-body);}
+.loadoutLanes .rowActions button {min-height:34px;border-radius:8px;font:500 12px/1.4 var(--font-body);}
+@media(max-width:600px) {.editor{padding:16px;gap:14px;}.editor header h2{font-size:17px;}}
+.keyring {border-radius:14px;}
+.keyringHeader strong {font:500 14px/1.4 var(--font-body);}
+.credentialGridHeader {min-height:40px;}
+.credentialGridHeader svg {width:17px;height:17px;}
+.credentialTitle strong {font:500 14px/1.4 var(--font-body);}
+.credentialCell {font-size:13px;line-height:1.5;}
+.editor footer button:last-child {background:var(--module-action);color:var(--module-action-contrast);border-color:var(--module-action);}
+.credentialIdentityText > strong {font:500 14px/1.4 var(--font-body);}
+@media(max-width:600px) {
+ .editor[data-record-editor=vehicles] {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .editor[data-record-editor=vehicles] > :is(header,footer,.full),.editor[data-record-editor=vehicles] > label:has(input[name=name]),.editor[data-record-editor=vehicles] > label:has(input[name=vinNote]) {grid-column:1/-1;}
+}

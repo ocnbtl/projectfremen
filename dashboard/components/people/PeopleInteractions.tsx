@@ -18,8 +18,8 @@ export type InteractionEntry = {
   participantIds: string[]; startTime?: string; endTime?: string;
   approach?: string; updatesLastContact?: boolean; source: "record" | "profile";
 };
-const kinds = ["call", "message", "email", "meeting", "catch-up", "ran-into", "note", "memory", "milestone"];
-const label = (value: string) => value ? value[0].toUpperCase() + value.slice(1).replace(/-/g, " ") : "Interaction";
+const kinds = ["call", "message", "email", "meeting", "catch-up", "ran-into", "hired", "service", "introduction", "interview", "note", "memory", "milestone"];
+const label = (value: string) => value === "service" ? "Service appointment" : value ? value[0].toUpperCase() + value.slice(1).replace(/-/g, " ") : "Interaction";
 const initials = (value: string) => value.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
 const validDate = (value?: string) => Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T12:00:00Z`)));
 const dateLabel = (value?: string, month = false) => validDate(value)
@@ -28,7 +28,7 @@ const dateLabel = (value?: string, month = false) => validDate(value)
 const timeLabel = (value?: string) => {
   if (!value || !/^\d{2}:\d{2}$/.test(value)) return "";
   const [hour, minute] = value.split(":").map(Number);
-  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
+  return `${hour % 12 || 12}${minute ? `:${String(minute).padStart(2, "0")}` : ""}${hour >= 12 ? "pm" : "am"}`;
 };
 
 function InteractionDetail({ item, people, explicitSelection, empty, error, onBack, onOpenPerson }: {

@@ -16,8 +16,7 @@ export function adjustInteractionTime(range: InteractionTimeRange, field: "start
     const end = Temporal.PlainDateTime.from(`${range.date}T${value}`).add({ hours: 1 });
     return { ...range, startTime: value, endTime: clock(end) };
   }
-  // The date belongs to the start; retain the end's day when editing an overnight range.
-  const endDay = Temporal.PlainDate.from(range.date).add({ days: range.startTime && range.endTime && range.endTime < range.startTime ? 1 : 0 });
-  const start = Temporal.PlainDateTime.from(`${endDay}T${value}`).subtract({ hours: 1 });
-  return { date: start.toPlainDate().toString(), startTime: clock(start), endTime: value };
+  // End edits belong to the user. An earlier clock time means the next day;
+  // it must never rewrite the recorded start or its date.
+  return { ...range, endTime: value };
 }

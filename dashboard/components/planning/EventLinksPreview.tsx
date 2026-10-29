@@ -20,7 +20,7 @@ export function EventObjectPreview({record, showName = false, iconOnly = false}:
   </button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.panel} sideOffset={6} collisionPadding={10} aria-label={record.label} onOpenAutoFocus={e=>e.preventDefault()} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
     <header className={styles.profileHeading}>{identity(record)}<strong>{record.label}</strong><Popover.Close aria-label="Close profile preview"><UnigentamosIcon role="close" size={16}/></Popover.Close></header>
     {detail && <p className={styles.detail}>{detail}</p>}
-    {record.route && <Link className={styles.profileLink} href={record.route}><UnigentamosIcon role="link" size={14}/>Open {record.objectType === "person" || record.objectType === "organization" ? "profile" : "record"}</Link>}
+    {record.route && <Link prefetch={false} className={styles.profileLink} href={record.route}><UnigentamosIcon role="link" size={14}/>Open {record.objectType === "person" || record.objectType === "organization" ? "profile" : "record"}</Link>}
   </Popover.Content></Popover.Portal></Popover.Root>;
 }
 

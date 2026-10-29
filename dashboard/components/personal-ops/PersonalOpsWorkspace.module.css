@@ -2490,3 +2490,13 @@ button.metric {
 .personalCardLinks a:is(:hover,:focus-visible) {background:var(--surface-panel);border-color:var(--module-accent);}
 @supports not (grid-template-rows:subgrid) {.personalCards article {grid-row:auto;grid-template-rows:auto auto 1fr auto auto;}}
 @media(prefers-reduced-motion:reduce) {.personalCards article {transition:none;}}
+
+.personalCards article {grid-row:span 4;}
+.personalCardTop {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px;}
+.personalCardDates {flex-direction:column;align-items:flex-end;gap:5px;line-height:1.5;}
+.personalCardDates time {white-space:nowrap;}
+.personalCardLinks > button {display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 7px 3px 3px;border:1px solid var(--border);border-radius:999px;background:var(--surface-panel);color:var(--text-strong);font:400 12px/1.4 var(--font-body);}
+.personalCardLinks > button:is(:hover,:focus-visible) {border-color:var(--module-accent);background:var(--module-primary-50);}
+.personalCardLinks > button > span:last-child {max-width:100%;white-space:normal;overflow-wrap:anywhere;}
+.personalCardMeta {align-self:end;}
+@supports not (grid-template-rows:subgrid) {.personalCards article {grid-row:auto;grid-template-rows:auto auto 1fr auto;}}

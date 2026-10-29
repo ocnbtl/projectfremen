@@ -19,11 +19,13 @@ function moduleColor(moduleName: IconModuleName, modules: StyleGuideModulePalett
 }
 
 export default function StyleGuideIconRegistry({
+  query = "",
   assignments,
   modules,
   busy,
   onSelect
 }: {
+  query?: string;
   assignments: StyleGuideIconAssignment[];
   modules: StyleGuideModulePalette[];
   busy: boolean;
@@ -38,7 +40,7 @@ export default function StyleGuideIconRegistry({
 
   return (
     <div className={styles.iconRegistry} data-icon-registry-count={ICON_REGISTRY.length}>
-      {ICON_REGISTRY.map((entry) => {
+      {ICON_REGISTRY.filter(entry => ["icons icon language", entry.id, entry.label, ...entry.usages.map(usage => `${usage.module} ${usage.breadcrumb}`)].join(" ").toLowerCase().includes(query.trim().toLowerCase())).map((entry) => {
         const assignment = assignments.find((item) => item.icon === entry.id);
         const selected = assignment?.selection || "";
         const shownCandidate = selected || entry.defaultCandidate;

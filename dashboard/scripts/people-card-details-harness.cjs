@@ -9,8 +9,8 @@ assert.equal(organizationCategory({...org,profile:{organizationType:'Pub'}}),'Fo
 assert.equal(organizationCategory({...org,profile:{organizationType:'Airport'}}),'Travel');
 assert.equal(organizationCategory({...org,profile:{locations:[{placeId:'p'}]}},[{id:'p',tags:['Food'],linkedRefs:[]}]),'Food');
 assert.equal(occupationLabel({profile:{occupations:[{status:'past',title:'Old role'},{status:'current',title:'Designer'}]}}),'Designer');
-assert.equal(interactionTimeLabel('23:15','00:15'),'11:15 PM – 12:15 AM (+1 day)');
-assert.equal(interactionTimeLabel(undefined,'13:00'),'Until 1:00 PM');assert.equal(interactionTimeLabel('24:00',undefined),'');
+assert.equal(interactionTimeLabel('23:15','00:15'),'11:15pm – 12:15am (+1 day)');
+assert.equal(interactionTimeLabel(undefined,'13:00'),'Until 1pm');assert.equal(interactionTimeLabel('24:00',undefined),'');
 assert.equal(organizationLocationLabel({...org,profile:{headquarters:'Cincinnati, OH'}}),'Cincinnati, OH');
 assert.equal(organizationLocationLabel({...org,profile:{locations:[{placeId:'p'}]}},[{id:'p',addressParts:{city:'Hebron',region:'KY'},linkedRefs:[]}]),'Hebron, KY');
 assert.equal(organizationLocationLabel(org), '');
