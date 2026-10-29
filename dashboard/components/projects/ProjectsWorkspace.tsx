@@ -1,6 +1,7 @@
 "use client";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "../people/PeopleProfilePhoto";
 import SelectField from "../ui/SelectField";
+import ProjectProperties from "./ProjectProperties";
 import { workspaceReturnUrl } from "../admin-shell/useWorkspaceReturn";
 import RelatedRecords from "../planning/RelatedRecords";
 
@@ -1140,10 +1141,23 @@ export default function ProjectsWorkspace({
     [query, snapshot.projects]
   );
 
+  const reviewRefreshInFlight = useRef(false);
+  useEffect(() => {
+    if (activeTab !== "links") return;
+    const refreshOnReturn = () => { if (!document.hidden) void refreshReviewContext(); };
+    refreshOnReturn();
+    void refreshDecisions();
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => { window.removeEventListener("focus", refreshOnReturn); document.removeEventListener("visibilitychange", refreshOnReturn); };
+  }, [activeTab]);
+
   async function refreshReviewContext() {
-    if (reviewsLoading) return;
+    if (reviewRefreshInFlight.current) return;
+    reviewRefreshInFlight.current = true;
     setReviewsLoading(true);
     const result = await reviewsRepository.readState({ includeArchived: true });
+    reviewRefreshInFlight.current = false;
     if (!result.ok) {
       setReviewsError(result.error.message);
       setReviewsLoading(false);
@@ -1152,7 +1166,7 @@ export default function ProjectsWorkspace({
     setReviewViews(result.data.items);
     setReviewsError("");
     setReviewsLoading(false);
-    setNotice("Review context refreshed from the Reviews owner module.");
+
   }
 
   useEffect(() => {
@@ -2273,8 +2287,7 @@ export default function ProjectsWorkspace({
     const contexts = source
       ? getProjectSourceReviewContexts(reviewViews, target)
       : getProjectReviewContexts(reviewViews, item.project.id);
-    const targetLabel = source ? displayLabel(source.objectType) : "project";
-    const Heading = compact ? "h3" : "h2";
+        const Heading = compact ? "h3" : "h2";
     return (
       <section
         className={`${styles.panel} ${styles.reviewCoverage}`}
@@ -2287,14 +2300,7 @@ export default function ProjectsWorkspace({
             <Heading>Reviews</Heading>
           </div>
           <div className={styles.inlineActions}>
-            <button
-              type="button"
-              className={styles.button}
-              onClick={() => void refreshReviewContext()}
-              disabled={reviewsLoading}
-              aria-label={`Refresh Review coverage for ${target.label}`}
-            >{reviewsLoading ? "Refreshing…" : "Refresh"}</button>
-            <Link className={styles.button} href={buildProjectReviewHandoffRoute(target)}>Link review</Link>
+            <Link className={styles.button} href={buildProjectReviewHandoffRoute(target)}><UnigentamosIcon role="link" size={16} />Link review</Link>
           </div>
         </div>
         {reviewsError && (
@@ -2332,12 +2338,7 @@ export default function ProjectsWorkspace({
             })}
           </ul>
         ) : (
-          <SystemState
-            variant="empty"
-            compact
-            title="No linked reviews yet"
-            description={`Link a review when this ${targetLabel} needs one.`}
-          />
+          <p>No linked reviews.</p>
         )}
       </section>
     );
@@ -2421,18 +2422,18 @@ export default function ProjectsWorkspace({
           <div className={styles.panelHeader}>
             <h2>Notes</h2>
             <span className={styles.inlineActions}>
-              <Link className={styles.button} href={nativeCreateHref("notes", item.project)}>New note</Link>
-              <button type="button" className={styles.button} onClick={() => openEditor("link-create", item, undefined, { linkScope: "note", sourceModule: "notes", sourceObjectType: "note", relationship: "source_material" })} disabled={readOnly}>Link note</button>
+              <Link className={styles.button} href={nativeCreateHref("notes", item.project)}><UnigentamosIcon role="plus" size={16} />New note</Link>
+              <button type="button" className={styles.button} onClick={() => openEditor("link-create", item, undefined, { linkScope: "note", sourceModule: "notes", sourceObjectType: "note", relationship: "source_material" })} disabled={readOnly}><UnigentamosIcon role="link" size={16} />Link note</button>
             </span>
           </div>
-          {noteContext.length ? renderLinkedRows(item, ["notes"]) : <p>No linked notes yet.</p>}
+          {noteContext.length ? renderLinkedRows(item, ["notes"]) : <p>No linked notes.</p>}
         </section>
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
             <h2>Decisions</h2>
-            <span className={styles.inlineActions}><Link className={styles.button} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link><button type="button" className={styles.button} onClick={() => void refreshDecisions()} disabled={decisionsLoading}>{decisionsLoading ? "Refreshing…" : "Refresh"}</button></span>
+            <span className={styles.inlineActions}><Link className={styles.button} href={personalOpsCreateHref("decisions", item.project)}><UnigentamosIcon role="plus" size={16} />Add decision</Link></span>
           </div>
-          <LinkedDecisionsPanel source={projectDecisionSource(item.project)} decisions={decisions} loading={decisionsLoading} error={decisionsError} onRefresh={() => void refreshDecisions()} createHref={personalOpsCreateHref("decisions", item.project)} className={styles.embeddedPanel} compact showHeader={false} showBoundary={false} showSummary={false} showDecisionDetails title="Project decisions" />
+          <LinkedDecisionsPanel showRefresh={false} source={projectDecisionSource(item.project)} decisions={decisions} loading={decisionsLoading} error={decisionsError} onRefresh={() => void refreshDecisions()} emptyLabel="No linked decisions." className={styles.embeddedPanel} compact showHeader={false} showBoundary={false} showSummary={false} showDecisionDetails title="Project decisions" />
         </section>
       </div>
     );
@@ -2457,9 +2458,7 @@ export default function ProjectsWorkspace({
                 })}
                 disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)}
                 title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}
-              >
-                Link person
-              </button>
+              ><UnigentamosIcon role="link" size={16} />Link person</button>
             </span>
           </div>
           {people.length ? (
@@ -2478,7 +2477,7 @@ export default function ProjectsWorkspace({
                 </li>
               ))}
             </ul>
-          ) : <SystemState variant="empty" compact title="No linked people" description="Link the people working on this project." />}
+          ) : <p>No linked people.</p>}
         </section>
       </div>
     );
@@ -2492,7 +2491,7 @@ export default function ProjectsWorkspace({
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
             <h2>Files & resources</h2>
-            <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("link-create", item, undefined, { linkScope: "object", sourceModule: "media" })} disabled={readOnly}>Link object</button>
+            <button type="button" className={styles.button} onClick={() => openEditor("link-create", item, undefined, { linkScope: "object", sourceModule: "media" })} disabled={readOnly}><UnigentamosIcon role="link" size={16} />Link object</button>
           </div>
           {objectLinks.length ? (
             <ul className={styles.linkList}>
@@ -2525,7 +2524,7 @@ export default function ProjectsWorkspace({
                 </li>
               ))}
             </ul>
-          ) : <p>No linked files or resources yet.</p>}
+          ) : <p>No linked files.</p>}
         </section>
         {renderReviewCoverage(item)}
       </div>
@@ -2533,20 +2532,14 @@ export default function ProjectsWorkspace({
   }
 
   function renderProperties(item: ProjectDirectoryItem) {
-    return (
-      <div className={styles.overviewGrid}>
-        <section className={styles.panel} data-wide="true">
-          <div className={styles.panelHeader}><h2>Properties</h2>{item.project.editable && <button type="button" className={styles.button} onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)}>Edit properties</button>}</div>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>Status</span><strong>{displayLabel(item.project.lifecycle)}</strong></div>
-            <div className={styles.fact}><span>Review cadence</span><strong>{reviewCadenceLabel(item.project.defaultCadence)}</strong></div>
-            <div className={styles.fact} data-mono="true"><span>Project ID</span><strong>{item.project.uuid}</strong></div>
-            <div className={styles.fact} data-mono="true"><span>Slug</span><strong>{item.project.slug}</strong></div>
-            <div className={styles.fact}><span>Last updated</span><strong>{formatTimestamp(item.project.updatedAt)}</strong></div>
-          </div>
-        </section>
-      </div>
-    );
+    return <ProjectProperties key={item.project.id} project={{ ...item.project, updatedAt: item.project.updatedAt || "" }} readOnly={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} busy={mutationBusy} onSave={async (patch, expectedUpdatedAt) => {
+      if (mutationBusy || !item.project.editable) return false;
+      clearFeedback(); setMutationBusy(true);
+      const result = await repository.update("projects", item.project.id, patch, expectedUpdatedAt);
+      setMutationBusy(false);
+      if (!result.ok) { setMutationError(result.error.message); return false; }
+      applyMutationEnvelope(result.data); setNotice("Project properties saved."); return true;
+    }} />;
   }
 
   function renderSelectedChildContext(item: ProjectDirectoryItem) {
@@ -2627,7 +2620,7 @@ export default function ProjectsWorkspace({
               {!hasMilestoneDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}>File decision</Link>}
               {milestone.linkedRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>Open {ref.label}</Link>)}
             </div>
-            <LinkedFollowUpsPanel
+            <LinkedFollowUpsPanel showRefresh={false}
               source={projectFollowUpSource(item.project, {
                 objectType: "milestone",
                 objectId: milestone.id,
@@ -2645,7 +2638,7 @@ export default function ProjectsWorkspace({
               compact
               title="Milestone follow-through"
             />
-            <LinkedDecisionsPanel
+            <LinkedDecisionsPanel showRefresh={false}
               source={milestoneDecisionSource!}
               decisions={decisions}
               loading={decisionsLoading}
@@ -2679,7 +2672,7 @@ export default function ProjectsWorkspace({
               {!hasBlockerDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}>File decision</Link>}
               {blocker.sourceRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>Open {ref.label}</Link>)}
             </div>
-            <LinkedFollowUpsPanel
+            <LinkedFollowUpsPanel showRefresh={false}
               source={projectFollowUpSource(item.project, {
                 objectType: "blocker",
                 objectId: blocker.id,
@@ -2697,7 +2690,7 @@ export default function ProjectsWorkspace({
               compact
               title="Blocker follow-through"
             />
-            <LinkedDecisionsPanel
+            <LinkedDecisionsPanel showRefresh={false}
               source={blockerDecisionSource!}
               decisions={decisions}
               loading={decisionsLoading}
@@ -2805,7 +2798,7 @@ export default function ProjectsWorkspace({
         <DetailTabPanel tabsId={tabsId} tabId="overview" active={activeTab === "overview"}>{renderOverview(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="activity" active={visibleProjectTab(activeTab) === "activity"}>{renderTimeline(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="links" active={visibleProjectTab(activeTab) === "links"}>
-          <div className={styles.projectLinks}>{renderPeople(item)}{renderNotesDecisions(item)}{renderFilesLinks(item)}<RelatedRecords module="projects" type="project" id={item.project.id} /></div>
+          <div className={styles.projectLinks}>{renderPeople(item)}{renderNotesDecisions(item)}{renderFilesLinks(item)}<RelatedRecords module="projects" type="project" id={item.project.id} hideEmpty /></div>
         </DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="properties" active={activeTab === "properties"}>{renderProperties(item)}</DetailTabPanel>
       </div>

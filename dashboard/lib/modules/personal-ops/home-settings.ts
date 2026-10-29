@@ -5,6 +5,9 @@ export const HOME_SHORTCUTS = [
   { id: "personal-build", label: "Personal Build", icon: "build", href: "/admin/personal/personal-build" },
   { id: "car", label: "Car", icon: "car", href: "/admin/personal/car" },
   { id: "style-guide", label: "Style Guide", icon: "style-guide", href: "/admin/personal/style-guide" },
+  { id: "health", label: "Health", icon: "health", href: "/admin/personal/health" },
+  { id: "meals", label: "Meals", icon: "meals", href: "/admin/personal/meals" },
+  { id: "fitness", label: "Fitness", icon: "fitness", href: "/admin/personal/fitness" },
   { id: "dog", label: "Dog", icon: "dog", href: "/admin/personal/dog" }
 ] as const;
 export const SECTION_ICONS = ["list", "goal", "routine", "travel", "car", "dog", "build", "resource", "star", "person"] as const;

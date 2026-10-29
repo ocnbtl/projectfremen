@@ -2048,3 +2048,52 @@
 .projectLinks :global(.system-state__title) { font-size: 14px; }
 .projectLinks :global(.system-state__description) { font-size: 13px; }
 @media(max-width:760px) { .projectLinks { grid-template-columns: minmax(0, 1fr); gap: 14px; } .projectBody .projectLinks .panel { padding: 14px; } }
+.inlineProperties {max-width:1040px;}
+.propertyFields {display:grid;grid-template-columns:minmax(0,2fr) minmax(150px,1fr) minmax(150px,1fr);gap:18px;}
+.propertyFields label {display:flex;flex-direction:column;gap:7px;min-width:0;font-size:13px;color:var(--text-muted);}
+.propertyFields [data-wide=true] {grid-column:1/-1;}
+.propertyFields input,.propertyFields textarea {width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;color:var(--text-strong);background:var(--panel-bg);outline:none;}
+.propertyFields textarea {resize:none;}
+.propertyFields input:focus,.propertyFields textarea:focus {border-color:var(--module-accent);box-shadow:0 0 0 3px var(--module-primary-50);}
+.inlineProperties[data-editing=false] .propertyFields :is(input,textarea) {border-color:transparent;background:var(--panel-bg-subtle);}
+.inlineProperties[data-editing=false] .propertyFields button:disabled {opacity:1;color:var(--text-strong);}
+.projectBody .button,.inlineProperties .button {display:inline-flex;align-items:center;justify-content:center;gap:6px;color:var(--module-accent);}
+.projectBody .button[data-primary=true],.inlineProperties .button[data-primary=true] {background:var(--module-accent);border-color:var(--module-accent);color:white;}
+.projectLinks .panelHeader {min-height:36px;}
+.projectLinks .panel {padding:15px;}
+.projectLinks .panel p {margin:8px 0;font-size:13px;color:var(--text-muted);}
+.projectLinks .inlineActions {gap:6px;}
+.projectLinks .button {font-size:12px;padding:6px 10px;min-height:34px;}
+@media(max-width:700px) {.propertyFields{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}.propertyFields>label:first-child{grid-column:1/-1;}.inlineProperties .panelHeader{gap:10px;flex-wrap:wrap;}}
+
+/* Keep objective actions on the same baseline without oversized cards. */
+.objectivesPanel .objectiveList {gap:7px;}
+.objectivesPanel .objectiveList li {grid-template-columns:12px minmax(0,1fr) 138px 32px;align-items:center;padding:4px 7px;gap:6px;}
+.objectivesPanel .objectiveList input {min-height:34px;height:34px;padding:5px 6px;font-size:13px;}
+.objectivesPanel .objectiveList .objectiveDate {width:138px;grid-column:auto;}
+.objectivesPanel .objectiveList .removeObjectiveButton {grid-column:auto;grid-row:auto;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;min-height:32px;padding:0;border-radius:8px;}
+.objectivesPanel .removeObjectiveButton svg {width:16px;height:16px;flex:none;}
+@media(max-width:600px) {
+  .objectivesPanel .objectiveList li {grid-template-columns:12px minmax(0,1fr) 32px;}
+  .objectivesPanel .objectiveDate {grid-row:2;grid-column:2!important;}
+  .objectivesPanel .objectiveList .removeObjectiveButton {grid-column:3;grid-row:1;}
+}
+
+.shell,.detailShell,.projectBody {--action-primary:var(--module-action);--action-primary-hover:var(--module-action-hover);--action-primary-pressed:var(--module-action-hover);--action-primary-contrast:var(--module-action-contrast);}
+.projectBody .button,.inlineProperties .button {color:var(--module-icon);}
+.projectBody .button[data-primary=true],.inlineProperties .button[data-primary=true] {background:var(--module-action);border-color:var(--module-action);color:var(--module-action-contrast);}
+.propertyFields input,.propertyFields textarea {margin:0!important;}
+.propertyFields input {height:40px;}
+.projectBody .projectLinks .panel {padding:15px;}
+
+.objectivesPanel .objectiveList input {margin:0!important;}
+
+.projectLinks .embeddedPanel p {padding:0;border:0;border-radius:0;background:none;margin:8px 0;}
+
+@media(max-width:760px) {
+  .projectBody .activityList li {grid-template-columns:9px minmax(0,1fr) auto;}
+  .projectBody .activityList .itemBody {grid-column:2/-1;grid-row:1;}
+  .projectBody .activityList .activityActions {grid-column:3;grid-row:2;justify-self:end;}
+  .projectBody .activityList .timelineMeta {grid-column:2;grid-row:2;justify-self:start;font-size:12px;}
+  .projectBody .activityActions .iconButton {width:32px;height:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0;}
+}

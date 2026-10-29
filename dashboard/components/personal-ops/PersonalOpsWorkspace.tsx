@@ -1587,7 +1587,7 @@ export default function PersonalOpsWorkspace({
               </div>
               <button type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></button>
               <p className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</p>
-              <div className={styles.personalCardMeta}><span className={styles.personalCardType}><PersonalOpsIcon name={cardIcon(item)}/>{typeLabel(item)}</span><PersonalOpsStatusChip className={styles.personalCardStatus} tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip>{item.source === "native" && item.domain && <span className={styles.personalCardDomain}>{item.domain}</span>}</div>
+              <div className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalOpsStatusChip className={styles.personalCardStatus} tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip></div>
             </article>)}</section>
           )}
         </div>

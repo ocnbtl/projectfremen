@@ -317,4 +317,8 @@
   {"id": "place-tag-personal", "label": "Place tag: Personal", "defaultCandidate": "user-heart", "candidates": ["user-heart", "user", "user-circle", "heart", "user-star"], "usages": [{"module": "Map", "breadcrumb": "Places > Tags, filters and place details"}]},
   {"id": "place-tag-travel", "label": "Place tag: Travel", "defaultCandidate": "luggage", "candidates": ["luggage", "plane", "compass", "route", "world"], "usages": [{"module": "Map", "breadcrumb": "Places > Tags, filters and place details"}]},
   {"id": "place-tag-custom", "label": "Place tag: Custom", "defaultCandidate": "tag", "candidates": ["tag", "tags", "bookmark", "label", "hash"], "usages": [{"module": "Map", "breadcrumb": "Places > Tags, filters and place details"}]}
+,
+  {"id":"health","label":"Health","defaultCandidate":"heartbeat","candidates":["heartbeat","heart","stethoscope","activity","medical-cross"],"usages":[{"module":"Personal","breadcrumb":"Health"}]},
+  {"id":"meals","label":"Meals","defaultCandidate":"tools-kitchen-2","candidates":["tools-kitchen-2","soup","salad","chef-hat","bowl-spoon"],"usages":[{"module":"Personal","breadcrumb":"Meals"}]},
+  {"id":"fitness","label":"Fitness","defaultCandidate":"barbell","candidates":["barbell","run","stretching","activity","gymnastics"],"usages":[{"module":"Personal","breadcrumb":"Fitness"}]}
 ]

@@ -48,6 +48,7 @@ export default function LinkedFollowUpsPanel({
   compact = false,
   presentation = "default",
   showHeader = true,
+  showRefresh = true,
   showBoundary = true,
   hideWhenEmpty = false,
   className = "",
@@ -64,6 +65,7 @@ export default function LinkedFollowUpsPanel({
   compact?: boolean;
   presentation?: "default" | "rail" | "people";
   showHeader?: boolean;
+  showRefresh?: boolean;
   showBoundary?: boolean;
   hideWhenEmpty?: boolean;
   className?: string;
@@ -96,7 +98,7 @@ export default function LinkedFollowUpsPanel({
           </div>
           {presentation === "people" ? (
             <strong className={styles.count} aria-label={`${linked.length} linked follow-ups`}>{linked.length}</strong>
-          ) : (
+          ) : showRefresh ? (
             <button
               type="button"
               className={styles.refresh}
@@ -106,7 +108,7 @@ export default function LinkedFollowUpsPanel({
             >
               {loading ? "Checking…" : presentation === "rail" ? "Check" : "Refresh status"}
             </button>
-          )}
+          ) : null}
         </header>
       )}
 

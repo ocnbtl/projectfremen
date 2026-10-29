@@ -33,10 +33,12 @@ export default function LinkedDecisionsPanel({
   limit = 3,
   compact = false,
   showHeader = true,
+  showRefresh = true,
   showBoundary = true,
   showSummary = true,
   showDecisionDetails = false,
   hideWhenEmpty = false,
+  emptyLabel = "No Personal Decision uses this exact source.",
   className = "",
   wide = false,
   title = "Personal decisions"
@@ -50,10 +52,12 @@ export default function LinkedDecisionsPanel({
   limit?: number;
   compact?: boolean;
   showHeader?: boolean;
+  showRefresh?: boolean;
   showBoundary?: boolean;
   showSummary?: boolean;
   showDecisionDetails?: boolean;
   hideWhenEmpty?: boolean;
+  emptyLabel?: string;
   className?: string;
   wide?: boolean;
   title?: string;
@@ -78,7 +82,7 @@ export default function LinkedDecisionsPanel({
             <span>Personal owner</span>
             <strong>{title}</strong>
           </div>
-          <button
+          {showRefresh && <button
             type="button"
             className={styles.refresh}
             onClick={onRefresh}
@@ -86,7 +90,7 @@ export default function LinkedDecisionsPanel({
             aria-label={`Refresh linked Decisions for ${source.label}`}
           >
             {loading ? "Refreshing…" : "Refresh status"}
-          </button>
+          </button>}
         </header>
       )}
 
@@ -129,7 +133,7 @@ export default function LinkedDecisionsPanel({
         </ul>
       ) : (
         <p className={styles.empty}>
-          No Personal Decision uses this exact source.
+          {emptyLabel}
         </p>
       )}
 

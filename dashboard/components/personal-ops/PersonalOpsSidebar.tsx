@@ -20,6 +20,9 @@ export type PersonalOpsSidebarView =
   | "personal-build"
   | "car"
   | "style-guide"
+  | "health"
+  | "meals"
+  | "fitness"
   | "dog"
   | "inbox"
   | "templates";
@@ -67,6 +70,9 @@ const VIEW_ROUTES: Record<PersonalOpsSidebarView, string> = {
   car: "/admin/personal/car",
   "style-guide": "/admin/personal/style-guide",
   dog: "/admin/personal/dog",
+  health: "/admin/personal/health",
+  meals: "/admin/personal/meals",
+  fitness: "/admin/personal/fitness",
   inbox: "/admin/personal/inbox",
   templates: "/admin/personal/templates"
 };
@@ -127,7 +133,7 @@ export default function PersonalOpsSidebar({
   mobileOpen: boolean;
   onClose: () => void;
 }) {
-  const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car", "style-guide", "dog"].includes(activeView);
+  const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car", "style-guide", "dog", "health", "meals", "fitness"].includes(activeView);
   const domainItems: ModuleSidebarItem[] = PERSONAL_OPS_DOMAIN_LABELS.map((domain) => {
     const id = `domain-${domain.toLowerCase().replace(/\s+/g, "-")}`;
     return {
@@ -239,7 +245,7 @@ export default function PersonalOpsSidebar({
     ? [commandSection, dataSection]
     : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }, dataSection];
 
-  sections.splice(1, 0, { id: "personal-systems", label: "Personal", items: ([ ["passwords", "Passwords", "password"], ["lists", "Lists", "list"], ["travel", "Travel", "travel"], ["personal-build", "Personal build", "build"], ["car", "Car", "car"], ["style-guide", "Style guide", "style-guide"], ["dog", "Dog", "dog"] ] as const).map(([view, label, icon]) => ({ id: view, label, href: VIEW_ROUTES[view], active: activeView === view, icon: <PersonalOpsIcon name={icon}/> })) });
+  sections.splice(1, 0, { id: "personal-systems", label: "Personal", items: ([ ["passwords", "Passwords", "password"], ["lists", "Lists", "list"], ["travel", "Travel", "travel"], ["personal-build", "Personal build", "build"], ["car", "Car", "car"], ["style-guide", "Style guide", "style-guide"], ["dog", "Dog", "dog"], ["health", "Health", "health"], ["meals", "Meals", "meals"], ["fitness", "Fitness", "fitness"] ] as const).map(([view, label, icon]) => ({ id: view, label, href: VIEW_ROUTES[view], active: activeView === view, icon: <PersonalOpsIcon name={icon}/> })) });
 
   return (
     <ModuleSidebar

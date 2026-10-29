@@ -2500,3 +2500,9 @@ button.metric {
 .personalCardLinks > button > span:last-child {max-width:100%;white-space:normal;overflow-wrap:anywhere;}
 .personalCardMeta {align-self:end;}
 @supports not (grid-template-rows:subgrid) {.personalCards article {grid-row:auto;grid-template-rows:auto auto 1fr auto;}}
+
+/* All linked identities use the same compact tag dimensions. */
+.personalCardLinks > :is(a,span,button) {box-sizing:border-box;height:34px;min-height:34px;max-width:100%;padding:3px 8px 3px 3px;border:1px solid var(--border);border-radius:999px;display:inline-flex;align-items:center;gap:6px;font:400 12px/1.4 var(--font-body);background:var(--surface-panel);color:var(--text-strong);--linked-object-size:26px;}
+.personalCardLinks > :is(a,span,button) > :first-child:is([role=img],:has(img),[class*=visual]) {width:26px;height:26px;min-width:26px;flex:0 0 26px;}
+.personalCardLinks > button > span:last-child {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.personalCardMeta .personalCardType {display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;box-sizing:border-box;padding:5px;flex:none;}
