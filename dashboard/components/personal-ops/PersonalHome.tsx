@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { WorkspaceButton, WorkspaceSheet } from "../admin-shell/WorkspaceKit";
+import { WorkspaceNavSlot } from "../admin-shell/WorkspaceTopbar";
 import SelectField from "../ui/SelectField";
 import PersonalOpsIcon from "./PersonalOpsIcon";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
@@ -61,10 +62,10 @@ export default function PersonalHome({ state, projectGoalCount = 0 }: { state: P
     {label:"Obligations", icon:"check" as const, href:"obligations", count:active(state.obligations), description:"Commitments to follow through"}
   ];
   return <section className={styles.home} aria-label="Your Personal workspace">
-    <header className={styles.sectionHeader}><WorkspaceButton icon="plus" disabled={!loaded || busy} onClick={() => {setDraft(settings); setOpen(true); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-label="New section name"]')?.focus());}}>Add section</WorkspaceButton><WorkspaceButton icon="edit" disabled={!loaded || busy} onClick={() => {setDraft(settings); setOpen(true);}}>Customize</WorkspaceButton></header>
+    <WorkspaceNavSlot kind="actions"><div className={styles.sectionHeader}><WorkspaceButton icon="plus" disabled={!loaded || busy} onClick={() => {setDraft(settings); setOpen(true); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-label="New section name"]')?.focus());}}>Add section</WorkspaceButton><WorkspaceButton icon="edit" disabled={!loaded || busy} onClick={() => {setDraft(settings); setOpen(true);}}>Customize</WorkspaceButton></div></WorkspaceNavSlot>
     {error && !open && <p role="alert">{error}</p>}
     <nav className={styles.shortcuts} aria-label="Personal spaces">{shortcuts.filter(item => !settings.hidden.includes(item.id)).map(item => <Link prefetch={false} href={item.href} key={item.id}><span><PersonalOpsIcon name={item.icon}/></span><strong>{item.label}</strong></Link>)}{loaded && shortcuts.every(item => settings.hidden.includes(item.id)) && <p>Choose spaces in Customize to make this page yours.</p>}</nav>
-    <div className={styles.operations}>{operations.map(item => <Link prefetch={false} href={`/admin/personal/${item.href}`} key={item.href}><PersonalOpsIcon name={item.icon}/><span><strong>{item.label}</strong><small>{item.description}</small></span><b>{item.count}</b></Link>)}</div>
+    <div className={styles.operations}>{operations.map(item => <Link prefetch={false} href={`/admin/personal/${item.href}`} key={item.href}><PersonalOpsIcon name={item.icon}/><span><strong>{item.label}</strong></span><b>{item.count}</b></Link>)}</div>
     <WorkspaceSheet open={open} onClose={() => {if (!busy) setOpen(false);}} title="Customize Personal" titleIcon="module-personal" presentation="center" className={styles.customizeSheet} focusInput={false}>
       <div className={styles.customize}>
         <p>Choose the spaces shown here. Hiding a space keeps all its information.</p>

@@ -2464,13 +2464,13 @@ button.metric {
 .rowTitle {font-size:.875rem;line-height:1.45;font-weight:600;}
 .rowSummary {font-size:.8125rem;line-height:1.4;}
 @media(max-width:760px){.personalSystemsDock{margin-inline:16px}.personalSystemsDock a{min-height:44px}}
-.personalCards { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:12px; padding:16px 20px; }
+.personalCards { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:16px; padding:16px 20px; }
 .personalCards article { min-width:0; border:1px solid var(--border); border-radius:14px; padding:16px; background:var(--surface); transition:background .2s; }
-.personalCards article:is(:hover,[data-selected=true]) { background:var(--module-primary-50); }
+.personalCards article:is(:hover,:focus-within,[data-selected=true]) { background:var(--module-primary-100); }
 .personalCardOpen { display:flex; align-items:flex-start; width:100%; gap:12px; padding:0; color:var(--text-strong); text-align:left; }
 .personalCardOpen svg { flex:none; color:var(--module-accent); }
 .personalCardOpen span { display:grid; gap:5px; min-width:0; }
-.personalCardOpen strong { font-size:15px; overflow-wrap:anywhere; }
+.personalCardOpen strong { font-size:14px; font-weight:500; line-height:1.5; overflow-wrap:anywhere; }
 .personalCardOpen small { font-size:12px; color:var(--text-muted); }
 .personalCardMeta { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:12px; font-size:12px; }
 .personalCardMeta time { margin-left:auto; }
@@ -2478,3 +2478,11 @@ button.metric {
 @media(max-width:600px) { .personalCards {grid-template-columns:minmax(0,1fr);padding:12px;} }
 .filterHeading { display:block; width:100%; padding:10px 5px 3px; font-size:12px; color:var(--text-muted); }
 .personalCards .personalCardOpen { background:none; border:0; border-radius:0; box-shadow:none; font-family:var(--font-body); }
+.personalCardType {display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:var(--module-primary-50);color:var(--module-accent);font-size:11px;line-height:1.4;}
+.personalCardType svg,.personalCardLinks svg {width:14px;height:14px;flex:none;}
+.personalCardLinks {display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+.personalCardLinks:empty {display:none;}
+.personalCardLinks > :is(a,span) {display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-strong);overflow-wrap:anywhere;text-decoration:none;}
+.personalCardLinks a:is(:hover,:focus-visible) {background:var(--surface-panel);border-color:var(--module-accent);}
+.personalCardLinks > .personalCardDomain {border:0;padding-inline:0;color:var(--text-muted);}
+@media(prefers-reduced-motion:reduce) {.personalCards article {transition:none;}}

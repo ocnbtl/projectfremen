@@ -367,6 +367,15 @@ function typeLabel(item: PersonalOpsListItem) {
   return FAMILY_LABELS[familyForObject(item)];
 }
 
+function cardIcon(item: PersonalOpsListItem): PersonalOpsIconName {
+  return item.objectType === "goal" ? "goal" : item.objectType === "decision" ? "decision" : item.objectType === "follow_up" ? "follow-up" : "check";
+}
+
+function cardLinks(item: PersonalOpsListItem): NativeObjectRef[] {
+  if (item.source === "legacy-goal") return [];
+  return [...new Map([...item.sourceRefs, ...item.linkedRefs].map(ref => [`${ref.module}:${ref.objectType}:${ref.containerObjectId || ""}:${ref.objectId}`, ref])).values()];
+}
+
 function stateLabel(item: PersonalOpsListItem) {
   if (item.source === "legacy-goal") return item.done ? "complete" : "active";
   return nativeStateLabel(item);
@@ -1533,12 +1542,9 @@ export default function PersonalOpsWorkspace({
       />
 
       <main className={styles.directory} aria-label={`${VIEW_COPY[initialView].title} ledger`}>
-        <div className={styles.mobileToolbar}>
-          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button>
-        </div>
         <div className={styles.mainScroll}>
           <WorkspaceHeader title={initialView === "command" ? "Personal" : VIEW_COPY[initialView].title} count={scopedItems.length}>
-            {initialView === "command" ? <SelectField aria-label="Create personal item" value="" onChange={event => {if(event.target.value) openCreate(event.target.value as PersonalOpsFamily);}}><option value="" disabled>Add new</option>{(["goals","followUps","decisions","obligations"] as const).map(family => <option value={family} key={family}>{FAMILY_LABELS[family]}</option>)}</SelectField> : <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate(primaryFamily)}>Add {FAMILY_LABELS[primaryFamily].toLowerCase()}</WorkspaceButton>}
+            {initialView === "command" ? <SelectField aria-label="Create personal item" optionIcons={{"":"plus",goals:"goal",followUps:"follow-up",decisions:"decision",obligations:"check"}} value="" onChange={event => {if(event.target.value) openCreate(event.target.value as PersonalOpsFamily);}}><option value="" disabled>Add new</option>{(["goals","followUps","decisions","obligations"] as const).map(family => <option value={family} key={family}>{FAMILY_LABELS[family]}</option>)}</SelectField> : <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate(primaryFamily)}>Add {FAMILY_LABELS[primaryFamily].toLowerCase()}</WorkspaceButton>}
           </WorkspaceHeader>
           <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<>{filterItems.map(item=><WorkspaceButton key={item.id} aria-pressed={item.active} onClick={item.onSelect}>{item.label}</WorkspaceButton>)}<strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
@@ -1563,7 +1569,17 @@ export default function PersonalOpsWorkspace({
                 : { label: `Create ${FAMILY_LABELS[primaryFamily]}`, onSelect: () => openCreate(primaryFamily) }}
             />
           ) : (
-            <section className={styles.personalCards} aria-label="Personal records">{scopedItems.map(item => <article key={item.id} data-selected={item.id === urlState.selected || undefined}><button type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><PersonalOpsIcon name={item.source === "legacy-goal" || item.objectType === "goal" ? "goal" : item.objectType === "decision" ? "decision" : item.objectType === "follow_up" ? "follow-up" : "check"}/><span><strong>{item.title}</strong><small>{item.source === "legacy-goal" ? item.entity : item.domain}</small></span></button><div className={styles.personalCardMeta}><PersonalOpsStatusChip tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip><span>{typeLabel(item)}</span>{item.source === "native" && item.dueAt && <time>{formatDate(item.dueAt)}</time>}</div>{summaryForItem(item) && <p>{summaryForItem(item)}</p>}</article>)}</section>
+            <section className={styles.personalCards} aria-label="Personal records">{scopedItems.map(item => <article key={item.id} data-selected={item.id === urlState.selected || undefined}>
+              <button type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></button>
+              <div className={styles.personalCardMeta}><span className={styles.personalCardType}><PersonalOpsIcon name={cardIcon(item)}/>{typeLabel(item)}</span><PersonalOpsStatusChip tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip>{item.source === "native" && item.dueAt && <time>{formatDate(item.dueAt)}</time>}</div>
+              {item.source === "native" && summaryForItem(item) && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title && <p>{summaryForItem(item)}</p>}
+              <div className={styles.personalCardLinks}>
+                {item.source === "legacy-goal" ? <span title={item.projectLabel}><PersonalOpsIcon name="object"/>{item.entity}</span> : <>
+                  {cardLinks(item).map(ref => <Link prefetch={false} href={ref.route} key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || ""}:${ref.objectId}`} title={cleanLabel(ref.module)}><PersonalOpsIcon name="link"/>{ref.label}</Link>)}
+                  {item.domain && <span className={styles.personalCardDomain}>{item.domain}</span>}
+                </>}
+              </div>
+            </article>)}</section>
           )}
         </div>
 
