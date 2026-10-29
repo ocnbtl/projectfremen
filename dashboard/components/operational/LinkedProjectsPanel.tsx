@@ -1,4 +1,6 @@
 "use client";
+import { EventObjectIdentity } from "../planning/EventObjects";
+import { projectLinkPreview } from "../../lib/modules/projects/link-preview";
 import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
@@ -306,13 +308,13 @@ export default function LinkedProjectsPanel({
               return (
                 <li key={connection.projectId}>
                   <Link
-                    href={`${connection.projectRef.route}?tab=${destinationTab}`}
+                    prefetch={false} href={`${connection.projectRef.route}?tab=${destinationTab}`}
                     className={styles.row}
                     data-project-id={connection.projectId}
                     data-project-state={connection.lifecycle}
                   >
                     <span className={styles.rowBody}>
-                      <strong>{connection.name}</strong>
+                      <strong className={styles.projectIdentity}><EventObjectIdentity record={{...connection.projectRef,preview:projectLinkPreview(state.projects.find(project => project.id === connection.projectId))}} />{connection.name}</strong>
                       <small>
                         {roles.join(" · ")}
                         {connection.notes[0] ? ` · ${connection.notes[0]}` : ""}
@@ -380,7 +382,7 @@ export default function LinkedProjectsPanel({
                     data-project-link-state={link.linkState}
                   >
                     <span className={styles.linkBody}>
-                      <strong>{projectName}</strong>
+                      <strong className={styles.projectIdentity}>{project && <EventObjectIdentity record={{...createNativeObjectRef({module:"projects",objectType:"project",objectId:project.id,label:project.name}),preview:projectLinkPreview(project)}} />}{projectName}</strong>
                       <small>
                         {labelize(link.relationship)} · {labelize(link.relationshipStrength)}
                         {link.isRequiredEvidence ? " · Required evidence" : ""}

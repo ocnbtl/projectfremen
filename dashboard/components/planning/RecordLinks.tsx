@@ -1,4 +1,5 @@
 "use client";
+import { linkedImageSource } from "../../lib/native-objects/image-preview";
 import SearchField from "../ui/SearchField";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -44,7 +45,7 @@ export default function RecordLinks({
       <div className="work-links">
         {refs.map((ref) => (
           <span key={key(ref)}>
-            <Link href={ref.route}>
+            <Link prefetch={false} href={ref.route}>
               {ref.module === "people" && ref.objectType === "person" ? <PersonAvatar person={available.find(x => x.module === "people" && x.objectId === ref.objectId) || ref} /> : <EventObjectIdentity record={available.find(x => x.module === ref.module && x.objectType === ref.objectType && x.objectId === ref.objectId) || ref} />}
               {ref.label}
             </Link>
@@ -106,24 +107,22 @@ export default function RecordLinks({
 }
 
 type PreviewRef = NativeObjectRef & {
-  preview?: { imageUrl?: string; detail?: string };
+  preview?: { imageUrl?: string; imageUpdatedAt?: string; detail?: string };
 };
 function RecordIdentity({ record }: { record: PreviewRef }) {
-  const [failed, setFailed] = useState(false),
-    url = record.preview?.imageUrl || "";
-  const safe =
-    /^\/api\/people\/photos\/personal-[0-9a-f-]+$/i.test(url) ||
-    /^https:\/\//.test(url);
+  const [failed, setFailed] = useState("");
+  const url = linkedImageSource(record.preview);
   return (
     <span className="work-record-identity">
-      {safe && !failed ? (
+      {url && failed !== url ? (
         <img
           src={url}
+          loading="lazy"
           data-organization-logo={record.objectType === "organization" || undefined}
           style={record.objectType === "organization" ? organizationLogoStyle : undefined}
           alt=""
           referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
+          onError={() => setFailed(url)}
         />
       ) : record.module === "people" ? (
         <span>

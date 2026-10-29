@@ -450,3 +450,4 @@
     transition: none;
   }
 }
+.projectIdentity { display: inline-flex; align-items: center; gap: 8px; min-width: 0; --linked-object-size: 28px; }

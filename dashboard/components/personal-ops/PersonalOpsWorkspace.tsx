@@ -1724,7 +1724,7 @@ export default function PersonalOpsWorkspace({
                     {urlState.tab === "links" && (
                       <PersonalOpsPanel title="Native links" meta={`${selectedItem.sourceRefs.length + selectedItem.linkedRefs.length} total`} wide>
                         {selectedItem.sourceRefs.length + selectedItem.linkedRefs.length ? (
-                          <ul>{[...selectedItem.sourceRefs, ...selectedItem.linkedRefs].map((ref) => <li key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || "root"}:${ref.objectId}`}><Link href={ref.route}>{ref.label}</Link> <small>({cleanLabel(ref.module)})</small></li>)}</ul>
+                          <ul>{[...selectedItem.sourceRefs, ...selectedItem.linkedRefs].map((ref) => <li key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || "root"}:${ref.objectId}`}><Link prefetch={false} href={ref.route} style={{display:"inline-flex",alignItems:"center",gap:6}}><EventObjectIdentity record={{...ref,preview:linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`]}} />{ref.label}</Link> <small>({cleanLabel(ref.module)})</small></li>)}</ul>
                         ) : <p>No links. Creating a link never moves or deletes either object.</p>}
                       </PersonalOpsPanel>
                     )}

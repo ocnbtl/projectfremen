@@ -4,6 +4,7 @@ import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./EventObjects.module.css";
+import { linkedImageSource } from "../../lib/native-objects/image-preview";
 import { organizationLogoStyle } from "../people/organization-logo";
 
 type PreviewRef = NativeObjectRef & { preview?: { imageUrl?: string; imageUpdatedAt?: string } };
@@ -18,9 +19,7 @@ export function eventObjectRefs(event: EventOccurrence, available: NativeObjectR
   return refs.sort((a,b) => rank(a) - rank(b));
 }
 export function EventObjectIdentity({ record }: { record: PreviewRef }) {
-  const raw = record.preview?.imageUrl || "";
-  const safe = /^\/api\/people\/photos\/personal-[0-9a-f-]+$/i.test(raw) || /^https:\/\//.test(raw);
-  const source = safe ? raw + (record.preview?.imageUpdatedAt ? (raw.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(record.preview.imageUpdatedAt) : "") : "";
+  const source = linkedImageSource(record.preview);
   const [failed, setFailed] = useState("");
   const icon = record.module === "map" ? "location" : record.objectType === "organization" ? "organization" : record.module === "personal_ops" ? "module-personal" : "module-" + record.module;
   return <span className={styles.visual} data-location={!source && record.module === "map" || undefined} data-organization={record.objectType === "organization" || undefined}>

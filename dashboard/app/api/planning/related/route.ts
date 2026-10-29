@@ -1,3 +1,5 @@
+import { readProjectsState } from "../../../../lib/modules/projects/store";
+import { projectLinkPreview } from "../../../../lib/modules/projects/link-preview";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { readPlanningState } from "../../../../lib/modules/planning/store";
@@ -99,8 +101,10 @@ export async function GET(request: Request) {
           detail: `${t.stops.length} stops${t.startDate ? ` · ${t.startDate.slice(0, 10)}` : ""}`,
         });
     const unique = [...new Map(items.map(item => [`${item.ref.module}:${item.ref.objectType}:${item.ref.objectId}`, item])).values()];
+    const projects = unique.some(item => item.ref.module === "projects" && item.ref.objectType === "project") ? await readProjectsState().then(state => state.projects).catch(() => []) : [];
     // Resolve current photos instead of relying on stale previews saved in links.
     const enriched = unique.slice(0, 100).map(item => {
+      if (item.ref.module === "projects" && item.ref.objectType === "project") return {...item, ref:{...item.ref, preview:projectLinkPreview(projects.find(project => project.id === item.ref.objectId))}};
       const record = records.find(record => !record.archivedAt && record.id === item.ref.objectId);
       return { ...item, ref: { ...item.ref, preview: {
         imageUrl: record?.profile?.photoUrl || record?.resourceProfile?.metadata?.imageUrl || "",

@@ -1,3 +1,5 @@
+import { readProjectsState } from "../../../lib/modules/projects/store";
+import { projectLinkPreview } from "../../../lib/modules/projects/link-preview";
 import AdminChrome from "../../../components/AdminChrome";
 import PersonalOpsAdvancedWorkspace, {
   type PersonalOpsAdvancedView
@@ -134,8 +136,15 @@ export default async function PersonalOpsRoutePage({
   const recordsById = new Map(identityRecords.map(record => [record.id, record]));
   const linkedPreviews: Record<string, { imageUrl?: string; imageUpdatedAt?: string; detail?: string }> = {};
   if (nativeResult.ok) {
-    for (const item of [...nativeResult.state.goals, ...nativeResult.state.decisions, ...nativeResult.state.obligations, ...nativeResult.state.followUps]) {
-      for (const ref of [...item.sourceRefs, ...item.linkedRefs]) {
+    const linkedItems = [...nativeResult.state.goals, ...nativeResult.state.decisions, ...nativeResult.state.obligations, ...nativeResult.state.followUps, ...nativeResult.state.routines];
+    const hasProjects = linkedItems.some(item => [...("sourceRefs" in item ? item.sourceRefs : []), ...item.linkedRefs].some(ref => ref.module === "projects" && ref.objectType === "project"));
+    const linkedProjects = hasProjects ? await readProjectsState().then(state => new Map(state.projects.map(project => [project.id, project]))).catch(() => new Map()) : new Map();
+    for (const item of linkedItems) {
+      for (const ref of [...("sourceRefs" in item ? item.sourceRefs : []), ...item.linkedRefs]) {
+        if (ref.module === "projects" && ref.objectType === "project") {
+          linkedPreviews[`projects:project:${ref.objectId}`] = projectLinkPreview(linkedProjects.get(ref.objectId));
+          continue;
+        }
         const record = recordsById.get(ref.objectId);
         if (!record) continue;
         const matches = ref.module === "people" && ((ref.objectType === "person" && record.className === "person") || (ref.objectType === "organization" && record.className === "org")) || ref.module === "resources" && record.className === "resource";

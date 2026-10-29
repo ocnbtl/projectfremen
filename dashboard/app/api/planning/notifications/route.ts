@@ -1,3 +1,5 @@
+import { readProjectsState } from "../../../../lib/modules/projects/store";
+import { projectLinkPreview } from "../../../../lib/modules/projects/link-preview";
 import { reminderIsDue } from "../../../../lib/modules/planning/calendar-tasks";
 import { readPersonalRecords } from "../../../../lib/personal-records-store";
 import { repeatBirthdays } from "../../../../lib/modules/planning/repeat-birthdays";
@@ -33,14 +35,11 @@ export async function GET(request: Request) {
     const taskRecords = state.events.filter(event => event.isTask || event.overrides?.isTask || Object.values(event.exceptions || {}).some(value => value.isTask) || Object.values(event.sourceExceptions || {}).some(value => value.isTask));
     const firstTaskDate = taskRecords.flatMap(event => [event.start, event.overrides?.start, ...Object.values(event.exceptions || {}).map(value => value.start)]).filter((value): value is string => Boolean(value)).map(value => value.slice(0,10)).sort()[0];
     const olderTasks = firstTaskDate && firstTaskDate < addDays(today,-30) ? eventOccurrences(taskRecords,firstTaskDate,addDays(today,-30),zone,birthdays).filter(event => event.isTask) : [];
-    const events = [...new Map([...olderTasks,...recent].map(event => [event.id,event])).values()];
+    const events = [...new Map([...olderTasks,...recent].map(event => [event.id,event])).values()]
+      .filter(event => reminderIsDue(event, state.reminders.find(receipt => receipt.occurrenceId === event.id), now));
+    const projects = events.some(event => event.linkedRefs.some(ref => ref.module === "projects" && ref.objectType === "project")) ? await readProjectsState().then(state => state.projects).catch(() => []) : [];
     const records = events.some(e => e.linkedRefs.length) ? await readPersonalRecords().catch(() => []) : [];
-    const reminders = events
-      .filter(
-        (e) =>
-          reminderIsDue(e, state.reminders.find(r => r.occurrenceId === e.id), now),
-      )
-      .flatMap((e) => {
+    const reminders = events.flatMap((e) => {
         const receipt = state.reminders.find((r) => r.occurrenceId === e.id);
         return receipt &&
           (receipt.state === "dismissed" ||
@@ -56,7 +55,7 @@ export async function GET(request: Request) {
                 startMs: e.startMs,
                 endMs: e.endMs,
                 timeZone: zone,
-                linkedRefs: e.linkedRefs.map(ref => { const record=records.find(r => r.id === ref.objectId); return record ? {...ref, preview:{imageUrl:record.profile?.photoUrl || record.resourceProfile?.metadata?.imageUrl || "", imageUpdatedAt:record.profile?.photoUpdatedAt}} : ref; }),
+                linkedRefs: e.linkedRefs.map(ref => { if(ref.module === "projects" && ref.objectType === "project") return {...ref,preview:projectLinkPreview(projects.find(project=>project.id===ref.objectId))}; const record=records.find(r => r.id === ref.objectId); return record ? {...ref, preview:{imageUrl:record.profile?.photoUrl || record.resourceProfile?.metadata?.imageUrl || "", imageUpdatedAt:record.profile?.photoUpdatedAt}} : ref; }),
                 place: (() => { const p=state.places.find(p => p.id === e.placeId); return p ? {id:p.id,name:p.name} : undefined; })(),
                 location: e.location,
                 allDay: e.allDay,

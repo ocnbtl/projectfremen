@@ -22,6 +22,7 @@ import {
 import { readPersonalRecords } from "../../../lib/personal-records-store";
 import { readPersonalLifeState } from "../../../lib/modules/personal-life/store";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
+import { projectLinkPreview } from "../../../lib/modules/projects/link-preview";
 import { readProjectsState } from "../../../lib/modules/projects/store";
 import { createNativeObjectRef } from "../../../lib/native-objects/routes";
 import { addDays } from "../../../lib/modules/planning/calendar-model";
@@ -103,12 +104,12 @@ export async function GET() {
     }
     for (const project of (projects?.projects || []).filter(project => !project.archivedAt && project.lifecycle !== "archived"))
       refs.push(
-        createNativeObjectRef({
+        Object.assign(createNativeObjectRef({
           module: "projects",
           objectType: "project",
           objectId: project.id,
           label: project.name,
-        }),
+        }), { preview: projectLinkPreview(project) }),
       );
     for (const item of [
       ...(ops?.obligations || []),

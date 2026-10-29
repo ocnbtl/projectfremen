@@ -8,6 +8,11 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 import ObjectPreview, { type ObjectPreviewData } from "./ObjectPreview";
 
+function inlineProjectPreview(target: NativeObjectRef): ObjectPreviewData | undefined {
+  const preview = (target as NativeObjectRef & {preview?: {imageUrl?: string; imageUpdatedAt?: string}}).preview;
+  return target.module === "projects" && preview ? {id:target.objectId,imageUrl:preview.imageUrl,updatedAt:preview.imageUpdatedAt} : undefined;
+}
+
 const kinds = [
   { id: "all", label: "All", icon: "object" },
   { id: "person", label: "People", icon: "person" },
@@ -69,7 +74,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
   const currentKind = kinds.find(item => item.id === kind)!;
   const shown = filtered;
   const [previews, setPreviews] = useState<Record<string, ObjectPreviewData>>({});
-  const previewIds = shown.filter(target => ["people", "resources", "media"].includes(target.module)).map(target => target.objectId).join("|");
+  const previewIds = shown.filter(target => ["people", "resources", "media", "projects"].includes(target.module) && !inlineProjectPreview(target)).map(target => target.objectId).join("|");
   useEffect(() => {
     if (!open || !previewIds) return;
     const controller = new AbortController();
@@ -128,7 +133,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
               options[Math.max(0, Math.min(options.length - 1, next))]?.focus();
             }}>
             {shown.map(target => <button type="button" role="option" tabIndex={objectTargetKey(target) === tabTarget ? 0 : -1} aria-selected={objectTargetKey(target) === value} data-select-value={objectTargetKey(target)} key={objectTargetKey(target)} onClick={() => select(target)}>
-              <ObjectPreview target={target} preview={previews[target.objectId]} icon={objectTargetIcon(target)} />
+              <ObjectPreview target={target} preview={inlineProjectPreview(target) || previews[target.objectId]} icon={objectTargetIcon(target)} />
               <span><strong>{target.label}</strong>{kind === "all" && <small>{objectTargetTypeLabel(target)}</small>}</span>
               <UnigentamosIcon role={objectTargetKey(target) === value ? "check" : "plus"} size={16} />
             </button>)}
