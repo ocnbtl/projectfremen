@@ -1,5 +1,6 @@
 "use client";
 import PersonalHome from "./PersonalHome";
+import { EventObjectIdentity } from "../planning/EventObjects";
 import SelectField from "../ui/SelectField";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 
@@ -82,6 +83,8 @@ export type LegacyEntityGoalProjection = {
   text: string;
   done: boolean;
   index: number;
+  imageUrl?: string;
+  imageUpdatedAt?: string;
 };
 
 export type PersonalOpsWorkspaceProps = {
@@ -90,6 +93,7 @@ export type PersonalOpsWorkspaceProps = {
   legacyGoals: LegacyEntityGoalProjection[];
   legacyCandidates: LegacyPersonalOpsCandidate[];
   initialLoadError?: string;
+  linkedPreviews?: Record<string, { imageUrl?: string; imageUpdatedAt?: string }>;
 };
 
 type LegacyGoalItem = LegacyEntityGoalProjection & {
@@ -1057,7 +1061,8 @@ export default function PersonalOpsWorkspace({
   initialView,
   legacyGoals: initialLegacyGoals,
   legacyCandidates,
-  initialLoadError = ""
+  initialLoadError = "",
+  linkedPreviews = {}
 }: PersonalOpsWorkspaceProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -1571,13 +1576,13 @@ export default function PersonalOpsWorkspace({
           ) : (
             <section className={styles.personalCards} aria-label="Personal records">{scopedItems.map(item => <article key={item.id} data-selected={item.id === urlState.selected || undefined}>
               <button type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></button>
-              <div className={styles.personalCardMeta}><span className={styles.personalCardType}><PersonalOpsIcon name={cardIcon(item)}/>{typeLabel(item)}</span><PersonalOpsStatusChip tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip>{item.source === "native" && item.dueAt && <time>{formatDate(item.dueAt)}</time>}</div>
-              {item.source === "native" && summaryForItem(item) && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title && <p>{summaryForItem(item)}</p>}
-              <div className={styles.personalCardLinks}>
-                {item.source === "legacy-goal" ? <span title={item.projectLabel}><PersonalOpsIcon name="object"/>{item.entity}</span> : <>
-                  {cardLinks(item).map(ref => <Link prefetch={false} href={ref.route} key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || ""}:${ref.objectId}`} title={cleanLabel(ref.module)}><PersonalOpsIcon name="link"/>{ref.label}</Link>)}
-                  {item.domain && <span className={styles.personalCardDomain}>{item.domain}</span>}
-                </>}
+              <div className={styles.personalCardMeta}><span className={styles.personalCardType}><PersonalOpsIcon name={cardIcon(item)}/>{typeLabel(item)}</span><PersonalOpsStatusChip className={styles.personalCardStatus} tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip>{item.source === "native" && item.domain && <span className={styles.personalCardDomain}>{item.domain}</span>}</div>
+              <p className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</p>
+              <div className={styles.personalCardDates}>
+                {item.source === "native" && <><time dateTime={item.createdAt} title={`Created ${formatTimestamp(item.createdAt)}`}><PersonalOpsIcon name="today"/>Created {formatDate(item.createdAt)}</time>{item.dueAt && <time dateTime={item.dueAt} title="Due date">Due {formatDate(item.dueAt)}</time>}</>}
+              </div>
+              <div className={styles.personalCardLinks} aria-label="Linked objects">
+                {item.source === "legacy-goal" ? <span title={item.projectLabel}><EventObjectIdentity record={{module:"people",objectType:"organization",objectId:item.slug,label:item.entity,route:"",preview:{imageUrl:item.imageUrl,imageUpdatedAt:item.imageUpdatedAt}}}/>{item.entity}</span> : cardLinks(item).map(ref => <Link prefetch={false} href={ref.route} key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || ""}:${ref.objectId}`} title={cleanLabel(ref.module)}><EventObjectIdentity record={{...ref,preview:linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`]}}/>{ref.label}</Link>)}
               </div>
             </article>)}</section>
           )}

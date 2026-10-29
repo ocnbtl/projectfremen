@@ -2607,7 +2607,7 @@ export default function NotesWorkspace({
           ) : unavailableViewReason ? (
             <SystemState variant="read_only" title="This Notes view is staged" description={unavailableViewReason} />
           ) : visibleNotes.length ? (
-            <div className={`resource-directory ${density === "grid" ? "is-grid" : density === "compact" ? "is-compact" : ""}`} data-density={density} role="list" aria-label="Notes">
+            <div className={`resource-directory ${density === "grid" ? "is-grid" : density === "compact" ? "is-compact" : ""}`} data-notes data-density={density} role="list" aria-label="Notes">
               {visibleNotes.map((note) => {
                 const item = noteRecordToDirectoryItem(note);
                 const propertyItem = propertyQueue.byNoteId.get(note.id);

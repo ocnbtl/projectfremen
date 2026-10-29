@@ -294,27 +294,27 @@ html[data-active-module] button.workspace-actions-trigger:is(:hover,[data-state=
 }
 
 /* Resources: stable identity, classification, and supporting information in every view. */
-.resource-directory[data-library] .resource-directory-card {align-items:start;border-radius:14px;min-height:0;padding:16px;gap:14px;}
+.resource-directory[data-library] .resource-directory-card {grid-template-columns:80px minmax(0,1fr);align-items:start;border-radius:14px;min-height:0;padding:16px;gap:14px;}
 .resource-directory[data-library] .resource-card-content {gap:8px;}
 .resource-directory[data-library] .resource-card-heading {grid-template-columns:minmax(0,1fr);gap:8px;}
 .resource-directory[data-library] .resource-card-tags {grid-template-columns:20px minmax(0,1fr) 28px;gap:6px;padding:0;background:transparent;min-height:28px;}
 .resource-directory[data-library] .resource-card-tag {background:var(--module-quiet);padding:3px 8px;border-radius:999px;max-width:100%;}
-.resource-directory[data-library] .resource-card-picture {align-self:center;width:64px;height:64px;}
+.resource-directory[data-library] .resource-card-picture {align-self:center;width:80px;height:80px;}
 .resource-directory[data-library] .resource-card-source {flex-basis:auto;}
 .resource-directory[data-library] .resource-card-description {font-size:13px;line-height:1.5;}
-.resource-directory[data-library].is-compact .resource-directory-card {grid-template-columns:44px minmax(0,1fr);padding:12px;gap:10px;}
-.resource-directory[data-library].is-compact .resource-card-picture {width:44px;height:44px;}
+.resource-directory[data-library].is-compact .resource-directory-card {grid-template-columns:60px minmax(0,1fr);padding:12px;gap:10px;}
+.resource-directory[data-library].is-compact .resource-card-picture {width:60px;height:60px;}
 .resource-directory[data-library].is-compact .resource-card-title {font-size:14px;}
 .resource-directory[data-library].is-compact .resource-card-description {-webkit-line-clamp:1;}
-.resource-directory[data-library].is-grid .resource-directory-card {grid-template-columns:52px minmax(0,1fr);grid-template-rows:minmax(52px,auto) auto auto auto;gap:10px;align-content:start;}
-.resource-directory[data-library].is-grid .resource-card-picture {width:52px;height:52px;}
+.resource-directory[data-library].is-grid .resource-directory-card {grid-template-columns:72px minmax(0,1fr);grid-template-rows:minmax(72px,auto) auto auto auto;gap:10px;align-content:start;}
+.resource-directory[data-library].is-grid .resource-card-picture {width:72px;height:72px;}
 .resource-directory[data-library].is-grid .resource-card-tags {grid-row:2;}
 .resource-directory[data-library].is-grid .resource-card-title {-webkit-line-clamp:2;align-self:start;}
 .resource-directory[data-library].is-grid .resource-card-description {-webkit-line-clamp:3;}
 @media(min-width:1800px){.resource-directory[data-library].is-compact{grid-template-columns:repeat(3,minmax(0,1fr));}}
 @media(max-width:700px){
- .resource-directory[data-library].is-grid .resource-directory-card{grid-template-columns:minmax(0,1fr);grid-template-rows:44px minmax(38px,auto) auto auto;padding:12px;}
- .resource-directory[data-library].is-grid .resource-card-picture{grid-column:1;grid-row:1;width:44px;height:44px;justify-self:start;}
+ .resource-directory[data-library].is-grid .resource-directory-card{grid-template-columns:minmax(0,1fr);grid-template-rows:60px minmax(38px,auto) auto auto;padding:12px;}
+ .resource-directory[data-library].is-grid .resource-card-picture{grid-column:1;grid-row:1;width:60px;height:60px;justify-self:start;}
  .resource-directory[data-library].is-grid .resource-card-title{grid-column:1;grid-row:2;font-size:13px;}
  .resource-directory[data-library].is-grid .resource-card-tags{grid-row:3;grid-template-columns:18px minmax(0,1fr) 20px;gap:4px;padding:0;}
  .resource-directory[data-library].is-grid .resource-card-description{font-size:12px;}
@@ -323,3 +323,14 @@ html[data-active-module] button.workspace-actions-trigger:is(:hover,[data-state=
 .admin-global-topnav,.app-top-nav,.workspace-topnav {border-bottom:0!important;box-shadow:none;}
 .work-sheet-header h2 {display:flex;align-items:center;gap:10px;}
 .work-sheet-header h2 > svg {flex:none;}
+
+/* Notes keep their type, state and update date close to their content. */
+.resource-directory[data-notes].is-grid .resource-directory-card {min-height:0;grid-template-columns:44px minmax(0,1fr);grid-template-rows:44px auto auto auto;align-content:start;gap:6px 12px;}
+.resource-directory[data-notes].is-grid .resource-card-picture {width:44px;height:44px;}
+.resource-directory[data-notes].is-grid .resource-card-title {align-self:start;-webkit-line-clamp:2;}
+.resource-directory[data-notes].is-grid .resource-card-tags {display:flex;justify-content:flex-start;gap:6px;}
+.resource-directory[data-notes].is-grid .resource-card-pin:empty {display:none;}
+.resource-directory[data-notes].is-grid .resource-card-details {line-height:1.4;}
+@media(max-width:700px) {
+ .resource-directory[data-notes].is-grid .resource-directory-card {grid-template-columns:minmax(0,1fr);grid-template-rows:44px minmax(36px,auto) auto auto;gap:6px;}
+}
