@@ -52,7 +52,7 @@ export function wellnessOccurrence(entry: WellnessEntry, date: string) {
   const duration = Temporal.PlainDateTime.from(schedule.end).since(Temporal.PlainDateTime.from(schedule.start));
   const original = Temporal.PlainDateTime.from(date + schedule.start.slice(10));
   const override = entry.occurrenceOverrides?.[date];
-  return { date, start: override?.start || original.toString({smallestUnit:"minute"}), end: override?.end || original.add(duration).toString({smallestUnit:"minute"}), completed: schedule.repeat ? override?.completed === true : entry.status === "completed" };
+  return { date, skipped: Boolean(schedule.repeat && override?.skipped === true), start: override?.start || original.toString({smallestUnit:"minute"}), end: override?.end || original.add(duration).toString({smallestUnit:"minute"}), completed: schedule.repeat ? override?.completed === true : entry.status === "completed" };
 }
 export function wellnessOccurrences(entry: WellnessEntry, from: string, through: string) {
   const rows: NonNullable<ReturnType<typeof wellnessOccurrence>>[] = [];

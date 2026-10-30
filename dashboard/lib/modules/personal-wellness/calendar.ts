@@ -9,7 +9,7 @@ export function wellnessCalendarEvents(section: "meals" | "fitness", entries: We
     const schedule = entry.schedule!;
     const dayCodes = ["MO","TU","WE","TH","FR","SA","SU"];
     const exceptions: CalendarEvent["exceptions"] = {};
-    for (const [date, override] of Object.entries(entry.occurrenceOverrides || {})) if (schedule.repeat && isWellnessDate(schedule, date)) exceptions[`${date}${schedule.start.slice(10)}:00`] = { ...override };
+    for (const [date, override] of Object.entries(entry.occurrenceOverrides || {})) if (schedule.repeat && isWellnessDate(schedule, date)) exceptions[`${date}${schedule.start.slice(10)}:00`] = { ...override, cancelled: override.skipped === true };
     return ({
     ...schedule, start: firstWellnessDate(schedule) + schedule.start.slice(10), end: wellnessOccurrence({ ...entry, occurrenceOverrides: {} }, firstWellnessDate(schedule))!.end, id: wellnessCalendarId(section, entry.id), title: entry.title, description: "", allDay: false,
     // Private recipe, exercise and care notes stay in Personal, including in shared feeds.

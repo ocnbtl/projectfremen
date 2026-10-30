@@ -18,7 +18,7 @@ export const PERSONAL_OPS_ICON_LIBRARY = [
   { name: "health", label: "Health" },
   { name: "meals", label: "Meals" },
   { name: "fitness", label: "Fitness" },
-  { name: "dog", label: "Dog" },
+  { name: "dog", label: "Pets" },
   { name: "sort", label: "Sort" },
   { name: "font", label: "Typography" },
   { name: "palette", label: "Color" },

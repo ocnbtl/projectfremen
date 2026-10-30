@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { appendAuditEvent, getRequestIp } from "../../../../lib/audit-log";
 import { isCsrfRequestValid } from "../../../../lib/csrf";
-import { createDogCareEvent, deleteDogCareEvent, readDogTrackerState, updateDogCareEvent } from "../../../../lib/modules/dog-tracker/store";
+import { createDogCareEvent, deleteDogCareEvent, readDogTrackerState, updateDogCareEvent, savePetProfile } from "../../../../lib/modules/dog-tracker/store";
 import type { DogCareInput } from "../../../../lib/modules/dog-tracker/types";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ async function authorizeMutation(request: Request, action: string) {
 
 function responseFor(error: unknown) {
   const message = error instanceof Error ? error.message : "The dog care entry could not be saved";
-  return json({ ok: false, error: message }, message.startsWith("This dog care entry changed") ? 409 : message.endsWith("not found") ? 404 : 400);
+  return json({ ok: false, error: message }, message.includes("changed elsewhere") ? 409 : message.endsWith("not found") ? 404 : 400);
 }
 
 export async function GET() {
@@ -38,8 +38,9 @@ export async function POST(request: Request) {
   const denied = await authorizeMutation(request, "personal_dog.create");
   if (denied) return denied;
   try {
-    const body = await request.json() as { input?: DogCareInput };
-    const item = await createDogCareEvent((body.input || {}) as DogCareInput);
+    const body = await request.json() as { input?: DogCareInput; entity?: string };
+    if (body.entity && !["pet","care"].includes(body.entity)) throw new Error("Unknown record type");
+    const item = body.entity === "pet" ? await savePetProfile(body.input) : await createDogCareEvent((body.input || {}) as DogCareInput);
     await appendAuditEvent({ at: new Date().toISOString(), action: "personal_dog.create.success", path: new URL(request.url).pathname, method: "POST", ip: getRequestIp(request), status: "ok", detail: item.id });
     return json({ ok: true, item });
   } catch (error) {
@@ -51,11 +52,12 @@ export async function PATCH(request: Request) {
   const denied = await authorizeMutation(request, "personal_dog.update");
   if (denied) return denied;
   try {
-    const body = await request.json() as { id?: unknown; input?: Partial<DogCareInput>; expectedUpdatedAt?: unknown };
+    const body = await request.json() as { id?: unknown; input?: Partial<DogCareInput>; entity?: string; expectedUpdatedAt?: unknown };
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const expectedUpdatedAt = typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
     if (!id || !expectedUpdatedAt) throw new Error("Entry id and expectedUpdatedAt are required");
-    const item = await updateDogCareEvent(id, body.input || {}, expectedUpdatedAt);
+    if (body.entity && !["pet","care"].includes(body.entity)) throw new Error("Unknown record type");
+    const item = body.entity === "pet" ? await savePetProfile(body.input,id,expectedUpdatedAt) : await updateDogCareEvent(id, body.input || {}, expectedUpdatedAt);
     await appendAuditEvent({ at: new Date().toISOString(), action: "personal_dog.update.success", path: new URL(request.url).pathname, method: "PATCH", ip: getRequestIp(request), status: "ok", detail: item.id });
     return json({ ok: true, item });
   } catch (error) {

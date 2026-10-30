@@ -44,13 +44,13 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
   const weekStart = new Date(`${currentDay}T12:00:00Z`); weekStart.setUTCDate(weekStart.getUTCDate() - 6); const start = weekStart.toISOString().slice(0, 10);
   const thisWeek = current.flatMap(entry=>entry.schedule?.repeat ? wellnessOccurrences(entry,start,currentDay).filter(row=>row.completed).map(row=>({...entry,date:row.start.slice(0,10),status:"completed" as const})) : entry.status === "completed" && entry.date >= start && entry.date <= currentDay ? [entry] : []);
   const nextWeek = new Date(`${currentDay}T12:00:00Z`); nextWeek.setUTCDate(nextWeek.getUTCDate()+6);
-  const upcoming = current.flatMap(entry=>entry.schedule?.repeat ? wellnessOccurrences(entry,currentDay,nextWeek.toISOString().slice(0,10)).filter(row=>!row.completed).map(row=>({...entry,date:row.start.slice(0,10)})) : entry.status === "planned" && entry.date >= currentDay ? [entry] : []);
+  const upcoming = current.flatMap(entry=>entry.schedule?.repeat ? wellnessOccurrences(entry,currentDay,nextWeek.toISOString().slice(0,10)).filter(row=>!row.completed && !row.skipped).map(row=>({...entry,date:row.start.slice(0,10)})) : entry.status === "planned" && entry.date >= currentDay ? [entry] : []);
   const summary = section === "health" ? [
     { label: "Latest check-in", value: newestCheckIn ? dateLabel(newestCheckIn.date) : "No check-ins yet" },
     { label: "Sleep", value: newestCheckIn?.fields.sleep ? `${newestCheckIn.fields.sleep} hours` : "—" },
     { label: "Energy", value: newestCheckIn?.fields.energy ? `${newestCheckIn.fields.energy} / 5` : "—" }
   ] : section === "meals" ? [
-    { label: "Today's meals", value: String(current.reduce((count,entry)=>count+(entry.kind !== "meal" ? 0 : entry.schedule?.repeat ? wellnessOccurrences(entry,currentDay,currentDay).length : Number(entry.date === currentDay)),0)) },
+    { label: "Today's meals", value: String(current.reduce((count,entry)=>count+(entry.kind !== "meal" ? 0 : entry.schedule?.repeat ? wellnessOccurrences(entry,currentDay,currentDay).filter(row=>!row.skipped).length : Number(entry.date === currentDay)),0)) },
     { label: "Planned", value: String(upcoming.filter(entry=>entry.kind==="meal").length) },
     { label: "Recipes", value: String(current.filter(entry => entry.kind === "recipe").length) }
   ] : [

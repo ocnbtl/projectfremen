@@ -1,6 +1,6 @@
 import { WorkspaceTopbarProvider } from "../../../components/admin-shell/WorkspaceTopbar";
 import AdminChrome from "../../../components/AdminChrome";
-import DogTrackerWorkspace from "../../../components/personal-ops/DogTrackerWorkspace";
+import PetsWorkspace from "../../../components/personal-ops/PetsWorkspace";
 import PersonalStyleGuideWorkspace from "../../../components/personal-ops/PersonalStyleGuideWorkspace";
 import type { PersonalOpsSidebarCounts } from "../../../components/personal-ops/PersonalOpsSidebar";
 import { readDogTrackerState, emptyDogTrackerState } from "../../../lib/modules/dog-tracker/store";
@@ -39,13 +39,13 @@ function countsFor(ops: PersonalOpsState, life: Awaited<ReturnType<typeof readPe
   };
 }
 
-export default async function PersonalUtilityRoutePage({ view }: { view: PersonalUtilityView }) {
+export default async function PersonalUtilityRoutePage({ view, petId }: { view: PersonalUtilityView; petId?: string }) {
   await requireAdminSession();
   const [opsResult, lifeResult, styleResult, dogResult, recordsResult] = await Promise.all([
     readPersonalOpsState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal could not be loaded." })),
     readPersonalLifeState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal systems could not be loaded." })),
     view === "style-guide" ? readStyleGuideState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Style Guide could not be loaded." })) : Promise.resolve({ ok: true as const, state: defaultStyleGuideState() }),
-    readDogTrackerState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Dog care could not be loaded." })),
+    readDogTrackerState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Pets could not be loaded." })),
     view === "style-guide" ? readPersonalRecords().then((records) => ({ ok: true as const, records })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Resources could not be loaded." })) : Promise.resolve({ ok: true as const, records: [] })
   ]);
 
@@ -63,7 +63,7 @@ export default async function PersonalUtilityRoutePage({ view }: { view: Persona
       {view === "style-guide" ? (
         <PersonalStyleGuideWorkspace initialState={style} initialResources={resources} sidebarCounts={counts} initialLoadError={errors || undefined} />
       ) : (
-        <DogTrackerWorkspace initialState={dog} sidebarCounts={counts} initialLoadError={errors || undefined} />
+        <PetsWorkspace initialPetId={petId} initialState={dog} sidebarCounts={counts} initialLoadError={errors || undefined} />
       )}
     </div></WorkspaceTopbarProvider>
   );

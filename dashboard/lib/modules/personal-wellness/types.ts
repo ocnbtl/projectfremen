@@ -5,7 +5,7 @@ export type WellnessEntry = {
   id: string; kind: string; title: string; date: string; status: "planned" | "completed";
   notes: string; fields: Record<string, string>; archived: boolean; createdAt: string; updatedAt: string;
   schedule?: WellnessSchedule | null;
-  occurrenceOverrides?: Record<string, { completed?: boolean; start?: string; end?: string }>;
+  occurrenceOverrides?: Record<string, { completed?: boolean; skipped?: boolean; start?: string; end?: string }>;
 };
 export type WellnessState = { schemaVersion: 1; entries: WellnessEntry[] };
 export type WellnessInput = Pick<WellnessEntry, "kind" | "title" | "date" | "status" | "notes" | "fields" | "archived" | "schedule">;

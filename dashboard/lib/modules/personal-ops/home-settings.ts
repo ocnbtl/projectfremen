@@ -8,7 +8,7 @@ export const HOME_SHORTCUTS = [
   { id: "health", label: "Health", icon: "health", href: "/admin/personal/health" },
   { id: "meals", label: "Meals", icon: "meals", href: "/admin/personal/meals" },
   { id: "fitness", label: "Fitness", icon: "fitness", href: "/admin/personal/fitness" },
-  { id: "dog", label: "Dog", icon: "dog", href: "/admin/personal/dog" }
+  { id: "dog", label: "Pets", icon: "dog", href: "/admin/personal/pets" }
 ] as const;
 export const SECTION_ICONS = ["list", "goal", "routine", "travel", "car", "dog", "build", "resource", "star", "person"] as const;
 export type PersonalSection = { id: string; label: string; icon: typeof SECTION_ICONS[number]; listId: string };

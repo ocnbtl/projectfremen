@@ -190,7 +190,7 @@ const PERSONAL_SYSTEM_LINKS: ReadonlyArray<{ label: string; href: string; icon: 
   { label: "Personal Build", href: "/admin/personal/personal-build", icon: "build" },
   { label: "Car", href: "/admin/personal/car", icon: "car" },
   { label: "Style Guide", href: "/admin/personal/style-guide", icon: "style-guide" },
-  { label: "Dog", href: "/admin/personal/dog", icon: "dog" }
+  { label: "Pets", href: "/admin/personal/pets", icon: "dog" }
 ];
 
 const PERSONAL_OPS_SORT_OPTIONS: ReadonlyArray<{ id: PersonalOpsSort; label: string }> = [

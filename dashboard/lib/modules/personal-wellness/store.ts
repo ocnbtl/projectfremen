@@ -48,8 +48,11 @@ export async function saveWellnessEntry(section: WellnessSection, raw: unknown, 
       if (Object.keys(raw).length || !occurrence || typeof occurrence !== "object" || Array.isArray(occurrence)) throw new Error("Update one occurrence at a time.");
       const change = occurrence as Record<string,unknown>, date = change.date;
       if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !isWellnessDate(previous.schedule,date)) throw new Error("Choose a scheduled occurrence.");
-      if (Object.keys(change).some(key=>!["date","completed","start","end"].includes(key)) || !["completed","start","end"].some(key=>key in change)) throw new Error("Choose a completion or time change.");
+      if (Object.keys(change).some(key=>!["date","completed","skipped","start","end"].includes(key)) || !["completed","skipped","start","end"].some(key=>key in change)) throw new Error("Choose a completion, skip or time change.");
       const override = { ...previous.occurrenceOverrides?.[date] };
+      if (change.completed === true && change.skipped === true) throw new Error("An occurrence cannot be skipped and completed.");
+      if ("skipped" in change) { if (typeof change.skipped !== "boolean") throw new Error("Choose a valid skip status."); override.skipped = change.skipped; if (change.skipped) override.completed = false; }
+      if (change.completed === true) override.skipped = false;
       if ("completed" in change) { if (typeof change.completed !== "boolean") throw new Error("Choose a valid completion status."); override.completed = change.completed; }
       if ("start" in change || "end" in change) { const schedule = validateWellnessSchedule({ ...previous.schedule, repeat: undefined, start: change.start, end: change.end })!; override.start = schedule.start; override.end = schedule.end; }
       const occurrenceOverrides = { ...previous.occurrenceOverrides, [date]: override };

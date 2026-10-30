@@ -1,7 +1,2 @@
-import PersonalUtilityRoutePage from "../PersonalUtilityRoutePage";
-
-export const dynamic = "force-dynamic";
-
-export default function DogPage() {
-  return <PersonalUtilityRoutePage view="dog" />;
-}
+import { redirect } from "next/navigation";
+export default function DogPage() { redirect("/admin/personal/pets"); }
