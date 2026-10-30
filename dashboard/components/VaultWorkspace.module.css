@@ -5,7 +5,7 @@
   --vault-accent: #3e3c38;
   --vault-accent-strong: #282624;
   --vault-mint: #f3f2f0;
-  --vault-canvas: #f4f7f5;
+  --vault-canvas: var(--workspace-canvas, #f6f8f7);
   --vault-surface: rgba(255, 255, 255, .92);
   --vault-control: #fbfcfb;
   --vault-border: rgba(62, 60, 56, .18);

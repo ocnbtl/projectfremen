@@ -40,6 +40,7 @@ export type DogCareEvent = {
   instructions?: string;
   nextDue?: string;
   archived?: boolean;
+  schedule?: import("../personal-wellness/types").WellnessSchedule | null;
 };
 
 export type DogTrackerState = {
@@ -48,4 +49,4 @@ export type DogTrackerState = {
   pets?: PetProfile[];
 };
 
-export type DogCareInput = Pick<DogCareEvent, "kind" | "occurredAt" | "peed" | "pooped" | "notes" | "petId" | "title" | "status" | "amount" | "instructions" | "nextDue" | "archived">;
+export type DogCareInput = Pick<DogCareEvent, "kind" | "occurredAt" | "peed" | "pooped" | "notes" | "petId" | "title" | "status" | "amount" | "instructions" | "nextDue" | "archived" | "schedule">;

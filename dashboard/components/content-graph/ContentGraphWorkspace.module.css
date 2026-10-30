@@ -94,6 +94,7 @@
 }
 
 .mainScroll {
+  composes: workspace-canvas from global;
   height: 100%;
   min-height: 0;
   overflow: auto;

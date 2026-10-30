@@ -249,3 +249,13 @@ details.pending {
     margin-inline: 16px;
   }
 }
+.filters { display:grid;gap:14px;width:min(310px,calc(100vw - 48px)); }
+.filterHeading { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.filters fieldset { border:0;padding:0;margin:0;min-width:0; }
+.filters legend,.filters label { font-size:13px;font-weight:550; }
+.filters legend { margin-bottom:6px; }
+.filters label { display:grid;gap:6px; }
+.filterOptions { display:flex;flex-wrap:wrap;gap:6px; }
+.filterOptions button { flex:1 0 auto;min-height:36px;font-size:13px; }
+.filterOptions button[aria-pressed="true"] { background:var(--selected-bg);border-color:var(--module-accent); }
+.filters p { font-size:12px;color:var(--text-muted);margin:0; }

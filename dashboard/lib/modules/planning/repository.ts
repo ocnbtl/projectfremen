@@ -30,7 +30,7 @@ import {
 } from "./types";
 
 export type PlanningSnapshot = {
-  wellnessEvents?: import("../personal-wellness/calendar").WellnessCalendarEvent[];
+  wellnessEvents?: (import("../personal-wellness/calendar").WellnessCalendarEvent | import("../dog-tracker/calendar").PetCalendarEvent)[];
   workEvents?: import("./personal-calendar").PersonalCalendarEvent[];
   state: PlanningState;
   refs: NativeObjectRef[];

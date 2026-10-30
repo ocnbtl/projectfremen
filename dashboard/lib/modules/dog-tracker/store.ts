@@ -1,3 +1,6 @@
+import { Temporal } from "@js-temporal/polyfill";
+import { validateWellnessSchedule } from "../personal-wellness/schedule";
+import { readPlanningState } from "../planning/store";
 import { randomUUID } from "node:crypto";
 import { mutateJsonFile, readJsonFile } from "../../file-store";
 import { DOG_TRACKER_SCHEMA_VERSION, LEGACY_PET_ID, PET_CARE_KINDS, PET_PROFILE_FIELDS, type DogCareEvent, type DogCareInput, type DogTrackerState, type PetProfile } from "./types";
@@ -22,31 +25,35 @@ function stateOf(raw: unknown): DogTrackerState {
   return { ...raw, schemaVersion: 1, events: [...events].sort((a,b)=>b.occurredAt.localeCompare(a.occurredAt)), pets } as DogTrackerState;
 }
 export async function readDogTrackerState(): Promise<DogTrackerState> { return stateOf(await readJsonFile(FILE_NAME,emptyDogTrackerState())); }
-function validateEvent(raw: DogCareInput, state: DogTrackerState): DogCareInput {
+async function validateEvent(raw: DogCareInput, state: DogTrackerState, previous?:DogCareEvent): Promise<DogCareInput> {
   if (!record(raw) || !PET_CARE_KINDS.some(kind=>kind.id===raw.kind)) throw new Error("Choose a valid care type");
   const petId=text(raw.petId || LEGACY_PET_ID,"Pet",120,true);
   if (!state.pets?.some(p=>p.id===petId && !p.archived)) throw new Error("Choose an active pet");
   if (raw.status !== undefined && raw.status!=="planned" && raw.status!=="completed") throw new Error("Choose planned or completed");
-  if (raw.nextDue && Date.parse(iso(raw.nextDue,"Next due")) <= Date.parse(iso(raw.occurredAt,"When"))) throw new Error("Next due must be after the care date");
+  const schedule=validateWellnessSchedule(raw.schedule);
+  if(schedule?.repeat)throw new Error("Schedule each pet care entry separately.");
+  if(schedule && JSON.stringify(schedule)!==JSON.stringify(previous?.schedule)){const calendar=(await readPlanningState()).calendars.find(c=>c.id===schedule.calendarId&&!c.archivedAt&&!c.connectionId);if(!calendar)throw new Error("Choose an available local calendar.");}
+  const occurredAt=schedule?Temporal.PlainDateTime.from(schedule.start).toZonedDateTime(schedule.timeZone).toInstant().toString():iso(raw.occurredAt,"When");
+  if (raw.nextDue && Date.parse(iso(raw.nextDue,"Next due")) <= Date.parse(occurredAt)) throw new Error("Next due must be after the care date");
   if (raw.archived !== undefined && typeof raw.archived!=="boolean") throw new Error("Invalid archive status");
-  return { kind: raw.kind, petId, occurredAt: iso(raw.occurredAt,"When"), peed: raw.peed===true, pooped: raw.pooped===true,
+  return { kind: raw.kind, petId, occurredAt, schedule, peed: raw.peed===true, pooped: raw.pooped===true,
     notes: text(raw.notes,"Notes",8000), title: text(raw.title,"Title",180), status: raw.status || "completed", amount: text(raw.amount,"Amount / dose",200), instructions: text(raw.instructions,"Instructions",4000), nextDue: raw.nextDue ? iso(raw.nextDue,"Next due") : "", archived: raw.archived===true };
 }
 function checkVersion(item: {updatedAt:string}, expected: string) { if (!expected || item.updatedAt!==expected) throw new Error("This pet record changed elsewhere. Reload before saving; your draft is still here."); }
 export async function createDogCareEvent(input: DogCareInput): Promise<DogCareEvent> {
-  return mutateJsonFile(FILE_NAME,emptyDogTrackerState(),raw=>{
+  return mutateJsonFile(FILE_NAME,emptyDogTrackerState(),async raw=>{
     const state=stateOf(raw);
     if (!input.petId && !state.pets?.some(p=>p.id===LEGACY_PET_ID)) state.pets!.push(legacyPet(state.events));
-    const now=stamp(), item={...validateEvent(input,state),id:randomUUID(),createdAt:now,updatedAt:now};
+    const now=stamp(), item={...await validateEvent(input,state),id:randomUUID(),createdAt:now,updatedAt:now};
     return { value:{...state,events:[item,...state.events]},result:item };
   });
 }
 export async function updateDogCareEvent(id: string, input: Partial<DogCareInput>, expectedUpdatedAt: string): Promise<DogCareEvent> {
-  return mutateJsonFile(FILE_NAME,emptyDogTrackerState(),raw=>{
+  return mutateJsonFile(FILE_NAME,emptyDogTrackerState(),async raw=>{
     const state=stateOf(raw),previous=state.events.find(e=>e.id===id);if(!previous)throw new Error("Care entry not found");checkVersion(previous,expectedUpdatedAt);
     if (!record(input)) throw new Error("Care details are required");
     if (input.petId && input.petId!==(previous.petId || LEGACY_PET_ID)) throw new Error("A care entry cannot be moved to another pet");
-    const item={...previous,...validateEvent({...previous,...input},state),id,createdAt:previous.createdAt,updatedAt:stamp(previous.updatedAt)};
+    const item={...previous,...await validateEvent({...previous,...input},state,previous),id,createdAt:previous.createdAt,updatedAt:stamp(previous.updatedAt)};
     return {value:{...state,events:state.events.map(e=>e.id===id?item:e)},result:item};
   });
 }

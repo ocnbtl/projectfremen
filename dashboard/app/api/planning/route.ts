@@ -270,7 +270,7 @@ export async function POST(request: Request) {
       void lastAttemptAt;
       void lastError;
       if (body.collection === "events") {
-        if (typeof input.id === "string" && input.id.startsWith("wellness-")) throw new Error("Update this meal or workout through its Personal record.");
+        if (typeof input.id === "string" && (input.id.startsWith("wellness-") || input.id.startsWith("pet-care-"))) throw new Error("Update this meal or workout through its Personal record.");
         const current = (await readPlanningState()).events.find(
           (x) => x.id === input.id,
         );

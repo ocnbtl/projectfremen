@@ -1,5 +1,5 @@
 /* Purpose-built working surfaces inside the existing Personal command shell. */
-.scroll { min-height: 0; flex: 1; overflow: auto; background: var(--panel-bg); color: var(--text); }
+.scroll { composes: workspace-canvas from global; min-height: 0; flex: 1; overflow: auto; background: var(--panel-bg); color: var(--text); }
 .pageHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 20px 22px 14px; border-bottom: 1px solid var(--border); }
 .pageHeader span, .editor header span { color: var(--text-muted); font: 800 10px/1.2 var(--font-heading); letter-spacing: .09em; text-transform: uppercase; }
 .pageHeader h1 { margin: 3px 0 2px; color: var(--text-strong); font: 820 24px/1.15 var(--font-heading); letter-spacing: -.02em; }
@@ -8,7 +8,7 @@
 .privacyToggle { display: inline-flex; width: auto; min-height: 34px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-bg); color: var(--text); font: 750 10px var(--font-heading); cursor: pointer; }
 .privacyToggle:disabled { opacity: .55; cursor: wait; }
 .privacyToggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
-.workspace { min-height: calc(100dvh - 190px); padding: 16px 22px 32px; }
+.workspace { min-height: calc(100dvh - 190px); padding: 0 22px 32px; }
 .primaryButton { display: inline-flex; width: auto; min-height: 34px; align-items: center; justify-content: center; padding: 0 13px; border: 1px solid var(--action-primary); border-radius: 6px; background: var(--action-primary); color: #fff; font: 800 11px var(--font-heading); text-decoration: none; cursor: pointer; }
 .primaryButton:disabled { opacity: .55; cursor: not-allowed; }
 .addAction, .mobileAddAction { gap: 6px; }
@@ -499,3 +499,5 @@
  .editor[data-record-editor=vehicles] {grid-template-columns:repeat(2,minmax(0,1fr));}
  .editor[data-record-editor=vehicles] > :is(header,footer,.full),.editor[data-record-editor=vehicles] > label:has(input[name=name]),.editor[data-record-editor=vehicles] > label:has(input[name=vinNote]) {grid-column:1/-1;}
 }
+
+.scroll > .workspace { padding-top: 0; }

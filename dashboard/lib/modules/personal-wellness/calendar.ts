@@ -1,6 +1,7 @@
 import type { CalendarEvent, EventOccurrence } from "../planning/types";
 import type { WellnessEntry } from "./types";
 import { firstWellnessDate, isWellnessDate, wellnessOccurrence } from "./schedule";
+import { readPetCalendarEvents, type PetCalendarEvent } from "../dog-tracker/calendar";
 import { readWellnessState } from "./store";
 export type WellnessCalendarEvent = CalendarEvent & { wellnessSource: NonNullable<EventOccurrence["wellnessSource"]> };
 export const wellnessCalendarId = (section: "meals" | "fitness", id: string) => `wellness-${section}-${id}`;
@@ -17,7 +18,7 @@ export function wellnessCalendarEvents(section: "meals" | "fitness", entries: We
     createdAt: entry.createdAt, updatedAt: entry.updatedAt, exceptions, wellnessSource: { section, id: entry.id, updatedAt: entry.updatedAt, repeating: Boolean(schedule.repeat) }
   }); });
 }
-export async function readWellnessCalendarEvents(): Promise<WellnessCalendarEvent[]> {
-  const [meals, fitness] = await Promise.all([readWellnessState("meals"), readWellnessState("fitness")]);
-  return [...wellnessCalendarEvents("meals", meals.entries), ...wellnessCalendarEvents("fitness", fitness.entries)];
+export async function readWellnessCalendarEvents(): Promise<(WellnessCalendarEvent | PetCalendarEvent)[]> {
+  const [meals, fitness, pets] = await Promise.all([readWellnessState("meals"), readWellnessState("fitness"), readPetCalendarEvents()]);
+  return [...wellnessCalendarEvents("meals", meals.entries), ...wellnessCalendarEvents("fitness", fitness.entries), ...pets];
 }

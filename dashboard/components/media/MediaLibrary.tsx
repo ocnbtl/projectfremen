@@ -1,4 +1,6 @@
 "use client";
+import * as Popover from "@radix-ui/react-popover";
+import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
 import SelectField from "../ui/SelectField";
 import DirectoryCard from "../operational/DirectoryCard";
 import { accountFile, mediaSnapshot, openMediaFile, saveMediaDetails, uploadAccountFile } from "../../lib/modules/media/account-client";
@@ -387,9 +389,11 @@ export default function MediaLibrary({
       setBusy(false);
     }
   }
+  const [filters,setFilters]=useState<MediaFilters>(EMPTY_MEDIA_FILTERS);
+  const filterCount=Number(archive)+Number(filters.type!=="all")+Number(filters.links!=="all")+Number(filters.storage!=="all");
   const visible = objects.filter(
     (object) =>
-      Boolean(profileFor(object).archivedAt) === archive &&
+      Boolean(profileFor(object).archivedAt) === archive && matchesMediaFilters(profileFor(object),filters) &&
       `${object.fields.title} ${object.fields.body}`
         .toLowerCase()
         .includes(query.toLowerCase()),
@@ -398,7 +402,7 @@ export default function MediaLibrary({
   const legacy = records.filter(
     (record) =>
       !known.has(record.id) &&
-      !record.mediaProfile &&
+      !record.mediaProfile && matchesMediaFilters(undefined,filters,Object.values(record.relations || {}).some(refs=>Array.isArray(refs)&&refs.length>0)) &&
       !archive &&
       record.title.toLowerCase().includes(query.toLowerCase()),
   );
@@ -502,12 +506,13 @@ export default function MediaLibrary({
           </div>
         )}
 </section>}>
-    <div className="work-surface" aria-busy={!catalogueLoaded}>
+    <div className="work-surface workspace-canvas" aria-busy={!catalogueLoaded}>
       <WorkspaceHeader
         title="Media"
         count={visible.length + legacy.length}
       >
         {<>
+            <Popover.Root><Popover.Trigger asChild><Button icon="settings" aria-label="Upload options" title="Upload options"/></Popover.Trigger><Popover.Portal><Popover.Content className="app-select-menu workspace-filter-menu" align="end" sideOffset={8} collisionPadding={12}><strong>Upload options</strong><label className="work-check"><input type="checkbox" checked={readLocation} onChange={e=>setReadLocation(e.target.checked)}/>Read embedded JPEG locations on upload</label><p>Off by default. Only new uploads are affected.</p></Popover.Content></Popover.Portal></Popover.Root>
             <Button
               intent="primary"
               icon="photo-upload"
@@ -535,37 +540,16 @@ export default function MediaLibrary({
           setChecked(new Set());
         }}
         placeholder="Search media"
-        filters={
-          <>
-            <label className="work-check">
-              <input
-                type="checkbox"
-                checked={readLocation}
-                onChange={(e) => setReadLocation(e.target.checked)}
-              />
-              Read embedded JPEG locations on upload
-            </label>
-            <Button
-              aria-pressed={!archive}
-              onClick={() => {
-                setArchive(false);
-                setChecked(new Set());
-              }}
-            >
-              Library
-            </Button>
-            <Button
-              aria-pressed={archive}
-              onClick={() => {
-                setArchive(true);
-                setChecked(new Set());
-              }}
-            >
-              Archive
-            </Button>
-          </>
-        }
-        activeFilters={archive ? 1 : 0}
+        actions={<Button icon="check" title={selectionMode?"Finish selecting":"Select files"} aria-label={selectionMode?"Finish selecting":"Select files"} aria-pressed={selectionMode} onClick={()=>{setSelectionMode(!selectionMode);setChecked(new Set());}}/>}
+        filters={<div className={styles.filters}>
+          <div className={styles.filterHeading}><strong>Filter media</strong><Button onClick={()=>{setFilters(EMPTY_MEDIA_FILTERS);setArchive(false);setChecked(new Set());}} disabled={!filterCount}>Reset</Button></div>
+          <fieldset><legend>Show</legend><div className={styles.filterOptions}>{[false,true].map(value=><Button key={String(value)} aria-pressed={archive===value} onClick={()=>{setArchive(value);setChecked(new Set());}}>{value?"Archive":"Library"}</Button>)}</div></fieldset>
+          <fieldset><legend>File type</legend><div className={styles.filterOptions}>{MEDIA_TYPES.map(type=><Button key={type.id} aria-pressed={filters.type===type.id} onClick={()=>{setFilters({...filters,type:type.id});setChecked(new Set());}}>{type.label}</Button>)}</div></fieldset>
+          <label>Linked objects<SelectField value={filters.links} onChange={e=>{setFilters({...filters,links:e.target.value as MediaFilters["links"]});setChecked(new Set());}}><option value="all">Any</option><option value="linked">With links</option><option value="unlinked">Without links</option></SelectField></label>
+          <label>Storage<SelectField value={filters.storage} onChange={e=>{setFilters({...filters,storage:e.target.value as MediaFilters["storage"]});setChecked(new Set());}}><option value="all">All storage</option><option value="account">Account files</option><option value="encrypted">Encrypted files</option><option value="references">File references</option></SelectField></label>
+          <p>{visible.length+legacy.length} matching {(visible.length+legacy.length)===1?"file":"files"}</p>
+        </div>}
+        activeFilters={filterCount}
       >
         <SelectField
           data-toolbar-view
@@ -579,16 +563,7 @@ export default function MediaLibrary({
           <option value="compact">Compact</option>
           <option value="grid">Grid</option>
         </SelectField>
-        {(<Button
-            aria-pressed={selectionMode}
-            onClick={() => {
-              setSelectionMode(!selectionMode);
-              setChecked(new Set());
-            }}
-          >
-            Select files
-          </Button>
-        )}
+
       </WorkspaceToolbar>
       <WorkspaceFeedback error={error} message={notice} />
       {undoBatch.length > 0 && (
@@ -763,15 +738,15 @@ export default function MediaLibrary({
       {!visible.length && !legacy.length && catalogueLoaded && (
         <WorkspaceEmpty
           title={
-            query
+            query || filterCount > 0
               ? "No matching media"
               : archive
                 ? "No archived files"
                 : "Add your first file"
           }
         >
-          {query
-            ? "Try a filename or a word from its description."
+          {query || filterCount > 0
+            ? "Try another search or reset your filters."
             : "Images, video, audio, and documents, available when you sign in."}
         </WorkspaceEmpty>
       )}

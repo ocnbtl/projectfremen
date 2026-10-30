@@ -1,0 +1,49 @@
+/* One canvas and content inset for signed-in workspaces. Controls and cards
+   retain their own white surfaces; Calendar and Map retain their canvases. */
+html[data-active-module] {
+  --workspace-canvas: #f6f8f7;
+  --workspace-content-gap: 16px;
+}
+html[data-active-module], html[data-active-module] body {
+  background-color: var(--workspace-canvas);
+}
+.module-shell.workspace-pages,
+[data-personal-pages],
+.people-redesign-shell.workspace-people-pages {
+  border-top: 0 !important;
+  background: var(--workspace-canvas, #f6f8f7) !important;
+  --shell-bg: var(--workspace-canvas, #f6f8f7);
+  --shell-bg-alt: var(--workspace-canvas, #f6f8f7);
+}
+.workspace-pages > .module-shell__main,
+.workspace-pages .directory-pane,
+.workspace-pages .directory-pane__content,
+[data-personal-pages] > main,
+.workspace-people-pages .people-directory-panel,
+.workspace-detail-page {
+  background: var(--workspace-canvas, #f6f8f7) !important;
+}
+.workspace-canvas,
+.workspace-pages .finance-main-workspace,
+.workspace-people-pages .people-directory-panel {
+  background: var(--workspace-canvas, #f6f8f7) !important;
+  padding-top: var(--workspace-content-gap, 16px) !important;
+}
+.workspace-pages .work-surface.workspace-canvas {
+  min-height: 100%;
+}
+.workspace-detail-page {
+  padding-top: var(--workspace-content-gap, 16px);
+}
+.admin-global-topnav, .app-top-nav, .workspace-topnav {
+  border-bottom: 0 !important;
+  box-shadow: none;
+  background: #fff;
+}
+@media(max-width:760px) {
+  html[data-active-module] { --workspace-content-gap: 12px; }
+}
+
+.workspace-canvas > .media-directory { padding-top: 0; }
+
+.workspace-people-pages .people-profile-panel { background:var(--workspace-canvas,#f6f8f7); padding-top:var(--workspace-content-gap,16px); }
