@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import WellnessScheduleFields from "./WellnessScheduleFields";
+import { announceWellnessChange, WELLNESS_CHANGE_KEY } from "../../lib/modules/personal-wellness/client";
 import { WorkspaceButton, WorkspaceHeader, WorkspaceSheet, WorkspaceToolbar } from "../admin-shell/WorkspaceKit";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -16,6 +19,7 @@ const dateLabel = (date: string) => date ? new Date(`${date}T12:00:00`).toLocale
 type Draft = WellnessInput & { id?: string; updatedAt?: string };
 export default function PersonalWellnessWorkspace({ section, initialState, initialError, sidebarCounts, initialDay }: { section: WellnessSection; initialState: WellnessState; initialError?: string; sidebarCounts: PersonalOpsSidebarCounts; initialDay: string }) {
   const config = WELLNESS_CONFIG[section];
+  const params = useSearchParams(), openedEntry = useRef<string | null>(null), refreshVersion = useRef(0), saving = useRef(false);
   const [currentDay, setCurrentDay] = useState(initialDay);
   useEffect(() => {
     const updateDay = () => { if (!document.hidden) setCurrentDay(today()); };
@@ -56,16 +60,24 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
   }
   async function save(value: Draft) {
     if (busy || initialError) return;
-    setBusy(true); setError("");
+    saving.current = true; ++refreshVersion.current; setBusy(true); setError("");
     try {
       const response = await fetch("/api/personal/wellness", { method: value.id ? "PATCH" : "POST", headers: buildJsonHeadersWithCsrf(), body: JSON.stringify({ section, id: value.id, expectedUpdatedAt: value.updatedAt, input: value }) });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.error || "This entry could not be saved.");
       setEntries(previous => value.id ? previous.map(item => item.id === value.id ? result.item : item) : [...previous, result.item]);
+      announceWellnessChange();
       setKind(value.kind); setDraft(null); setNotice(value.archived ? "Entry archived. You can restore it from Archived." : "Saved.");
     } catch (error) { setError(error instanceof Error ? error.message : "This entry could not be saved. Your draft is still here."); }
-    finally { setBusy(false); }
+    finally { saving.current = false; setBusy(false); }
   }
+  const refreshEntries = useCallback(async () => {
+    if (document.hidden || saving.current) return;
+    const version = ++refreshVersion.current;
+    try { const response = await fetch(`/api/personal/wellness?section=${section}`, { cache: "no-store" }); const result = await response.json(); if (!response.ok || !result.ok) throw new Error(result.error || "Could not refresh these plans."); if (version === refreshVersion.current) setEntries(result.state.entries); } catch (e) { if (version === refreshVersion.current) setError((e as Error).message); }
+  }, [section]);
+  useEffect(() => { setEntries(initialState.entries); void refreshEntries(); const storage = (event: StorageEvent) => { if (event.key === WELLNESS_CHANGE_KEY) void refreshEntries(); }; window.addEventListener("focus", refreshEntries); document.addEventListener("visibilitychange", refreshEntries); window.addEventListener("storage", storage); return () => { ++refreshVersion.current; window.removeEventListener("focus", refreshEntries); document.removeEventListener("visibilitychange", refreshEntries); window.removeEventListener("storage", storage); }; }, [initialState, refreshEntries]);
+  useEffect(() => { const id = params.get("entry"); if (!id || openedEntry.current === id) return; const entry = entries.find(item => item.id === id); if (entry) { openedEntry.current = id; setKind(entry.kind); setArchive(entry.archived); setDraft({ ...entry, fields: { ...entry.fields } }); } }, [params, entries]);
   const setField = (id: string, value: string) => setDraft(previous => previous ? { ...previous, fields: { ...previous.fields, [id]: value } } : null);
   return <div className={baseStyles.shell} data-personal-pages>
     <PersonalOpsSidebar activeView={section} filter="" pathname={`/admin/personal/${section}`} counts={sidebarCounts} mobileOpen={false} onClose={() => {}} />
@@ -84,16 +96,18 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
           <div className={styles.metrics}>{activeKind.fields.filter(field => field.type !== "textarea" && entry.fields[field.id] && field.id !== "recipeId").map(field => <span key={field.id} title={field.label}>{entry.fields[field.id]}{field.suffix ? ` ${field.suffix}` : ""}</span>)}</div>
           {entry.kind === "recipe" && entry.fields.ingredients && <p className={styles.recipeIngredients}>{entry.fields.ingredients}</p>}
           {entry.fields.recipeId && <button className={styles.recipeLink} type="button" onClick={() => { const recipe = entries.find(item => item.id === entry.fields.recipeId); if (recipe) setDraft({ ...recipe, fields: { ...recipe.fields } }); }}><UnigentamosIcon role="meals" size={15} />{entries.find(item => item.id === entry.fields.recipeId)?.title || "Recipe"}</button>}
+          {entry.schedule && <Link prefetch={false} className={styles.scheduleLink} href={`/admin/calendar?date=${entry.date}`}><UnigentamosIcon role="clock" size={15} />{new Date(`${entry.schedule.start}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {new Date(`${entry.schedule.end}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}<span>{entry.schedule.timeZone.replaceAll("_", " ")}</span><UnigentamosIcon role="calendar" size={15} /></Link>}
           {entry.notes && <p className={styles.notes}>{entry.notes}</p>}
-          <footer><WorkspaceButton icon="edit" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>Edit</WorkspaceButton>{!archive && entry.kind === "recipe" && <WorkspaceButton icon="calendar" onClick={() => create("meal", entry)}>Plan meal</WorkspaceButton>}{!archive && entry.status === "planned" && <WorkspaceButton icon="check" busy={busy} onClick={() => void save({ ...entry, status: "completed" })}>Complete</WorkspaceButton>}{archive && <WorkspaceButton icon="discard-changes" busy={busy} onClick={() => void save({ ...entry, archived: false })}>Restore</WorkspaceButton>}</footer>
+          <footer><WorkspaceButton icon="edit" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>Edit</WorkspaceButton>{!archive && entry.kind === "recipe" && <WorkspaceButton icon="calendar" onClick={() => create("meal", entry)}>Plan meal</WorkspaceButton>}{!archive && section !== "health" && entry.kind !== "recipe" && <><WorkspaceButton icon="calendar" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>{entry.schedule ? "Reschedule" : "Schedule"}</WorkspaceButton><WorkspaceButton icon={entry.status === "completed" ? "discard-changes" : "check"} busy={busy} onClick={() => void save({ ...entry, status: entry.status === "completed" ? "planned" : "completed" })}>{entry.status === "completed" ? "Reopen" : "Complete"}</WorkspaceButton></>}{archive && <WorkspaceButton icon="discard-changes" busy={busy} onClick={() => void save({ ...entry, archived: false })}>Restore</WorkspaceButton>}</footer>
         </article>)}</div>}
       </div>
     </main>
     <WorkspaceSheet open={Boolean(draft)} onClose={() => { if (!busy) setDraft(null); }} presentation="center" titleIcon={config.icon} title={`${draft?.id ? "Edit" : "Add"} ${draftKind?.label.toLowerCase() || "entry"}`} className={styles.sheet}>
       {draft && draftKind && <form className={styles.form} onSubmit={event => { event.preventDefault(); void save(draft); }}>
         <label data-wide="true">Title<input required maxLength={180} value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })} placeholder={section === "meals" ? "What are you making?" : section === "fitness" ? "e.g. Morning strength session" : "Give this entry a name"} /></label>
-        {draft.kind !== "recipe" && <label>Date<input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label>}
+        {draft.kind !== "recipe" && !draft.schedule && <label>Date<input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label>}
         {section !== "health" && draft.kind !== "recipe" && <label>Status<SelectField value={draft.status} onChange={event => setDraft({ ...draft, status: event.target.value as Draft["status"] })}><option value="planned">Planned</option><option value="completed">Completed</option></SelectField></label>}
+        {section !== "health" && draft.kind !== "recipe" && <WellnessScheduleFields value={draft.schedule} date={draft.date} minutes={Number(draft.fields.minutes) || (section === "meals" ? 30 : 60)} onChange={schedule => setDraft({ ...draft, schedule, date: schedule ? schedule.start.slice(0, 10) : draft.date })} />}
         {draftKind.fields.map(field => <label key={field.id} data-wide={field.type === "textarea" || undefined}>{field.label}{field.id === "recipeId" ? <SelectField value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)}><option value="">No recipe</option>{entries.filter(item => item.kind === "recipe" && (!item.archived || item.id === draft.fields.recipeId)).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</SelectField> : field.type === "select" ? <SelectField value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)}><option value="">Not recorded</option>{field.options?.map(value => <option key={value}>{value}</option>)}</SelectField> : field.type === "textarea" ? <textarea rows={3} maxLength={8000} value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)} /> : <input type={field.type} min={field.min} max={field.max} step={field.type === "number" ? "any" : undefined} maxLength={300} value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)} />}</label>)}
         <label data-wide="true">{draft.kind === "recipe" ? "Instructions & notes" : "Notes"}<textarea rows={3} maxLength={12000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} placeholder="Optional" /></label>
         {error && <p data-wide="true" role="alert" className={styles.error}>{error}</p>}

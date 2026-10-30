@@ -1,4 +1,6 @@
 "use client";
+import WellnessScheduleDialog from "../personal-ops/WellnessScheduleDialog";
+import { updateWellnessEntry, WELLNESS_CHANGE_KEY } from "../../lib/modules/personal-wellness/client";
 import SearchField from "../ui/SearchField";
 import { createPersonalOpsRepository } from "../../lib/modules/personal-ops/repository";
 import PlaceSync from "./PlaceSync";
@@ -228,6 +230,7 @@ export default function CalendarWorkspace() {
     writes.current = job.then(() => undefined);
     return job;
   }
+  const [wellnessTarget, setWellnessTarget] = useState<NonNullable<EventOccurrence["wellnessSource"]>>();
   const nativeCalendar = snapshot?.state.calendars.find(c => c.id === "native");
   const observanceSettings = useMemo(() => nativeCalendar?.observances || defaultObservances(), [nativeCalendar?.observances]);
   const refresh = useCallback(async () => {
@@ -255,11 +258,14 @@ export default function CalendarWorkspace() {
     if (matchMedia("(max-width:760px)").matches) setView("day");
     void refresh();
     const timer = setInterval(() => setNow(Date.now()), 60000);
+    const wellnessChanged = (event: StorageEvent) => { if (!document.hidden && event.key === WELLNESS_CHANGE_KEY) void refresh(); };
+    window.addEventListener("storage", wellnessChanged);
     window.addEventListener("online", refresh);
     window.addEventListener("focus", refresh);
     window.addEventListener("unigentamos-planning-changed", refresh);
     return () => {
       clearInterval(timer);
+      window.removeEventListener("storage", wellnessChanged);
       window.removeEventListener("online", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("unigentamos-planning-changed", refresh);
@@ -388,8 +394,8 @@ export default function CalendarWorkspace() {
         `${item.title} ${item.description} ${item.location}`
           .toLowerCase()
           .includes(query.trim().toLowerCase()),
-    ), ...eventOccurrences(showDated ? snapshot?.workEvents || [] : [], range.start, range.end, zone).filter(item => (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
-  }, [showCompleted, showDated, expanded.items, snapshot?.state.calendars, snapshot?.workEvents, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
+    ), ...eventOccurrences(snapshot?.wellnessEvents || [], range.start, range.end, zone).filter(item => visibleCalendars.has(item.calendarId) && (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(showDated ? snapshot?.workEvents || [] : [], range.start, range.end, zone).filter(item => (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
+  }, [showCompleted, showDated, expanded.items, snapshot?.state.calendars, snapshot?.workEvents, snapshot?.wellnessEvents, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
   const dated = showDated
     ? (snapshot?.dated || []).filter(
         (x) =>
@@ -550,21 +556,28 @@ export default function CalendarWorkspace() {
   });
   async function move(item: EventOccurrence, day: string, hour: number) {
     const original = snapshot?.state.events.find(x => x.id === item.eventId);
-    if (!original) return;
+    if (!original && !item.wellnessSource) return;
     const minute = Math.round(hour * 60), displayStart = `${day}T${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
     const ms = instantFor(displayStart, zone), start = localFor(ms, item.timeZone), end = localFor(ms + item.endMs - item.startMs, item.timeZone);
     if (ms === item.startMs) return;
-    await commitTime(timeChange(original, item, start, end));
+    if (item.wellnessSource) { await updateWellnessTime(item, start, end); return; }
+    if (original) await commitTime(timeChange(original, item, start, end));
   }
   async function resizeEvent(item: EventOccurrence, value: number, edge: "start" | "end") {
     const original = snapshot?.state.events.find(x => x.id === item.eventId);
-    if (!original) return;
+    if (!original && !item.wellnessSource) return;
     const next = resizedEventTime(item, edge, value);
     if (next.startMs === item.startMs && next.endMs === item.endMs) return;
-    await commitTime(timeChange(original, item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)));
+    if (item.wellnessSource) { await updateWellnessTime(item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)); return; }
+    if (original) await commitTime(timeChange(original, item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)));
+  }
+  async function updateWellnessTime(item: EventOccurrence, start: string, end: string) {
+    const source = item.wellnessSource; if (!source || busy) return;
+    await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, { schedule: { start, end, calendarId: item.calendarId, timeZone: item.timeZone } }); setPreviewOpen(false); }, "Schedule updated");
   }
   async function completeTask(item: EventOccurrence) {
     if (busy) return;
+    if (item.wellnessSource) { const source = item.wellnessSource; await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, { status: item.completed ? "planned" : "completed" }); setPreviewOpen(false); }, item.completed ? "Plan reopened" : "Plan completed"); return; }
     if (item.workSource?.family === "followUps") {
       const source = item.workSource;
       await action(async () => {
@@ -947,7 +960,8 @@ export default function CalendarWorkspace() {
           </form>
         )}
       </WorkspaceSheet>
-      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onEdit={()=>{const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
+      {wellnessTarget && <WellnessScheduleDialog target={wellnessTarget} onClose={() => setWellnessTarget(undefined)} onSaved={() => { setWellnessTarget(undefined); void refresh(); }} />}
+      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onComplete={() => void completeTask(preview.event)} onEdit={()=>{if (preview.event.wellnessSource) { setWellnessTarget(preview.event.wellnessSource); setPreviewOpen(false); return; } const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
       <CalendarSharePanel open={sharing} onClose={() => setSharing(false)} calendars={snapshot?.state.calendars || []} />
       <WorkspaceSheet
         open={connections}

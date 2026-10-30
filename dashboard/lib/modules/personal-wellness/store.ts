@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mutateJsonFile, readJsonFile } from "../../file-store";
+import { validateWellnessSchedule, moveWellnessStart } from "./schedule";
+import { readPlanningState } from "../planning/store";
 import { emptyWellnessState, WELLNESS_CONFIG, type WellnessEntry, type WellnessInput, type WellnessSection, type WellnessState } from "./types";
 
 const key = (section: WellnessSection) => `personal-${section}.v1.json`;
@@ -30,16 +32,25 @@ function validate(section: WellnessSection, raw: Record<string, unknown>, entrie
     if (id === "recipeId" && normalized && !entries.some(entry => entry.id === normalized && entry.kind === "recipe")) throw new Error("Choose a saved recipe.");
     fields[id] = normalized;
   }
-  return { kind: kind.id, title: text(raw.title, "Title", 180, true), date, status: section === "health" || kind.id === "recipe" ? "completed" : raw.status, notes: text(raw.notes ?? "", "Notes", 12000), fields, archived: raw.archived };
+  const schedule = validateWellnessSchedule(raw.schedule);
+  if (schedule && (section === "health" || kind.id === "recipe")) throw new Error("Only meals and workouts can be scheduled on Calendar.");
+  return { kind: kind.id, title: text(raw.title, "Title", 180, true), date: schedule ? schedule.start.slice(0, 10) : date, status: section === "health" || kind.id === "recipe" ? "completed" : raw.status, notes: text(raw.notes ?? "", "Notes", 12000), fields, archived: raw.archived, schedule };
 }
 export async function saveWellnessEntry(section: WellnessSection, raw: unknown, id?: string, expectedUpdatedAt?: string): Promise<WellnessEntry> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Entry details are required.");
-  return mutateJsonFile(key(section), emptyWellnessState(), current => {
+  return mutateJsonFile(key(section), emptyWellnessState(), async current => {
     const state = assertState(current);
     const previous = id ? state.entries.find(entry => entry.id === id) : undefined;
     if (id && !previous) throw new Error("Entry not found.");
     if (previous && (!expectedUpdatedAt || previous.updatedAt !== expectedUpdatedAt)) throw new Error("This record changed elsewhere. Reload before saving; your draft is still here.");
-    const input = validate(section, { ...(previous || {}), ...(raw as object) }, state.entries);
+    const merged = { ...(previous || {}), ...(raw as Record<string, unknown>) };
+    // Existing editors that change just the date keep the schedule and its duration.
+    if (previous?.schedule && !("schedule" in raw) && typeof merged.date === "string" && merged.date !== previous.date) merged.schedule = moveWellnessStart(previous.schedule, `${merged.date}T${previous.schedule.start.slice(11)}`);
+    const input = validate(section, merged, state.entries);
+    if (input.schedule && JSON.stringify(input.schedule) !== JSON.stringify(previous?.schedule)) {
+      const calendar = (await readPlanningState()).calendars.find(item => item.id === input.schedule!.calendarId && !item.archivedAt && !item.connectionId);
+      if (!calendar) throw new Error("Choose an available local calendar.");
+    }
     if (previous && input.kind !== previous.kind) throw new Error("An entry type cannot be changed. Create a separate entry instead.");
     const updatedAt = new Date(Math.max(Date.now(), Date.parse(previous?.updatedAt || "") + 1 || 0)).toISOString();
     const item: WellnessEntry = { ...input, id: previous?.id || randomUUID(), createdAt: previous?.createdAt || updatedAt, updatedAt };

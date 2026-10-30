@@ -1,3 +1,4 @@
+import { readWellnessCalendarEvents } from "../personal-wellness/calendar";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { addDays, eventOccurrences, localFor } from "./calendar-model";
@@ -141,7 +142,7 @@ export async function publicBooking(token: string): Promise<PublicBooking> {
   if (!/^[a-f0-9-]{36}\.[a-f0-9]{64}$/.test(token)) return fail("This booking link is unavailable.",404);
   const state = await readPlanningState(), link = resolve(token, state);
   const birthdays = await repeatBirthdays(state.events);
-  return { name: link.name, description: link.description, location: link.location, timeZone: link.timeZone, durationMinutes: link.durationMinutes, slots: availableBookingSlots(link, state, birthdays), confirmationEmail: bookingEmailConfig().ready && (link.emailPreferences?.guestConfirmation ?? true) };
+  return { name: link.name, description: link.description, location: link.location, timeZone: link.timeZone, durationMinutes: link.durationMinutes, slots: availableBookingSlots(link, { ...state, events: [...state.events, ...await readWellnessCalendarEvents()] }, birthdays), confirmationEmail: bookingEmailConfig().ready && (link.emailPreferences?.guestConfirmation ?? true) };
 }
 export async function reserveBooking(token: string, input: Record<string, unknown>, ip: string) {
   const name = text(input.name, "name", 120, true), email = text(input.email, "email", 254, true).toLowerCase(), note = text(input.note ?? "", "note", 1500);
@@ -152,6 +153,7 @@ export async function reserveBooking(token: string, input: Record<string, unknow
   const fingerprint = hash(JSON.stringify([token, start, name, email, note]));
   const ipHash = createHmac("sha256", signingSecret()).update(`booking-ip:${ip}`).digest("hex"), emailHash = createHmac("sha256", signingSecret()).update(`booking-email:${email}`).digest("hex");
   const birthdays = await repeatBirthdays((await readPlanningState()).events);
+  const wellnessEvents = await readWellnessCalendarEvents();
   return mutatePlanningState(state => {
     const link = resolve(token, state), data = state.bookingData!, now = Date.now();
     const previous = data.receipts.find(receipt => receipt.id === requestId);
@@ -164,7 +166,7 @@ export async function reserveBooking(token: string, input: Record<string, unknow
     const recent = data.receipts.filter(receipt => now - Date.parse(receipt.createdAt) < 86400000);
     if (recent.filter(receipt => receipt.emailHash === emailHash).length >= 5 || recent.filter(receipt => receipt.ipHash === ipHash && now - Date.parse(receipt.createdAt) < 3600000).length >= 10 || recent.filter(receipt => receipt.linkId === link.id && now - Date.parse(receipt.createdAt) < 3600000).length >= 60) return fail("Too many bookings. Please try again later or contact the organizer.", 429);
     if (data.receipts.length >= 20000) return fail("Bookings are temporarily unavailable. Contact the organizer.", 503);
-    const slot = availableBookingSlots(link, state, birthdays, now).find(slot => slot.start === start);
+    const slot = availableBookingSlots(link, { ...state, events: [...state.events, ...wellnessEvents] }, birthdays, now).find(slot => slot.start === start);
     if (!slot) return fail("That time is no longer available. Please choose another time.", 409);
     const stamp = new Date(now).toISOString();
     const event = normalizePlanningRecord("events", { id: randomUUID(), title: `${link.name} — ${name}`, description: note, start: localFor(Date.parse(slot.start), link.timeZone), end: localFor(Date.parse(slot.end), link.timeZone), timeZone: link.timeZone, allDay: false, calendarId: link.calendarId, location: link.location, linkedRefs: [], participants: [{ name, email }], recurrence: "", exceptions: {}, reminderMinutes: 15, kind: "event", createdAt: stamp, updatedAt: stamp });

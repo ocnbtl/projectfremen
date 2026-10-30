@@ -1,11 +1,13 @@
 export const WELLNESS_SECTIONS = ["health", "meals", "fitness"] as const;
 export type WellnessSection = typeof WELLNESS_SECTIONS[number];
+export type WellnessSchedule = { start: string; end: string; timeZone: string; calendarId: string };
 export type WellnessEntry = {
   id: string; kind: string; title: string; date: string; status: "planned" | "completed";
   notes: string; fields: Record<string, string>; archived: boolean; createdAt: string; updatedAt: string;
+  schedule?: WellnessSchedule | null;
 };
 export type WellnessState = { schemaVersion: 1; entries: WellnessEntry[] };
-export type WellnessInput = Pick<WellnessEntry, "kind" | "title" | "date" | "status" | "notes" | "fields" | "archived">;
+export type WellnessInput = Pick<WellnessEntry, "kind" | "title" | "date" | "status" | "notes" | "fields" | "archived" | "schedule">;
 export type WellnessField = { id: string; label: string; type: "text" | "number" | "textarea" | "select"; min?: number; max?: number; options?: string[]; suffix?: string };
 export const WELLNESS_CONFIG: Record<WellnessSection, { title: string; icon: string; kinds: { id: string; label: string; plural: string; fields: WellnessField[] }[] }> = {
   health: { title: "Health", icon: "health", kinds: [

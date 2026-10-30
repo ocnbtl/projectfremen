@@ -58,3 +58,6 @@
 
 .kindSwitch {display:inline-flex;width:fit-content;max-width:100%;}
 .kindSwitch button {width:auto!important;min-width:0;padding-inline:12px;}
+
+.scheduleLink {display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--text-muted);font-size:12px;text-decoration:none;}
+.scheduleLink span {font-size:11px;}

@@ -1,3 +1,4 @@
+import { readWellnessCalendarEvents } from "../../../lib/modules/personal-wellness/calendar";
 import { taskCompletionPatch } from "../../../lib/modules/planning/calendar-tasks";
 import { personalCalendarEvents } from "../../../lib/modules/planning/personal-calendar";
 import { reconcilePlaces } from "../../../lib/modules/planning/place-reconciliation";
@@ -38,17 +39,19 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { "Cache-Control": "private, no-store", Vary: "Cookie" },
   });
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await hasAdminSession()))
     return json({ ok: false, error: "Unauthorized" }, 401);
   try {
     const state = await readPlanningState();
+    if (new URL(request.url).searchParams.get("scope") === "calendars") return json({ ok: true, calendars: state.calendars.filter(calendar => !calendar.archivedAt && !calendar.connectionId) });
     const sources = await Promise.allSettled([
       readPersonalRecords(),
       readPersonalLifeState(),
       readPersonalOpsState(),
       readProjectsState(),
       readTravelRecords(),
+      readWellnessCalendarEvents(),
     ]);
     const records = sources[0].status === "fulfilled" ? sources[0].value : [],
       life = sources[1].status === "fulfilled" ? sources[1].value : null,
@@ -204,10 +207,11 @@ export async function GET() {
       birthdays: records.filter(record => record.className === "person" && !record.archivedAt && record.profile?.birthday).map(record => ({ ref: refs.find(ref => ref.module === "people" && ref.objectId === record.id)!, birthday: record.profile!.birthday! })),
       trips: life?.trips || [],
       dated,
+      wellnessEvents: sources[5].status === "fulfilled" ? sources[5].value : [],
       workEvents: personalCalendarEvents({ followUps: ops?.followUps || [], routines: ops?.routines || [] }),
       sourceErrors: sources.flatMap((x, i) =>
         x.status === "rejected"
-          ? [["Records", "Personal", "Work", "Projects", "Travel"][i]]
+          ? [["Records", "Personal", "Work", "Projects", "Travel", "Meals and Fitness"][i]]
           : [],
       ),
       capabilities: {
@@ -266,6 +270,7 @@ export async function POST(request: Request) {
       void lastAttemptAt;
       void lastError;
       if (body.collection === "events") {
+        if (typeof input.id === "string" && input.id.startsWith("wellness-")) throw new Error("Update this meal or workout through its Personal record.");
         const current = (await readPlanningState()).events.find(
           (x) => x.id === input.id,
         );

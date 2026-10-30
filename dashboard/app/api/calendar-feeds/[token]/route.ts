@@ -1,3 +1,4 @@
+import { readWellnessCalendarEvents } from "../../../../lib/modules/personal-wellness/calendar";
 import { resolveCalendarShare, serializeCalendarShare, sharedEvents } from "../../../../lib/modules/planning/calendar-sharing";
 import { readPlanningState } from "../../../../lib/modules/planning/store";
 import { repeatBirthdays } from "../../../../lib/modules/planning/repeat-birthdays";
@@ -8,7 +9,8 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
   try {
     const share = await resolveCalendarShare((await context.params).token);
     if (!share) return new Response("Calendar link not found.", { status: 404, headers });
-    const state = await readPlanningState();
+    const original = await readPlanningState();
+    const state = { ...original, events: [...original.events, ...await readWellnessCalendarEvents()] };
     const birthdays = await repeatBirthdays(sharedEvents(share, state));
     const body = serializeCalendarShare(share, state, birthdays);
     return new Response(body, { headers: { ...headers, "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": 'inline; filename="calendar.ics"' } });
