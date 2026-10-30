@@ -573,11 +573,11 @@ export default function CalendarWorkspace() {
   }
   async function updateWellnessTime(item: EventOccurrence, start: string, end: string) {
     const source = item.wellnessSource; if (!source || busy) return;
-    await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, { schedule: { start, end, calendarId: item.calendarId, timeZone: item.timeZone } }); setPreviewOpen(false); }, "Schedule updated");
+    await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, source.repeating ? {} : { schedule: { start, end, calendarId: item.calendarId, timeZone: item.timeZone } }, source.repeating ? { date: item.occurrenceKey.slice(0,10), start, end } : undefined); setPreviewOpen(false); }, "Schedule updated");
   }
   async function completeTask(item: EventOccurrence) {
     if (busy) return;
-    if (item.wellnessSource) { const source = item.wellnessSource; await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, { status: item.completed ? "planned" : "completed" }); setPreviewOpen(false); }, item.completed ? "Plan reopened" : "Plan completed"); return; }
+    if (item.wellnessSource) { const source = item.wellnessSource; await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, source.repeating ? {} : { status: item.completed ? "planned" : "completed" }, source.repeating ? { date: item.occurrenceKey.slice(0,10), completed: !item.completed } : undefined); setPreviewOpen(false); }, item.completed ? "Plan reopened" : "Plan completed"); return; }
     if (item.workSource?.family === "followUps") {
       const source = item.workSource;
       await action(async () => {
@@ -961,7 +961,7 @@ export default function CalendarWorkspace() {
         )}
       </WorkspaceSheet>
       {wellnessTarget && <WellnessScheduleDialog target={wellnessTarget} onClose={() => setWellnessTarget(undefined)} onSaved={() => { setWellnessTarget(undefined); void refresh(); }} />}
-      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onComplete={() => void completeTask(preview.event)} onEdit={()=>{if (preview.event.wellnessSource) { setWellnessTarget(preview.event.wellnessSource); setPreviewOpen(false); return; } const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
+      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onComplete={() => void completeTask(preview.event)} onEdit={()=>{if (preview.event.wellnessSource) { setWellnessTarget({ ...preview.event.wellnessSource, occurrenceDate: preview.event.occurrenceKey.slice(0,10) }); setPreviewOpen(false); return; } const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
       <CalendarSharePanel open={sharing} onClose={() => setSharing(false)} calendars={snapshot?.state.calendars || []} />
       <WorkspaceSheet
         open={connections}

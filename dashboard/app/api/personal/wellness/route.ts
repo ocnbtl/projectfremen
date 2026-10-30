@@ -26,7 +26,7 @@ async function save(request: Request) {
     if (!isWellnessSection(body.section)) throw new Error("Choose a Personal section.");
     const editing = request.method === "PATCH";
     if (editing && (typeof body.id !== "string" || !body.id || typeof body.expectedUpdatedAt !== "string" || !body.expectedUpdatedAt)) throw new Error("The entry and its current revision are required.");
-    const item = await saveWellnessEntry(body.section, body.input, editing ? body.id : undefined, editing ? body.expectedUpdatedAt : undefined);
+    const item = await saveWellnessEntry(body.section, body.input, editing ? body.id : undefined, editing ? body.expectedUpdatedAt : undefined, body.occurrence);
     await appendAuditEvent({ at: item.updatedAt, action: `personal_wellness.${body.section}.${editing ? "update" : "create"}.success`, path: new URL(request.url).pathname, method: request.method, ip: getRequestIp(request), status: "ok", detail: item.id });
     return json({ ok: true, item });
   } catch (error) {

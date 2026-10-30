@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import WellnessOccurrences from "./WellnessOccurrences";
+import { wellnessOccurrences, wellnessRepeatLabel } from "../../lib/modules/personal-wellness/schedule";
 import WellnessScheduleFields from "./WellnessScheduleFields";
 import { announceWellnessChange, WELLNESS_CHANGE_KEY } from "../../lib/modules/personal-wellness/client";
 import { WorkspaceButton, WorkspaceHeader, WorkspaceSheet, WorkspaceToolbar } from "../admin-shell/WorkspaceKit";
@@ -40,19 +42,21 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
   const current = entries.filter(entry => !entry.archived);
   const newestCheckIn = current.filter(entry => entry.kind === "check-in").sort((a, b) => b.date.localeCompare(a.date))[0];
   const weekStart = new Date(`${currentDay}T12:00:00Z`); weekStart.setUTCDate(weekStart.getUTCDate() - 6); const start = weekStart.toISOString().slice(0, 10);
-  const thisWeek = current.filter(entry => entry.status === "completed" && entry.date >= start && entry.date <= currentDay);
+  const thisWeek = current.flatMap(entry=>entry.schedule?.repeat ? wellnessOccurrences(entry,start,currentDay).filter(row=>row.completed).map(row=>({...entry,date:row.start.slice(0,10),status:"completed" as const})) : entry.status === "completed" && entry.date >= start && entry.date <= currentDay ? [entry] : []);
+  const nextWeek = new Date(`${currentDay}T12:00:00Z`); nextWeek.setUTCDate(nextWeek.getUTCDate()+6);
+  const upcoming = current.flatMap(entry=>entry.schedule?.repeat ? wellnessOccurrences(entry,currentDay,nextWeek.toISOString().slice(0,10)).filter(row=>!row.completed).map(row=>({...entry,date:row.start.slice(0,10)})) : entry.status === "planned" && entry.date >= currentDay ? [entry] : []);
   const summary = section === "health" ? [
     { label: "Latest check-in", value: newestCheckIn ? dateLabel(newestCheckIn.date) : "No check-ins yet" },
     { label: "Sleep", value: newestCheckIn?.fields.sleep ? `${newestCheckIn.fields.sleep} hours` : "—" },
     { label: "Energy", value: newestCheckIn?.fields.energy ? `${newestCheckIn.fields.energy} / 5` : "—" }
   ] : section === "meals" ? [
-    { label: "Today's meals", value: String(current.filter(entry => entry.kind === "meal" && entry.date === currentDay).length) },
-    { label: "Planned", value: String(current.filter(entry => entry.kind === "meal" && entry.status === "planned" && entry.date >= currentDay).length) },
+    { label: "Today's meals", value: String(current.reduce((count,entry)=>count+(entry.kind !== "meal" ? 0 : entry.schedule?.repeat ? wellnessOccurrences(entry,currentDay,currentDay).length : Number(entry.date === currentDay)),0)) },
+    { label: "Planned", value: String(upcoming.filter(entry=>entry.kind==="meal").length) },
     { label: "Recipes", value: String(current.filter(entry => entry.kind === "recipe").length) }
   ] : [
     { label: "Workouts · last 7 days", value: String(thisWeek.length) },
     { label: "Minutes · last 7 days", value: String(thisWeek.reduce((sum, entry) => sum + Number(entry.fields.minutes || 0), 0)) },
-    { label: "Upcoming", value: String(current.filter(entry => entry.status === "planned" && entry.date >= currentDay).length) }
+    { label: "Upcoming", value: String(upcoming.length) }
   ];
   function create(nextKind = kind, recipe?: WellnessEntry) {
     setError(""); setNotice("");
@@ -62,7 +66,7 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
     if (busy || initialError) return;
     saving.current = true; ++refreshVersion.current; setBusy(true); setError("");
     try {
-      const response = await fetch("/api/personal/wellness", { method: value.id ? "PATCH" : "POST", headers: buildJsonHeadersWithCsrf(), body: JSON.stringify({ section, id: value.id, expectedUpdatedAt: value.updatedAt, input: value }) });
+      const response = await fetch("/api/personal/wellness", { method: value.id ? "PATCH" : "POST", headers: buildJsonHeadersWithCsrf(), body: JSON.stringify({ section, id: value.id, expectedUpdatedAt: value.updatedAt, input: Object.fromEntries(Object.entries(value).filter(([key])=>key!=="occurrenceOverrides")) }) });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.error || "This entry could not be saved.");
       setEntries(previous => value.id ? previous.map(item => item.id === value.id ? result.item : item) : [...previous, result.item]);
@@ -91,14 +95,16 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
         {error && !draft && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
         {!visible.length ? <div className={styles.empty}><UnigentamosIcon role={config.icon} size={30} /><h2>{query ? "No matching entries" : archive ? "No archived entries" : `No ${activeKind.plural.toLowerCase()} yet`}</h2><p>{query ? "Try a different search." : section === "health" ? "Keep check-ins and care notes in one place." : section === "meals" ? "Plan a meal or save a recipe to use again." : "Plan your next session or record a completed workout."}</p>{!query && !archive && <WorkspaceButton icon="plus" disabled={Boolean(initialError)} onClick={() => create()}>Add {activeKind.label.toLowerCase()}</WorkspaceButton>}</div> : <div className={styles.cards} data-kind={kind} data-section={section}>{visible.map(entry => <article key={entry.id} className={styles.card}>
-          <div className={styles.cardTop}><span className={styles.entryKind}>{entry.kind === "recipe" ? <UnigentamosIcon role="meals" size={17} /> : <><UnigentamosIcon role="calendar" size={15} /><time dateTime={entry.date}>{dateLabel(entry.date)}</time></>}</span>{entry.kind !== "recipe" && section !== "health" && <span className={styles.status} data-complete={entry.status === "completed"}>{entry.status === "completed" ? "Completed" : "Planned"}</span>}</div>
+          <div className={styles.cardTop}><span className={styles.entryKind}>{entry.kind === "recipe" ? <UnigentamosIcon role="meals" size={17} /> : <><UnigentamosIcon role="calendar" size={15} /><time dateTime={entry.date}>{dateLabel(entry.date)}</time></>}</span>{entry.kind !== "recipe" && section !== "health" && <span className={styles.status} data-complete={!entry.schedule?.repeat && entry.status === "completed"}>{entry.schedule?.repeat ? "Repeats" : entry.status === "completed" ? "Completed" : "Planned"}</span>}</div>
           <button className={styles.title} type="button" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}><h2>{entry.title}</h2></button>
           <div className={styles.metrics}>{activeKind.fields.filter(field => field.type !== "textarea" && entry.fields[field.id] && field.id !== "recipeId").map(field => <span key={field.id} title={field.label}>{entry.fields[field.id]}{field.suffix ? ` ${field.suffix}` : ""}</span>)}</div>
           {entry.kind === "recipe" && entry.fields.ingredients && <p className={styles.recipeIngredients}>{entry.fields.ingredients}</p>}
           {entry.fields.recipeId && <button className={styles.recipeLink} type="button" onClick={() => { const recipe = entries.find(item => item.id === entry.fields.recipeId); if (recipe) setDraft({ ...recipe, fields: { ...recipe.fields } }); }}><UnigentamosIcon role="meals" size={15} />{entries.find(item => item.id === entry.fields.recipeId)?.title || "Recipe"}</button>}
           {entry.schedule && <Link prefetch={false} className={styles.scheduleLink} href={`/admin/calendar?date=${entry.date}`}><UnigentamosIcon role="clock" size={15} />{new Date(`${entry.schedule.start}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {new Date(`${entry.schedule.end}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}<span>{entry.schedule.timeZone.replaceAll("_", " ")}</span><UnigentamosIcon role="calendar" size={15} /></Link>}
+          {entry.schedule?.repeat && <p className={styles.repeatLabel}>{wellnessRepeatLabel(entry.schedule)}{entry.schedule.repeat.until ? ` · Until ${dateLabel(entry.schedule.repeat.until)}` : ""}</p>}
+          {entry.schedule?.repeat && !archive && <WellnessOccurrences entry={entry} section={section} today={currentDay} onSaved={item=>setEntries(previous=>previous.map(existing=>existing.id===item.id?item:existing))} />}
           {entry.notes && <p className={styles.notes}>{entry.notes}</p>}
-          <footer><WorkspaceButton icon="edit" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>Edit</WorkspaceButton>{!archive && entry.kind === "recipe" && <WorkspaceButton icon="calendar" onClick={() => create("meal", entry)}>Plan meal</WorkspaceButton>}{!archive && section !== "health" && entry.kind !== "recipe" && <><WorkspaceButton icon="calendar" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>{entry.schedule ? "Reschedule" : "Schedule"}</WorkspaceButton><WorkspaceButton icon={entry.status === "completed" ? "discard-changes" : "check"} busy={busy} onClick={() => void save({ ...entry, status: entry.status === "completed" ? "planned" : "completed" })}>{entry.status === "completed" ? "Reopen" : "Complete"}</WorkspaceButton></>}{archive && <WorkspaceButton icon="discard-changes" busy={busy} onClick={() => void save({ ...entry, archived: false })}>Restore</WorkspaceButton>}</footer>
+          <footer><WorkspaceButton icon="edit" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>Edit</WorkspaceButton>{!archive && entry.kind === "recipe" && <WorkspaceButton icon="calendar" onClick={() => create("meal", entry)}>Plan meal</WorkspaceButton>}{!archive && section !== "health" && entry.kind !== "recipe" && <><WorkspaceButton icon="calendar" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>{entry.schedule ? "Reschedule" : "Schedule"}</WorkspaceButton>{!entry.schedule?.repeat && <WorkspaceButton icon={entry.status === "completed" ? "discard-changes" : "check"} busy={busy} onClick={() => void save({ ...entry, status: entry.status === "completed" ? "planned" : "completed" })}>{entry.status === "completed" ? "Reopen" : "Complete"}</WorkspaceButton>}</>}{archive && <WorkspaceButton icon="discard-changes" busy={busy} onClick={() => void save({ ...entry, archived: false })}>Restore</WorkspaceButton>}</footer>
         </article>)}</div>}
       </div>
     </main>
@@ -106,7 +112,7 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
       {draft && draftKind && <form className={styles.form} onSubmit={event => { event.preventDefault(); void save(draft); }}>
         <label data-wide="true">Title<input required maxLength={180} value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })} placeholder={section === "meals" ? "What are you making?" : section === "fitness" ? "e.g. Morning strength session" : "Give this entry a name"} /></label>
         {draft.kind !== "recipe" && !draft.schedule && <label>Date<input type="date" required value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label>}
-        {section !== "health" && draft.kind !== "recipe" && <label>Status<SelectField value={draft.status} onChange={event => setDraft({ ...draft, status: event.target.value as Draft["status"] })}><option value="planned">Planned</option><option value="completed">Completed</option></SelectField></label>}
+        {section !== "health" && draft.kind !== "recipe" && !draft.schedule?.repeat && <label>Status<SelectField value={draft.status} onChange={event => setDraft({ ...draft, status: event.target.value as Draft["status"] })}><option value="planned">Planned</option><option value="completed">Completed</option></SelectField></label>}
         {section !== "health" && draft.kind !== "recipe" && <WellnessScheduleFields value={draft.schedule} date={draft.date} minutes={Number(draft.fields.minutes) || (section === "meals" ? 30 : 60)} onChange={schedule => setDraft({ ...draft, schedule, date: schedule ? schedule.start.slice(0, 10) : draft.date })} />}
         {draftKind.fields.map(field => <label key={field.id} data-wide={field.type === "textarea" || undefined}>{field.label}{field.id === "recipeId" ? <SelectField value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)}><option value="">No recipe</option>{entries.filter(item => item.kind === "recipe" && (!item.archived || item.id === draft.fields.recipeId)).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</SelectField> : field.type === "select" ? <SelectField value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)}><option value="">Not recorded</option>{field.options?.map(value => <option key={value}>{value}</option>)}</SelectField> : field.type === "textarea" ? <textarea rows={3} maxLength={8000} value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)} /> : <input type={field.type} min={field.min} max={field.max} step={field.type === "number" ? "any" : undefined} maxLength={300} value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)} />}</label>)}
         <label data-wide="true">{draft.kind === "recipe" ? "Instructions & notes" : "Notes"}<textarea rows={3} maxLength={12000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} placeholder="Optional" /></label>

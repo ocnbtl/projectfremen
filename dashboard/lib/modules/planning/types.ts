@@ -129,7 +129,7 @@ export type PlanningState = { schemaVersion: 1; bookingData?: import("./booking-
   [K in PlanningCollection]: PlanningCollections[K][];
 };
 export type EventOccurrence = EventFields & {
-  wellnessSource?: { section: "meals" | "fitness"; id: string; updatedAt: string };
+  wellnessSource?: { section: "meals" | "fitness"; id: string; updatedAt: string; repeating?: boolean; occurrenceDate?: string };
   workSource?: { family: "followUps" | "routines"; id: string; updatedAt: string };
   id: string;
   eventId: string;
