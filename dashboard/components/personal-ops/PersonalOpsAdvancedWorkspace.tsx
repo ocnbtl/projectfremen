@@ -321,6 +321,7 @@ function isLegacy(item: AdvancedListItem): item is LegacyCaptureProjection {
 }
 
 function toneFor(value: string): PersonalOpsTone {
+  if (value === "active" || value === "open") return value;
   if (["active", "healthy", "ready", "reviewed", "current", "processed"].includes(value)) return "positive";
   if (["blocked", "overdue", "invalid"].includes(value)) return "danger";
   if (["attention", "needs_attention", "needs_context", "due_soon", "paused", "deprecated"].includes(value)) return "attention";

@@ -869,6 +869,21 @@ button.metric {
   color: var(--ops-neutral);
 }
 
+/* In progress uses Personal blue; still-open work uses the attention palette. */
+.statusChip[data-tone="active"] {
+  background: var(--module-primary-100);
+  color: var(--module-primary-700);
+}
+.statusChip[data-tone="open"] {
+  background: color-mix(in srgb, var(--ops-attention) 15%, var(--panel-bg));
+  color: color-mix(in srgb, var(--ops-attention) 68%, #102026);
+}
+.statusChip[data-tone="open"]::before {
+  box-sizing: border-box;
+  background: transparent;
+  border: 1px solid currentColor;
+}
+
 .mono {
   font-family: var(--font-body);
   font-variant-numeric: tabular-nums;
@@ -2509,3 +2524,16 @@ button.metric {
 .personalCardMeta .personalCardType {display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;box-sizing:border-box;padding:5px;flex:none;}
 
 .personalCardLinkLabel {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.personalCardLinks > :is(a,span,button) {
+  background: var(--module-primary-50);
+  border-color: var(--module-primary-100);
+  transition: background-color 240ms ease, border-color 240ms ease, color 240ms ease;
+}
+.personalCardLinks > :is(a,button):is(:hover,:focus-visible,[data-state="open"]) {
+  background: var(--surface-panel, #fff);
+  border-color: var(--module-icon);
+}
+@media(prefers-reduced-motion:reduce) {
+  .personalCardLinks > :is(a,span,button) {transition:none;}
+}

@@ -5,6 +5,8 @@ import styles from "./PersonalOpsWorkspace.module.css";
 
 export type PersonalOpsTone =
   | "default"
+  | "active"
+  | "open"
   | "positive"
   | "attention"
   | "danger"

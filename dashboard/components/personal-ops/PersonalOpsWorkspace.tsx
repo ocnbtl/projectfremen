@@ -392,6 +392,7 @@ function decisionReviewState(item: PersonalOpsDecision) {
 }
 
 function toneForState(value: string): PersonalOpsTone {
+  if (value === "active" || value === "open") return value;
   if (["complete", "decided", "healthy", "reviewed", "current"].includes(value)) return "positive";
   if (["blocked", "critical", "overdue"].includes(value)) return "danger";
   if (["attention", "needs_review", "due_soon", "waiting", "deferred"].includes(value)) return "attention";
