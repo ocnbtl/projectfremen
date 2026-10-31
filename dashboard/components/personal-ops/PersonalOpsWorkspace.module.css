@@ -2465,8 +2465,8 @@ button.metric {
 .rowTitle {font-size:.875rem;line-height:1.45;font-weight:600;}
 .rowSummary {font-size:.8125rem;line-height:1.4;}
 @media(max-width:760px){.personalSystemsDock{margin-inline:16px}.personalSystemsDock a{min-height:44px}}
-.personalCards { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:16px; padding:16px 20px; }
-.personalCards article { display:grid; grid-row:span 5; grid-template-rows:subgrid; row-gap:10px; min-width:0; border:1px solid var(--border); border-radius:14px; padding:16px; background:var(--surface); transition:background .2s,border-color .2s; }
+.personalCards { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr)); gap:18px; padding:16px 20px; }
+.personalCards article { display:grid; grid-row:span 5; grid-template-rows:subgrid; row-gap:10px; min-width:0; border:1px solid var(--border); border-radius:14px; padding:18px; background:var(--surface); transition:background .2s,border-color .2s; }
 .personalCards article:is(:hover,:focus-within,[data-selected=true]) { background:color-mix(in srgb,var(--module-primary-100) 85%,var(--module-primary-50)); border-color:var(--module-border); }
 .personalCardOpen { display:flex; align-items:flex-start; width:100%; gap:12px; padding:0; color:var(--text-strong); text-align:left; }
 .personalCardOpen svg { flex:none; color:var(--module-accent); }
@@ -2494,8 +2494,8 @@ button.metric {
 
 .personalCards article {grid-row:span 4;}
 .personalCardTop {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px;}
-.personalCardDates {flex-direction:column;align-items:flex-end;gap:5px;line-height:1.5;}
-.personalCardDates time {white-space:nowrap;}
+.personalCardDates {box-sizing:border-box;height:34px;flex-direction:column;flex-wrap:nowrap;align-items:flex-start;justify-content:center;gap:2px;line-height:16px;}
+.personalCardDates time {height:16px;flex:none;white-space:nowrap;}
 .personalCardLinks > button {display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 7px 3px 3px;border:1px solid var(--border);border-radius:999px;background:var(--surface-panel);color:var(--text-strong);font:400 12px/1.4 var(--font-body);}
 .personalCardLinks > button:is(:hover,:focus-visible) {border-color:var(--module-accent);background:var(--module-primary-50);}
 .personalCardLinks > button > span:last-child {max-width:100%;white-space:normal;overflow-wrap:anywhere;}
@@ -2507,3 +2507,5 @@ button.metric {
 .personalCardLinks > :is(a,span,button) > :first-child:is([role=img],:has(img),[class*=visual]) {width:26px;height:26px;min-width:26px;flex:0 0 26px;}
 .personalCardLinks > button > span:last-child {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .personalCardMeta .personalCardType {display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;box-sizing:border-box;padding:5px;flex:none;}
+
+.personalCardLinkLabel {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
