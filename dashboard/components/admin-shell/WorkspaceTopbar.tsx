@@ -10,6 +10,7 @@ type Topbar = {
   setSearch: (node: HTMLDivElement | null) => void;
   setActions: (node: HTMLDivElement | null) => void;
 };
+export const WorkspaceHomeContext = createContext<(() => void) | undefined>(undefined);
 export const WorkspaceTopbarContext = createContext<Topbar | null>(null);
 export function WorkspaceTopbarProvider({ children }: { children: ReactNode }) {
   const [search, setSearch] = useState<HTMLDivElement | null>(null);

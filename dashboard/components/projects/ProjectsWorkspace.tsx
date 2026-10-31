@@ -3262,7 +3262,6 @@ export default function ProjectsWorkspace({
         {initialDetail && <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation" data-icon-button="standard"><UnigentamosIcon role="menu" size={18} /></button>}
         {initialDetail ? (
           <div className={styles.mainScroll}>
-            <div className={styles.mobileToolbar}><Link className={styles.textLink} href={workspaceReturnUrl("projects", getModuleRoute("projects"))}>Back to projects</Link></div>
             {selectedItem ? <>{renderProjectHeader(selectedItem, "h1")}{renderProjectBody(selectedItem)}</> : <SystemState variant="error" title="Project not found" description="The requested project identity is not available in the current native or legacy snapshot." />}
           </div>
         ) : directory}

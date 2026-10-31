@@ -4088,7 +4088,7 @@ export default function PeopleWorkspace({
       <span id="people-unavailable-actions" className="sr-only">
         This action is intentionally unavailable until its native owner or persistence path is connected.
       </span>
-      <ModuleSidebar title="People" keepSelectionOpen sections={PEOPLE_SIDEBAR_SECTIONS.slice(0, 1).map(section => ({
+      <ModuleSidebar title="People" onHome={() => updatePeopleUrl({}, { path: getModuleRoute("people"), history: "push", native: true })} keepSelectionOpen sections={PEOPLE_SIDEBAR_SECTIONS.slice(0, 1).map(section => ({
         id: section.title, label: section.title, items: section.items.map(item => ({
           id: item.id, label: item.label, active: activeSidebarView === item.id,
           icon: <UnigentamosIcon role={item.icon} size={18} />,
@@ -4367,7 +4367,6 @@ export default function PeopleWorkspace({
 
       {isInteractions && <section ref={setInteractionDetailTarget} id="people-interaction-panel" className="people-profile-panel people-interaction-panel" aria-label="Selected interaction" />}
       {!isInteractions && <section className="people-profile-panel" aria-label="Selected profile">
-        {!addingPerson && detailMode !== "edit" && <button type="button" className="people-mobile-profile-back" onClick={() => updatePeopleUrl({}, { path: getModuleRoute("people"), history: "push", native: true })}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /><span>Back to {activeViewLabel}</span></button>}
         {initialLoadError ? (
           <SystemState
             variant="error"

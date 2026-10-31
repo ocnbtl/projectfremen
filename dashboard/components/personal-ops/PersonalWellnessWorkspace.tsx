@@ -89,7 +89,7 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
       <div className={`${baseStyles.mainScroll} ${styles.content}`}>
         <WorkspaceHeader title={config.title}><WorkspaceButton intent="primary" icon="plus" disabled={Boolean(initialError)} onClick={() => create()}>Add {activeKind.label.toLowerCase()}</WorkspaceButton></WorkspaceHeader>
         <WorkspaceToolbar query={query} onQuery={setQuery} placeholder="Search" />
-        <div className={styles.heading}><Link prefetch={false} href="/admin/personal"><UnigentamosIcon role="back" size={16} />Personal</Link><h1><UnigentamosIcon role={config.icon} size={25} />{config.title}</h1></div>
+        <div className={styles.heading}><h1><UnigentamosIcon role={config.icon} size={25} />{config.title}</h1></div>
         <section className={styles.summary} aria-label={`${config.title} summary`}>{summary.map(item => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}</section>
         <div className={styles.controls}><div className={styles.kindSwitch} role="group" aria-label="Entry type">{config.kinds.map(item => <button key={item.id} type="button" aria-pressed={kind === item.id} onClick={() => setKind(item.id)}>{item.plural}</button>)}</div><WorkspaceButton icon="archive" aria-pressed={archive} onClick={() => setArchive(!archive)}>{archive ? "Show current" : "Archived"}</WorkspaceButton></div>
         {error && !draft && <p className={styles.error} role="alert">{error}</p>}

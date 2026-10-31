@@ -74,7 +74,7 @@ export async function savePetProfile(raw: unknown, id?: string, expectedUpdatedA
       fields[key]=text(value,key,4000);
       if (["birthday","adopted"].includes(key) && fields[key] && (!/^\d{4}-\d{2}-\d{2}$/.test(fields[key]) || !Number.isFinite(Date.parse(fields[key]+"T12:00Z")) || new Date(fields[key]+"T12:00Z").toISOString().slice(0,10)!==fields[key])) throw new Error("Choose a valid date");
     }
-    const now=stamp(previous?.updatedAt),item: PetProfile={...previous,id:previous?.id || randomUUID(),name:text(input.name,"Name",120,true),species:text(input.species,"Species",120,true),fields,archived:input.archived,createdAt:previous?.createdAt || now,updatedAt:now};
+    const now=stamp(previous?.updatedAt),item: PetProfile={...previous,id:previous?.id || randomUUID(),photoUpdatedAt:input.photoUpdatedAt?iso(input.photoUpdatedAt,"Picture version"):undefined,name:text(input.name,"Name",120,true),species:text(input.species,"Species",120,true),fields,archived:input.archived,createdAt:previous?.createdAt || now,updatedAt:now};
     return {value:{...state,pets:previous?state.pets!.map(p=>p.id===id?item:p):[...state.pets!,item]},result:item};
   });
 }

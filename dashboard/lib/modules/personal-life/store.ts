@@ -201,9 +201,16 @@ function normalizeList(raw: Record<string, unknown>, now: string): PersonalList 
 
 
 function normalizeBuildItem(raw: Record<string, unknown>, now: string): PersonalBuildItem {
+  let url = text(raw.url, "Item link", 2048);
+  if (url) {
+    if (!/^[a-z][a-z\d+.-]*:/i.test(url)) url = `https://${url}`;
+    try { const parsed = new URL(url); if (!["https:", "http:"].includes(parsed.protocol) || parsed.username || parsed.password) throw Error(); url = parsed.href; }
+    catch { throw new Error("Use a valid http or https item link."); }
+  }
   return {
     ...base(raw, now),
     name: text(raw.name, "Build item name", 240, true),
+    url,
     category: text(raw.category, "Category", 120),
     status: member(raw.status, ["wanted", "researching", "acquired", "retired"] as const, "wanted"),
     targetDate: iso(raw.targetDate, "Target date"),

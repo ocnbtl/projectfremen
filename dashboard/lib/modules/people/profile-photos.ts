@@ -44,14 +44,14 @@ export type StoredPeopleProfilePhoto = {
 
 function assertPersonId(personId: string): string {
   const clean = personId.trim();
-  if (!/^(?:personal|project)-[0-9a-f-]{36}$/i.test(clean)) throw new Error("Invalid profile picture id");
+  if (!/^(?:(?:personal|project|pet)-[0-9a-f-]{36}|pet-legacy-dog)$/i.test(clean)) throw new Error("Invalid profile picture id");
   return clean;
 }
 
 function fileName(personId: string): string {
   const id = assertPersonId(personId);
   // Project pictures share the validated crop pipeline, with their own storage namespace.
-  return `${id.startsWith("project-") ? "project" : "people"}-profile-photo-${id}.json`;
+  return `${id.startsWith("project-") ? "project" : id.startsWith("pet-") ? "pet" : "people"}-profile-photo-${id}.json`;
 }
 
 function hasExpectedSignature(bytes: Uint8Array, mimeType: string): boolean {

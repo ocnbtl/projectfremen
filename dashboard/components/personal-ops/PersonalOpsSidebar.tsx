@@ -123,7 +123,8 @@ export default function PersonalOpsSidebar({
   counts,
   unavailableViews,
   mobileOpen,
-  onClose
+  onClose,
+  onHome
 }: {
   activeView: PersonalOpsSidebarView;
   filter: string;
@@ -132,6 +133,7 @@ export default function PersonalOpsSidebar({
   unavailableViews?: Partial<Record<PersonalOpsSidebarView, string>>;
   mobileOpen: boolean;
   onClose: () => void;
+  onHome?: () => void;
 }) {
   const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car", "style-guide", "dog", "health", "meals", "fitness"].includes(activeView);
   const domainItems: ModuleSidebarItem[] = PERSONAL_OPS_DOMAIN_LABELS.map((domain) => {
@@ -250,6 +252,7 @@ export default function PersonalOpsSidebar({
   return (
     <ModuleSidebar
       title="Personal"
+      onHome={onHome}
       description="Daily command, durable records, and personal systems."
       sections={activeView === "command" ? [commandSection, dataSection] : sections}
       className={styles.sidebar}

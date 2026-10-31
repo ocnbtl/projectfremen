@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import SearchField from "../ui/SearchField";
 import PlaceSync from "./PlaceSync";
 import PlaceImagePicker from "./PlaceImagePicker";
@@ -383,7 +384,7 @@ export default function MapWorkspace() {
       <div className={styles.mapToolbar} aria-label="Map controls" onKeyDown={e => {
         if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.closest(".work-search") && query.trim().length >= 3 && !busy) { e.preventDefault(); void search(); }
       }}>
-      <h1 className={styles.moduleTitle}>Map</h1>
+      <h1 className={styles.moduleTitle}><Link prefetch={false} className="workspace-home-link" href="/admin/map">Map</Link></h1>
       <SearchField aria-label="Search places or addresses" value={query} onChange={e=>setQuery(e.target.value)} className={`work-search ${styles.moduleSearch}`} />
         <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!(tag || organizationType || industry)} title="Filter" /></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>

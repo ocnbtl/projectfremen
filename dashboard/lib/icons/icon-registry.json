@@ -320,5 +320,11 @@
 ,
   {"id":"health","label":"Health","defaultCandidate":"heartbeat","candidates":["heartbeat","heart","stethoscope","activity","medical-cross"],"usages":[{"module":"Personal","breadcrumb":"Health"}]},
   {"id":"meals","label":"Meals","defaultCandidate":"tools-kitchen-2","candidates":["tools-kitchen-2","soup","salad","chef-hat","bowl-spoon"],"usages":[{"module":"Personal","breadcrumb":"Meals"}]},
-  {"id":"fitness","label":"Fitness","defaultCandidate":"barbell","candidates":["barbell","run","stretching","activity","gymnastics"],"usages":[{"module":"Personal","breadcrumb":"Fitness"}]}
+  {"id":"fitness","label":"Fitness","defaultCandidate":"barbell","candidates":["barbell","run","stretching","activity","gymnastics"],"usages":[{"module":"Personal","breadcrumb":"Fitness"}]},
+  {"id":"pet-water","label":"Water","defaultCandidate":"droplet","candidates":["droplet","droplets","wash","bath","droplet-half-2"],"usages":[{"module":"Personal","breadcrumb":"Pets > Water"}]},
+  {"id":"pet-medication","label":"Medication","defaultCandidate":"pill","candidates":["pill","first-aid-kit","medical-cross","report-medical","stethoscope"],"usages":[{"module":"Personal","breadcrumb":"Pets > Medication"}]},
+  {"id":"pet-vet","label":"Vet visit","defaultCandidate":"stethoscope","candidates":["stethoscope","nurse","physiotherapist","heartbeat","first-aid-kit"],"usages":[{"module":"Personal","breadcrumb":"Pets > Vet visit"}]},
+  {"id":"pet-vaccination","label":"Vaccination","defaultCandidate":"vaccine","candidates":["vaccine","medical-cross","report-medical","first-aid-kit","pill"],"usages":[{"module":"Personal","breadcrumb":"Pets > Vaccination"}]},
+  {"id":"pet-grooming","label":"Grooming","defaultCandidate":"brush","candidates":["brush","bath","cut","wash","palette"],"usages":[{"module":"Personal","breadcrumb":"Pets > Grooming"}]},
+  {"id":"pet-bathroom","label":"Bathroom care","defaultCandidate":"toilet-paper","candidates":["toilet-paper","bath","wash","droplets","droplet"],"usages":[{"module":"Personal","breadcrumb":"Pets > Bathroom"}]}
 ]

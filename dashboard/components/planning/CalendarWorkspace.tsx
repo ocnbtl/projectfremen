@@ -661,7 +661,7 @@ export default function CalendarWorkspace() {
     >
       <PlaceSync onComplete={refresh} />
       <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
-        <h1>Calendar</h1>
+        <h1><Link prefetch={false} className="workspace-home-link" href="/admin/calendar">Calendar</Link></h1>
           <SearchField aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} value={query} onChange={e => setQuery(e.target.value)} className={styles.calendarSearch} />
         <div className={styles.dateNavigation}>
           <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />

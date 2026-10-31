@@ -1540,6 +1540,7 @@ export default function PersonalOpsWorkspace({
   return (
     <WorkspaceTopbarProvider><div className={`${styles.shell} work-surface`} data-has-inspector={Boolean(selectedItem)} data-personal-pages data-detail-open={Boolean(selectedItem && mobileInspectorOpen) || undefined}>
       <PersonalOpsSidebar
+        onHome={selectedItem && mobileInspectorOpen ? () => setMobileInspectorOpen(false) : undefined}
         activeView={initialView}
         filter={urlState.filter}
         pathname={pathname}
@@ -1605,7 +1606,6 @@ export default function PersonalOpsWorkspace({
             onRequestClose={() => setMobileInspectorOpen(false)}
             busy={busy}
           >
-            <button type="button" className="workspace-back work-button" onClick={() => setMobileInspectorOpen(false)}>Back</button>
             <header className={styles.inspectorHeader}>
               <div className={styles.inspectorTop}>
                 <span className={styles.objectIcon} aria-hidden="true">{selectedItem.source === "legacy-goal" ? "G" : selectedItem.objectType === "decision" ? "D" : selectedItem.objectType === "obligation" ? "O" : selectedItem.objectType === "follow_up" ? "F" : "G"}</span>

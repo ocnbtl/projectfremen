@@ -75,6 +75,7 @@ export type BuildItemStatus = "wanted" | "researching" | "acquired" | "retired";
 
 export type PersonalBuildItem = PersonalLifeBase & {
   name: string;
+  url?: string;
   category: string;
   status: BuildItemStatus;
   targetDate: string;

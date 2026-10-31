@@ -47,3 +47,5 @@ html[data-active-module], html[data-active-module] body {
 .workspace-canvas > .media-directory { padding-top: 0; }
 
 .workspace-people-pages .people-profile-panel { background:var(--workspace-canvas,#f6f8f7); padding-top:var(--workspace-content-gap,16px); }
+
+.workspace-home-link{display:inline-flex;align-items:center;padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:none;border-radius:6px;cursor:pointer}.workspace-home-link:hover{color:var(--module-icon)}.workspace-home-link:focus-visible{outline:2px solid var(--module-focus);outline-offset:5px}

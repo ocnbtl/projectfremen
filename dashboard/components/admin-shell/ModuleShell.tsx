@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { WorkspacePageContext } from "./WorkspacePageContext";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import { WorkspaceTopbarProvider } from "./WorkspaceTopbar";
+import { WorkspaceTopbarProvider, WorkspaceHomeContext } from "./WorkspaceTopbar";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import type { ModuleId } from "../../lib/native-objects/types";
 
@@ -39,11 +39,11 @@ export default function ModuleShell({
   useLayoutEffect(() => {
     if (!detailOpen) return;
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    backRef.current?.focus({ preventScroll: true });
+    (sidebar ? document.querySelector<HTMLButtonElement>(".workspace-home-link") : backRef.current)?.focus({ preventScroll: true });
     return () => { requestAnimationFrame(() => returnFocus.current?.focus({ preventScroll: true })); };
   }, [detailOpen]);
   return (
-    <WorkspaceTopbarProvider>
+    <WorkspaceHomeContext.Provider value={detailOpen ? onBack : undefined}><WorkspaceTopbarProvider>
     <div
       className={["module-shell", "workspace-pages", className].filter(Boolean).join(" ")}
       data-detail-open={detailOpen || undefined}
@@ -58,13 +58,13 @@ export default function ModuleShell({
         {children}
       </main>
       <section className="workspace-detail-page" hidden={!detailOpen} aria-label="Details">
-        <button ref={backRef} type="button" className="workspace-back work-button" onClick={onBack}>
+        {!sidebar && <button ref={backRef} type="button" className="workspace-back work-button" onClick={onBack}>
           <UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /><span>Back</span>
-        </button>
+        </button>}
         <WorkspacePageContext.Provider value={true}>{inspector}</WorkspacePageContext.Provider>
       </section>
       {aiDock}
     </div>
-    </WorkspaceTopbarProvider>
+    </WorkspaceTopbarProvider></WorkspaceHomeContext.Provider>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import ViewCycleButton, { type DirectoryView } from "../ui/ViewCycleButton";
 import SelectField from "../ui/SelectField";
 import { useWorkspaceReturn } from "../admin-shell/useWorkspaceReturn";
@@ -87,6 +88,9 @@ const VIEW_COPY: Record<PersonalLifeView, { title: string; description: string; 
 };
 
 const TRIP_LABELS: Record<TripStatus, string> = { been: "Been", want: "Want to go", lived: "Lived", planned: "Planned" };
+const BUILD_CATEGORIES = ["Clothing", "Footwear", "Accessories", "Gear", "Technology", "Home", "Hobbies", "Other"];
+const BUILD_ICONS: Record<BuildItemStatus,string> = {wanted:"star",researching:"search",acquired:"check",retired:"archive"};
+const budgetLabel = (value:string) => /^\d/.test(value.trim()) ? "$"+value.trim() : value;
 const BUILD_LABELS: Record<BuildItemStatus, string> = { wanted: "Wanted", researching: "Researching", acquired: "Acquired", retired: "Retired" };
 const MOD_LABELS: Record<VehicleModificationStatus, string> = { idea: "Ideas", researching: "Researching", planned: "Planned", installed: "Installed", skipped: "Skipped" };
 const LIST_COLUMN_LABELS: Record<PersonalListColumnType, string> = {
@@ -328,7 +332,7 @@ export default function PersonalLifeWorkspace({
     }
     if (initialView === "lists") setEditor({ collection: "lists", values: { title: "", description: "", kind: "custom", ...preset } });
     if (initialView === "travel") setEditor({ collection: "trips", values: { name: "", place: "", region: "", status: "want", travelMode: "plane", latitude: "0", longitude: "0", startDate: "", endDate: "", notes: "", ...preset } });
-    if (initialView === "personal-build") setEditor({ collection: "buildItems", values: { name: "", category: "", status: "wanted", targetDate: "", budget: "", notes: "", ...preset } });
+    if (initialView === "personal-build") {setNewBuildCategory(false);setEditor({ collection: "buildItems", values: { name: "", url: "", category: "", status: "wanted", targetDate: "", budget: "", notes: "", ...preset } });}
     if (initialView === "car") setEditor({ collection: "vehicles", values: { name: "", year: "", make: "", model: "", trim: "", status: "future", vinNote: "", notes: "", ...preset } });
   }
 
@@ -340,8 +344,9 @@ export default function PersonalLifeWorkspace({
       const value = item as PersonalTrip;
       setEditor({ collection, id: value.id, values: { name: value.name, place: value.place, region: value.region, status: value.status, travelMode: value.travelMode, latitude: String(value.latitude), longitude: String(value.longitude), startDate: value.startDate, endDate: value.endDate, notes: value.notes } });
     } else if (collection === "buildItems") {
+      setNewBuildCategory(false);
       const value = item as PersonalBuildItem;
-      setEditor({ collection, id: value.id, values: { name: value.name, category: value.category, status: value.status, targetDate: value.targetDate, budget: value.budget, notes: value.notes } });
+      setEditor({ collection, id: value.id, values: { name: value.name, url: value.url || "", category: value.category, status: value.status, targetDate: value.targetDate, budget: value.budget, notes: value.notes } });
     } else {
       const value = item as PersonalVehicle;
       setEditor({ collection, id: value.id, values: { name: value.name, year: value.year, make: value.make, model: value.model, trim: value.trim, status: value.status, vinNote: value.vinNote, notes: value.notes } });
@@ -721,12 +726,15 @@ export default function PersonalLifeWorkspace({
     </div>;
   }
 
+  const [newBuildCategory,setNewBuildCategory]=useState(false);
   function renderBuild() {
-    const lanes = (["wanted", "researching", "acquired"] as BuildItemStatus[]);
-    return <div className={styles.loadout}>
-      <header className={styles.loadoutHeader}><PersonalOpsIcon name="build"/><div><h2>Your collection</h2><p>{state.buildItems.filter((item) => item.status === "acquired").length} acquired · {state.buildItems.filter(item => item.status !== "retired").length} active items</p></div><a href="/admin/resources">Research in Resources</a></header>
-      <div className={styles.loadoutLanes}>{lanes.map((status) => <section key={status}><header><h2>{BUILD_LABELS[status]}</h2><span>{state.buildItems.filter((item) => item.status === status).length}</span></header><div>{state.buildItems.filter((item) => item.status === status && matches(item.name,item.category,item.notes)).map((item) => <article key={item.id}><span>{item.category || "Unsorted"}</span><strong>{item.name}</strong>{item.notes && <p>{item.notes}</p>}<small>{item.targetDate ? formatDate(item.targetDate) : "No target"}{item.budget ? ` · ${item.budget}` : ""}</small><div className={styles.rowActions}><button type="button" onClick={() => openEdit("buildItems", item)}>Edit</button><button type="button" onClick={() => void removeObject("buildItems", item)}>Delete</button></div></article>)}</div></section>)}</div>
-      {state.buildItems.some((item) => item.status === "retired") && <p className={styles.retiredNote}>{state.buildItems.filter((item) => item.status === "retired").length} retired item(s) remain in the record.</p>}
+    const lanes = ["wanted", "researching", "acquired", "retired"] as BuildItemStatus[];
+    return <div className={styles.buildCollection}>
+      <header className={styles.loadoutHeader}><PersonalOpsIcon name="build"/><div><h2>Your collection</h2><p>{state.buildItems.filter(item => item.status === "acquired").length} acquired · {state.buildItems.filter(item => item.status !== "retired").length} active items</p></div><a href="/admin/resources"><UnigentamosIcon role="module-resources" size={16}/>Research in Resources</a></header>
+      {lanes.filter(status=>status!=="retired" || state.buildItems.some(item=>item.status===status)).map(status=><section key={status} className={styles.buildSection}><header><h2><UnigentamosIcon role={BUILD_ICONS[status]} size={18}/>{BUILD_LABELS[status]}</h2><span>{state.buildItems.filter(item=>item.status===status && matches(item.name,item.category,item.notes)).length}</span></header><div className={styles.buildCards}>
+        {state.buildItems.filter(item=>item.status===status && matches(item.name,item.category,item.notes)).map(item=><article key={item.id} className={styles.buildCard}><header><span className={styles.buildTag}><UnigentamosIcon role="place-tag-custom" size={14}/>{item.category || "Uncategorized"}</span><div className={styles.buildActions}><WorkspaceButton icon="edit" aria-label={"Edit "+item.name} onClick={()=>openEdit("buildItems",item)}/><WorkspaceButton icon="delete" aria-label={"Delete "+item.name} onClick={()=>void removeObject("buildItems",item)}/></div></header><h3>{item.name}</h3>{item.notes&&<p>{item.notes}</p>}<footer>{item.budget&&<span title="Budget"><UnigentamosIcon role="module-finance" size={16}/>{budgetLabel(item.budget)}</span>}{item.targetDate&&<span title="Target date"><UnigentamosIcon role="calendar" size={16}/>{formatDate(item.targetDate)}</span>}{item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer"><UnigentamosIcon role="link" size={16}/>Open link</a>}</footer></article>)}
+        {!state.buildItems.some(item=>item.status===status && matches(item.name,item.category,item.notes))&&<p className={styles.buildEmpty}>{query?"No matching items":"No items yet"}</p>}
+      </div></section>)}
     </div>;
   }
 
@@ -898,7 +906,7 @@ export default function PersonalLifeWorkspace({
         <fieldset className={styles.coordinateFields}><legend>Map pin</legend>{input("Latitude", "latitude", editorValue("latitude"), (value) => setEditorValue("latitude", value), { type: "number", required: true })}{input("Longitude", "longitude", editorValue("longitude"), (value) => setEditorValue("longitude", value), { type: "number", required: true })}</fieldset>
         <label className={styles.full}><span>{tripEditorStatus === "want" ? "Why it’s on the list" : tripEditorStatus === "lived" ? "Living notes" : "Trip notes"}</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={3} /></label>
       </>}
-      {editor.collection === "buildItems" && <>{input("Item", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true, placeholder: "Boots, jacket, vest…" })}{input("Category", "category", editorValue("category"), (value) => setEditorValue("category", value), { placeholder: "Footwear, outerwear, gear…" })}<label><span>Status</span><SelectField value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(BUILD_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</SelectField></label>{input("Target", "targetDate", editorValue("targetDate"), (value) => setEditorValue("targetDate", value), { type: "date" })}{input("Budget", "budget", editorValue("budget"), (value) => setEditorValue("budget", value), { placeholder: "$ or range" })}<label className={styles.full}><span>Notes</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={3} /></label></>}
+      {editor.collection === "buildItems" && <>{input("Item", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true, placeholder: "Boots, jacket, vest…" })}<label><span><UnigentamosIcon role="place-tag-custom" size={15}/>Category</span><>{newBuildCategory?<input aria-label="New category" autoFocus maxLength={120} placeholder="Category name" value={editorValue("category")} onChange={event=>setEditorValue("category",event.target.value)}/>:<SelectField searchable onCreate={()=>{setEditorValue("category","");setNewBuildCategory(true);}} createLabel="Add category" value={editorValue("category")} onChange={event=>setEditorValue("category",event.target.value)}><option value="">Uncategorized</option>{[...new Set([...BUILD_CATEGORIES,...state.buildItems.map(item=>item.category).filter(Boolean),editorValue("category")].filter(Boolean))].sort().map(category=><option key={category} value={category}>{category}</option>)}</SelectField>}</></label><label><span>Status</span><SelectField menuClassName={styles.buildStatusMenu} optionIcons={BUILD_ICONS} value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(BUILD_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</SelectField></label>{input("Target", "targetDate", editorValue("targetDate"), (value) => setEditorValue("targetDate", value), { type: "date" })}{input("Budget", "budget", editorValue("budget"), (value) => setEditorValue("budget", budgetLabel(value)), { placeholder: "$0 or range" })}{input("Link", "url", editorValue("url"), value => setEditorValue("url", value), { placeholder: "https://…" })}<label className={styles.full}><span>Notes</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={3} /></label></>}
       {editor.collection === "vehicles" && <>{input("Build name", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true, placeholder: "Daily driver or future build" })}{input("Year", "year", editorValue("year"), (value) => setEditorValue("year", value))}{input("Make", "make", editorValue("make"), (value) => setEditorValue("make", value))}{input("Model", "model", editorValue("model"), (value) => setEditorValue("model", value))}{input("Trim", "trim", editorValue("trim"), (value) => setEditorValue("trim", value))}<label><span>Status</span><SelectField value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}><option value="current">Current</option><option value="future">Future</option><option value="previous">Previous</option></SelectField></label>{input("Identification note", "vinNote", editorValue("vinNote"), (value) => setEditorValue("vinNote", value), { placeholder: "Optional partial reference—never a key" })}<label className={styles.full}><span>Build notes</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={3} /></label></>}
       <footer><button type="button" onClick={() => setEditor(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Saving…" : "Save"}</button></footer></form></Dialog.Content></Dialog.Overlay></Dialog.Portal>}</Dialog.Root>
   </div>;

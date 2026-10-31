@@ -1,11 +1,11 @@
 export const DOG_TRACKER_SCHEMA_VERSION = 1 as const;
 
 export const PET_CARE_KINDS = [
-  { id: "feed", label: "Food", icon: "meals" }, { id: "water", label: "Water", icon: "droplet" },
+  { id: "feed", label: "Food", icon: "meals" }, { id: "water", label: "Water", icon: "pet-water" },
   { id: "walk", label: "Walk", icon: "walk" }, { id: "activity", label: "Activity", icon: "fitness" },
-  { id: "medication", label: "Medication", icon: "health" }, { id: "vet", label: "Vet visit", icon: "health" },
-  { id: "vaccination", label: "Vaccination", icon: "health" }, { id: "grooming", label: "Grooming", icon: "dog" },
-  { id: "habitat", label: "Habitat care", icon: "place-tag-house" }, { id: "bathroom", label: "Bathroom", icon: "droplet" },
+  { id: "medication", label: "Medication", icon: "pet-medication" }, { id: "vet", label: "Vet visit", icon: "pet-vet" },
+  { id: "vaccination", label: "Vaccination", icon: "pet-vaccination" }, { id: "grooming", label: "Grooming", icon: "pet-grooming" },
+  { id: "habitat", label: "Habitat care", icon: "place-tag-house" }, { id: "bathroom", label: "Bathroom", icon: "pet-bathroom" },
   { id: "measurement", label: "Weight / measurement", icon: "calendar-group-scale" }, { id: "other", label: "Other care", icon: "notes" }
 ] as const;
 export type DogCareKind = typeof PET_CARE_KINDS[number]["id"];
@@ -21,8 +21,8 @@ export const PET_PROFILE_FIELDS = [
   { id: "emergency", label: "Emergency / caregiver contact", long: true }, { id: "insurance", label: "Insurance / policy" },
   { id: "notes", label: "Care notes", long: true }
 ] as const;
-export type PetProfile = { id: string; name: string; species: string; fields: Record<string,string>; archived: boolean; createdAt: string; updatedAt: string };
-export type PetInput = Pick<PetProfile,"name"|"species"|"fields"|"archived">;
+export type PetProfile = { photoUpdatedAt?: string; id: string; name: string; species: string; fields: Record<string,string>; archived: boolean; createdAt: string; updatedAt: string };
+export type PetInput = Pick<PetProfile,"name"|"species"|"fields"|"archived"|"photoUpdatedAt">;
 
 export type DogCareEvent = {
   id: string;

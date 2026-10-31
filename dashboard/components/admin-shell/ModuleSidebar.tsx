@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { workspaceReturnUrl } from "./useWorkspaceReturn";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { useContext, useEffect, useState, useId } from "react";
 import { LayoutGroup, motion } from "motion/react";
-import { WorkspaceTopbarContext } from "./WorkspaceTopbar";
+import { WorkspaceTopbarContext, WorkspaceHomeContext } from "./WorkspaceTopbar";
 import * as Popover from "@radix-ui/react-popover";
 
 export type ModuleSidebarItem = {
@@ -39,6 +41,7 @@ export type ModuleSidebarProps = {
   ariaLabel?: string;
   className?: string;
   keepSelectionOpen?: boolean;
+  onHome?: () => void;
 };
 
 function SidebarItem({ item, onNavigate }: { item: ModuleSidebarItem; onNavigate?: () => void }) {
@@ -106,8 +109,14 @@ function SidebarItem({ item, onNavigate }: { item: ModuleSidebarItem; onNavigate
   );
 }
 
-export default function ModuleSidebar({ id, title, sections, footer, status, onClose, keepSelectionOpen = false, ariaLabel = title + " navigation" }: ModuleSidebarProps) {
+export default function ModuleSidebar({ id, title, sections, footer, status, onClose, onHome, keepSelectionOpen = false, ariaLabel = title + " navigation" }: ModuleSidebarProps) {
   const layoutId = useId();
+  const returnHome = useContext(WorkspaceHomeContext);
+  const pathname = usePathname();
+  const module = pathname.split("/")[2] || "personal";
+  const root = "/admin/"+module;
+  const saved = workspaceReturnUrl(module,root);
+  const home = module !== "personal" && saved.split("?")[0]===root ? saved : root;
   const bar = useContext(WorkspaceTopbarContext);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [compact, setCompact] = useState(false);
@@ -120,7 +129,7 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
   const [openSection, setOpenSection] = useState<string | null>(null);
   const close = () => { if (!keepSelectionOpen) { setOpenSection(null); onClose?.(); } };
   return <nav id={id} className="workspace-topnav" aria-label={ariaLabel}>
-    <h1 className="workspace-topnav__title">{title}</h1>
+    <h1 className="workspace-topnav__title">{onHome || returnHome?<button type="button" className="workspace-home-link" onClick={onHome || returnHome} aria-label={"Return to "+title}>{title}</button>:<Link prefetch={false} className="workspace-home-link" href={home} aria-label={"Return to "+title}>{title}</Link>}</h1>
     {bar && <div className="workspace-topnav__search" ref={bar.setSearch} />}
     {compact && sections.length > 0 && <Popover.Root open={openSection === "compact"} onOpenChange={open => setOpenSection(open ? "compact" : null)}>
       <Popover.Trigger className="workspace-nav-trigger" aria-label={`${title} views`} title="Views"><UnigentamosIcon role="menu" size={18} /><span>Views</span></Popover.Trigger>
