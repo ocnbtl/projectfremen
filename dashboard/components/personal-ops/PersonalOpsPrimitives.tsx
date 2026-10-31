@@ -255,8 +255,8 @@ export function PersonalOpsPanel({
 }
 
 /** Keep native form values and the shared menu keyboard behavior; decorate only labels. */
-export function PersonalOpsStatusSelect(props: ComponentProps<typeof SelectField>) {
+export function PersonalOpsStatusSelect({ optionDescriptions, ...props }: ComponentProps<typeof SelectField> & { optionDescriptions?: Record<string, string> }) {
   return <SelectField {...props} menuClassName={[styles.statusSelectMenu, props.menuClassName].filter(Boolean).join(" ")} renderOptionLabel={(value, label) =>
-    <PersonalOpsStatusChip tone={personalOpsToneForState(value)}>{label}</PersonalOpsStatusChip>
+    <span className={styles.statusChoiceLabel}><PersonalOpsStatusChip tone={personalOpsToneForState(value)}>{label}</PersonalOpsStatusChip>{optionDescriptions?.[value] && <small>{optionDescriptions[value]}</small>}</span>
   } />;
 }

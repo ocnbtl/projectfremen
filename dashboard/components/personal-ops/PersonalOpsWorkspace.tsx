@@ -1,4 +1,5 @@
 "use client";
+import PersonalCardStatusControl, { personalCardStatusChoices } from "./PersonalCardStatusControl";
 import PersonalHome from "./PersonalHome";
 import { EventObjectPreview } from "../planning/EventLinksPreview";
 import { EventObjectIdentity } from "../planning/EventObjects";
@@ -1353,7 +1354,7 @@ export default function PersonalOpsWorkspace({
     return true;
   }
 
-  async function toggleLegacyGoal(goal: LegacyEntityGoalProjection) {
+  async function toggleLegacyGoal(goal: LegacyEntityGoalProjection, done = !goal.done): Promise<string | null> {
     setBusy(true);
     setError("");
     try {
@@ -1362,7 +1363,7 @@ export default function PersonalOpsWorkspace({
       if (!response.ok || !current.ok || !current.goals) throw new Error(current.error || "Current Goals could not be refreshed.");
       const target = current.goals.findIndex((item, index) => index === goal.index && item.text === goal.text);
       if (target === -1) throw new Error("This Current Goal changed elsewhere. Refresh before updating it.");
-      const goals = current.goals.map((item, index) => index === target ? { ...item, done: !goal.done } : item);
+      const goals = current.goals.map((item, index) => index === target ? { ...item, done } : item);
       const save = await fetch("/api/entity-goals", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
@@ -1371,11 +1372,33 @@ export default function PersonalOpsWorkspace({
       const saved = (await save.json()) as { ok?: boolean; goals?: Array<{ text: string; done: boolean }>; error?: string };
       if (!save.ok || !saved.ok || !saved.goals) throw new Error(saved.error || "Current Goal could not be saved.");
       setLegacyGoals((items) => items.map((item) => item.slug === goal.slug && item.index === goal.index ? { ...item, done: Boolean(saved.goals?.[goal.index]?.done) } : item));
+      return null;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Current Goal could not be saved.");
+      const message = caught instanceof Error ? caught.message : "Current Goal could not be saved.";
+      setError(message);
+      return message;
     } finally {
       setBusy(false);
     }
+  }
+
+  async function saveCardStatus(item: PersonalOpsListItem, next: string): Promise<string | null> {
+    if (stateLabel(item) === next) return null;
+    if (item.source === "legacy-goal") return toggleLegacyGoal(item, next === "complete");
+    const choice = personalCardStatusChoices(item).find(option => option.value === next);
+    if (!choice || choice.reason) return choice?.reason || "This status is not available.";
+    const family = familyForObject(item);
+    const reopen = item.lifecycle === "complete" && !["complete", "decided", "superseded"].includes(next) ? { lifecycle: "active" as const } : {};
+    let patch: PersonalOpsUpdateInputByFamily[PersonalOpsFamily];
+    if (item.objectType === "goal") patch = { lifecycle: next as PersonalOpsGoal["lifecycle"] };
+    else if (item.objectType === "decision") patch = { ...reopen, decisionState: next as PersonalOpsDecision["decisionState"] };
+    else if (item.objectType === "obligation") patch = { ...reopen, obligationState: next as PersonalOpsObligation["obligationState"] };
+    else if (item.objectType === "follow_up") patch = { ...reopen, followUpState: next as PersonalOpsFollowUp["followUpState"] };
+    else return "This status is not available.";
+    const saved = await updateByFamily(family, item, patch);
+    if (!saved.ok) return saved.error.message;
+    setState(current => replaceInState(current, family, saved.data as never));
+    return null;
   }
 
   async function toggleKeyResult(goal: PersonalOpsGoal, keyResultId: string) {
@@ -1581,7 +1604,7 @@ export default function PersonalOpsWorkspace({
               </div>
               <button type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></button>
               <p className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</p>
-              <div className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalOpsStatusChip className={styles.personalCardStatus} tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip></div>
+              <div className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? [{value:"active"}, {value:"complete"}] : personalCardStatusChoices(item)} disabled={busy} onSave={next => saveCardStatus(item, next)} /></div>
             </article>)}</section>
           )}
         </div>
