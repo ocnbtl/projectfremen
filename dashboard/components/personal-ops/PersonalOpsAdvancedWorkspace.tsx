@@ -51,6 +51,7 @@ import {
   PersonalOpsPanel,
   PersonalOpsStateGrid,
   PersonalOpsStatusChip,
+  PersonalOpsStatusSelect,
   personalOpsToneForState as toneFor,
   PersonalOpsStatusLine,
   type PersonalOpsMetricItem,
@@ -641,24 +642,24 @@ function AdvancedObjectForm({
             </Field>}
             {form.family !== "templates" && form.family !== "routines" && (
               <Field label="Health">
-                <SelectField value={draft.health} onChange={(event) => update("health", event.target.value as AdvancedDraft["health"])}>
+                <PersonalOpsStatusSelect value={draft.health} onChange={(event) => update("health", event.target.value as AdvancedDraft["health"])}>
                   <option value="unknown">Unknown</option>
                   <option value="healthy">Healthy</option>
                   <option value="attention">Needs attention</option>
                   <option value="blocked">Blocked</option>
                   <option value="stale">Stale</option>
-                </SelectField>
+                </PersonalOpsStatusSelect>
               </Field>
             )}
             {form.family !== "routines" && <Field label="Review state">
-              <SelectField value={draft.review} onChange={(event) => update("review", event.target.value as AdvancedDraft["review"])}>
+              <PersonalOpsStatusSelect value={draft.review} onChange={(event) => update("review", event.target.value as AdvancedDraft["review"])}>
                 <option value="not_reviewed">Not reviewed</option>
                 <option value="needs_review">Needs review</option>
                 <option value="in_review">In review</option>
                 <option value="reviewed">Reviewed</option>
                 <option value="not_required">Not required</option>
                 <option value="waived">Waived</option>
-              </SelectField>
+              </PersonalOpsStatusSelect>
             </Field>}
 
             {form.family === "routines" && (
@@ -694,12 +695,12 @@ function AdvancedObjectForm({
             {form.family === "captures" && (
               <>
                 <Field label="Triage state">
-                  <SelectField value={draft.triageState} onChange={(event) => update("triageState", event.target.value as AdvancedDraft["triageState"])}>
+                  <PersonalOpsStatusSelect value={draft.triageState} onChange={(event) => update("triageState", event.target.value as AdvancedDraft["triageState"])}>
                     <option value="untriaged">Untriaged</option>
                     <option value="needs_context">Needs context</option>
                     <option value="ready">Ready</option>
                     {form.item?.objectType === "capture_item" && form.item.triageState === "processed" && <option value="processed">Processed</option>}
-                  </SelectField>
+                  </PersonalOpsStatusSelect>
                 </Field>
                 <Field label="Missing context" full hint="One missing fact or source per line.">
                   <textarea value={draft.missingContext} onChange={(event) => update("missingContext", event.target.value)} />

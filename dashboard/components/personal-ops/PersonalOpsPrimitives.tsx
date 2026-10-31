@@ -1,6 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import SelectField from "../ui/SelectField";
 import styles from "./PersonalOpsWorkspace.module.css";
 
 export type PersonalOpsTone =
@@ -16,12 +18,12 @@ export type PersonalOpsTone =
 
 /** One semantic palette for Personal cards, details, routines and templates. */
 export function personalOpsToneForState(value: string): PersonalOpsTone {
-  const state = value.trim().toLowerCase().replaceAll(" ", "_");
+  const state = value.trim().toLowerCase().replace(/[ -]+/g, "_");
   if (["active", "in_progress"].includes(state)) return "active";
   if (["open", "planned", "pending"].includes(state)) return "open";
   if (["complete", "completed", "done", "decided", "resolved", "healthy", "reviewed", "current", "ready", "processed", "verified", "received"].includes(state)) return "positive";
   if (["blocked", "critical", "overdue", "invalid", "failed", "broken"].includes(state)) return "danger";
-  if (["waiting", "deferred", "paused", "attention", "needs_attention", "needs_context", "due_soon", "deprecated", "stale"].includes(state)) return "attention";
+  if (["waiting", "deferred", "paused", "attention", "needs_attention", "needs_context", "due_soon", "due_today", "deprecated", "stale"].includes(state)) return "attention";
   if (["needs_review", "in_review", "not_reviewed"].includes(state)) return "review";
   return "neutral";
 }
@@ -135,6 +137,7 @@ export type PersonalOpsFilterItem = {
   id: string;
   label: string;
   count?: number;
+  tone?: PersonalOpsTone;
   active?: boolean;
   onSelect: () => void;
   disabled?: boolean;
@@ -155,7 +158,8 @@ export function PersonalOpsFilterRail({
       {items.map((item) => (
         <button
           type="button"
-          className={styles.filterChip}
+          className={[styles.filterChip, styles.statusChip, styles.statusPalette, styles.statusFilter].join(" ")}
+          data-tone={item.tone || personalOpsToneForState(item.id)}
           data-active={item.active || undefined}
           aria-pressed={item.active}
           aria-label={item.count === undefined ? item.label : `${item.label}, ${item.count} items`}
@@ -166,6 +170,7 @@ export function PersonalOpsFilterRail({
         >
           <span>{item.label}</span>
           {item.count !== undefined && <span className={styles.filterCount}>{item.count}</span>}
+          {item.active && <UnigentamosIcon role="check" size={14} aria-hidden="true" className={styles.statusFilterCheck} />}
         </button>
       ))}
     </div>
@@ -182,7 +187,7 @@ export function PersonalOpsStatusChip({
   className?: string;
 }) {
   return (
-    <span className={[styles.statusChip, className].filter(Boolean).join(" ")} data-tone={toneData(tone)}>
+    <span className={[styles.statusChip, styles.statusPalette, className].filter(Boolean).join(" ")} data-tone={toneData(tone)}>
       {children}
     </span>
   );
@@ -247,4 +252,11 @@ export function PersonalOpsPanel({
       {children}
     </section>
   );
+}
+
+/** Keep native form values and the shared menu keyboard behavior; decorate only labels. */
+export function PersonalOpsStatusSelect(props: ComponentProps<typeof SelectField>) {
+  return <SelectField {...props} menuClassName={[styles.statusSelectMenu, props.menuClassName].filter(Boolean).join(" ")} renderOptionLabel={(value, label) =>
+    <PersonalOpsStatusChip tone={personalOpsToneForState(value)}>{label}</PersonalOpsStatusChip>
+  } />;
 }

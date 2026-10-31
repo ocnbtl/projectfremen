@@ -53,10 +53,12 @@ import ConfirmationSheet from "../operational/ConfirmationSheet";
 import DetailTabs, { type DetailTab } from "../operational/DetailTabs";
 import SystemState from "../operational/SystemState";
 import {
+  PersonalOpsFilterRail,
   PersonalOpsMetricRail,
   PersonalOpsPanel,
   PersonalOpsStateGrid,
   PersonalOpsStatusChip,
+  PersonalOpsStatusSelect,
   personalOpsToneForState as toneForState,
   PersonalOpsStatusLine,
   type PersonalOpsMetricItem,
@@ -840,14 +842,14 @@ function ObjectForm({
                   <textarea value={draft.description} onChange={(event) => update("description", event.target.value)} />
                 </Field>
                 <Field label="Status">
-                  <SelectField value={draft.followUpState} onChange={(event) => update("followUpState", event.target.value as FormDraft["followUpState"])}>
+                  <PersonalOpsStatusSelect value={draft.followUpState} onChange={(event) => update("followUpState", event.target.value as FormDraft["followUpState"])}>
                     <option value="open">Open</option>
                     <option value="scheduled">Scheduled</option>
                     <option value="waiting">Waiting</option>
                     <option value="deferred">Deferred</option>
                     <option value="complete">Complete</option>
                     <option value="carried_forward">Carried forward</option>
-                  </SelectField>
+                  </PersonalOpsStatusSelect>
                 </Field>
                 <Field label="Due date">
                   <input type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
@@ -895,35 +897,35 @@ function ObjectForm({
                 </Field>
                 {form.family !== "decisions" && (
                   <Field label="Health">
-                    <SelectField value={draft.health} onChange={(event) => update("health", event.target.value as FormDraft["health"])}>
+                    <PersonalOpsStatusSelect value={draft.health} onChange={(event) => update("health", event.target.value as FormDraft["health"])}>
                       <option value="unknown">Unknown</option>
                       <option value="healthy">Healthy</option>
                       <option value="attention">Needs attention</option>
                       <option value="blocked">Blocked</option>
                       <option value="stale">Stale</option>
-                    </SelectField>
+                    </PersonalOpsStatusSelect>
                   </Field>
                 )}
                 <Field label="Review state">
-                  <SelectField aria-label="Review state" value={draft.review} onChange={(event) => update("review", event.target.value as FormDraft["review"])}>
+                  <PersonalOpsStatusSelect aria-label="Review state" value={draft.review} onChange={(event) => update("review", event.target.value as FormDraft["review"])}>
                     <option value="not_reviewed">Not reviewed</option>
                     <option value="needs_review">Needs review</option>
                     <option value="in_review">In review</option>
                     <option value="reviewed">Reviewed</option>
                     <option value="not_required">Not required</option>
                     <option value="waived">Waived</option>
-                  </SelectField>
+                  </PersonalOpsStatusSelect>
                 </Field>
                 {form.family !== "decisions" && (
                   <>
                     <Field label="Cadence">
-                      <SelectField value={draft.cadence} onChange={(event) => update("cadence", event.target.value as FormDraft["cadence"])}>
+                      <PersonalOpsStatusSelect value={draft.cadence} onChange={(event) => update("cadence", event.target.value as FormDraft["cadence"])}>
                         <option value="dormant">No cadence</option>
                         <option value="current">Current</option>
                         <option value="due_soon">Due soon</option>
                         <option value="overdue">Overdue</option>
                         <option value="paused">Paused</option>
-                      </SelectField>
+                      </PersonalOpsStatusSelect>
                     </Field>
                     <Field label="Cadence rule" full hint="Plain-language reminder only; automatic creation is not enabled.">
                       <input value={draft.cadenceRule} onChange={(event) => update("cadenceRule", event.target.value)} placeholder="Example: review every Friday" />
@@ -959,7 +961,7 @@ function ObjectForm({
                   <textarea aria-label="Decision" value={draft.finalDecision} onChange={(event) => update("finalDecision", event.target.value)} required={draft.decisionState === "decided"} />
                 </Field>
                 <Field label="Decision state">
-                  <SelectField
+                  <PersonalOpsStatusSelect
                     aria-label="Decision state"
                     value={draft.decisionState}
                     onChange={(event) => {
@@ -974,7 +976,7 @@ function ObjectForm({
                     <option value="open">Open</option>
                     <option value="decided">Decided</option>
                     <option value="deferred">Deferred</option>
-                  </SelectField>
+                  </PersonalOpsStatusSelect>
                 </Field>
                 <Field label="Reversibility">
                   <SelectField aria-label="Reversibility" value={draft.reversibility} onChange={(event) => update("reversibility", event.target.value as FormDraft["reversibility"])}>
@@ -1009,12 +1011,12 @@ function ObjectForm({
             {form.family === "obligations" && (
               <>
                 <Field label="Current state">
-                  <SelectField value={draft.obligationState} onChange={(event) => update("obligationState", event.target.value as FormDraft["obligationState"])}>
+                  <PersonalOpsStatusSelect value={draft.obligationState} onChange={(event) => update("obligationState", event.target.value as FormDraft["obligationState"])}>
                     <option value="open">Open</option>
                     <option value="waiting">Waiting</option>
                     <option value="blocked">Blocked</option>
                     <option value="complete">Complete</option>
-                  </SelectField>
+                  </PersonalOpsStatusSelect>
                 </Field>
                 <Field label="Consequence" full hint="What happens if this commitment is missed?">
                   <textarea value={draft.consequence} onChange={(event) => update("consequence", event.target.value)} required />
@@ -1488,7 +1490,7 @@ export default function PersonalOpsWorkspace({
     { id: "complete", label: "Decided", count: state.decisions.filter((item) => item.decisionState === "decided" || item.decisionState === "superseded").length }
   ];
   const filterItems = (initialView === "decisions" ? decisionFilterItems : defaultFilterItems)
-    .map((item) => ({ ...item, active: urlState.filter === item.id, onSelect: () => updateUrl({ filter: item.id, selected: "" }) }));
+    .map((item) => ({ ...item, tone: toneForState(item.label), active: urlState.filter === item.id, onSelect: () => updateUrl({ filter: item.id, selected: "" }) }));
 
   const primaryFamily = VIEW_COPY[initialView].family || "followUps";
 
@@ -1547,7 +1549,7 @@ export default function PersonalOpsWorkspace({
           <WorkspaceHeader title={initialView === "command" ? "Personal" : VIEW_COPY[initialView].title} count={scopedItems.length}>
             {initialView === "command" ? <SelectField aria-label="Create personal item" optionIcons={{"":"plus",goals:"goal",followUps:"follow-up",decisions:"decision",obligations:"check"}} value="" onChange={event => {if(event.target.value) openCreate(event.target.value as PersonalOpsFamily);}}><option value="" disabled>Add new</option>{(["goals","followUps","decisions","obligations"] as const).map(family => <option value={family} key={family}>{FAMILY_LABELS[family]}</option>)}</SelectField> : <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate(primaryFamily)}>Add {FAMILY_LABELS[primaryFamily].toLowerCase()}</WorkspaceButton>}
           </WorkspaceHeader>
-          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<>{filterItems.map(item=><WorkspaceButton key={item.id} aria-pressed={item.active} onClick={item.onSelect}>{item.label}</WorkspaceButton>)}<strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</>}>
+          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<div><PersonalOpsFilterRail items={filterItems.map(({count, ...item}) => item)} ariaLabel="Filter by status" className={styles.statusFilterMenu} /><strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</div>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
           </WorkspaceToolbar>
 

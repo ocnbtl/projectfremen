@@ -1,3 +1,13 @@
+.shell, .statusPalette {
+  --ops-positive: #21845f;
+  --ops-attention: #c97418;
+  --ops-danger: #c92d3f;
+  --ops-linked: var(--module-icon, #2068c0);
+  --ops-review: #7f55c7;
+  --ops-people: #c74e90;
+  --ops-neutral: #506070;
+}
+
 /*
  * Intent: a calm, dense daily operating ledger for one person making consequential
  * decisions repeatedly. Palette and typography inherit the shared Unigentamos
@@ -8,13 +18,6 @@
 .shell {
   --ops-sidebar-width: clamp(214px, 14.85vw, 236px);
   --ops-inspector-width: clamp(492px, 33.2vw, 535px);
-  --ops-positive: #21845f;
-  --ops-attention: #c97418;
-  --ops-danger: #c92d3f;
-  --ops-linked: var(--module-icon, #2068c0);
-  --ops-review: #7f55c7;
-  --ops-people: #c74e90;
-  --ops-neutral: #506070;
   display: grid;
   grid-template-columns: var(--ops-sidebar-width) minmax(0, 1fr) var(--ops-inspector-width);
   width: 100%;
@@ -823,8 +826,8 @@ button.metric {
   gap: 4px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: var(--panel-bg-subtle);
-  color: var(--text-muted);
+  background: var(--status-chip-background, var(--panel-bg-subtle));
+  color: var(--status-chip-color, var(--text-muted));
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.15;
@@ -841,43 +844,43 @@ button.metric {
 }
 
 .statusChip[data-tone="positive"] {
-  background: color-mix(in srgb, var(--ops-positive) 10%, var(--panel-bg));
-  color: var(--ops-positive);
+  --status-chip-background: color-mix(in srgb, var(--ops-positive) 10%, var(--panel-bg, #fff));
+  --status-chip-color: var(--ops-positive);
 }
 
 .statusChip[data-tone="attention"] {
-  background: color-mix(in srgb, var(--ops-attention) 11%, var(--panel-bg));
-  color: color-mix(in srgb, var(--ops-attention) 68%, #102026);
+  --status-chip-background: color-mix(in srgb, var(--ops-attention) 11%, var(--panel-bg, #fff));
+  --status-chip-color: color-mix(in srgb, var(--ops-attention) 68%, #102026);
 }
 
 .statusChip[data-tone="danger"] {
-  background: color-mix(in srgb, var(--ops-danger) 9%, var(--panel-bg));
-  color: var(--ops-danger);
+  --status-chip-background: color-mix(in srgb, var(--ops-danger) 9%, var(--panel-bg, #fff));
+  --status-chip-color: var(--ops-danger);
 }
 
 .statusChip[data-tone="review"] {
-  background: color-mix(in srgb, var(--ops-review) 9%, var(--panel-bg));
-  color: var(--ops-review);
+  --status-chip-background: color-mix(in srgb, var(--ops-review) 9%, var(--panel-bg, #fff));
+  --status-chip-color: var(--ops-review);
 }
 
 .statusChip[data-tone="people"] {
-  background: color-mix(in srgb, var(--ops-people) 9%, var(--panel-bg));
-  color: var(--ops-people);
+  --status-chip-background: color-mix(in srgb, var(--ops-people) 9%, var(--panel-bg, #fff));
+  --status-chip-color: var(--ops-people);
 }
 
 .statusChip[data-tone="neutral"] {
-  background: color-mix(in srgb, var(--ops-neutral) 9%, var(--panel-bg));
-  color: var(--ops-neutral);
+  --status-chip-background: color-mix(in srgb, var(--ops-neutral) 9%, var(--panel-bg, #fff));
+  --status-chip-color: var(--ops-neutral);
 }
 
 /* In progress uses Personal blue; still-open work uses the attention palette. */
 .statusChip[data-tone="active"] {
-  background: var(--module-primary-100);
-  color: var(--module-primary-700);
+  --status-chip-background: var(--module-primary-100, #cfe2f8);
+  --status-chip-color: var(--module-primary-700, #1c4e9d);
 }
 .statusChip[data-tone="open"] {
-  background: color-mix(in srgb, var(--ops-attention) 15%, var(--panel-bg));
-  color: color-mix(in srgb, var(--ops-attention) 68%, #102026);
+  --status-chip-background: color-mix(in srgb, var(--ops-attention) 15%, var(--panel-bg, #fff));
+  --status-chip-color: color-mix(in srgb, var(--ops-attention) 68%, #102026);
 }
 .statusChip[data-tone="open"]::before {
   box-sizing: border-box;
@@ -1240,7 +1243,7 @@ button.metric {
   padding: 0.8125rem 0.8125rem;
   border: 1px solid color-mix(in srgb, var(--ops-linked) 26%, var(--border));
   border-radius: 7px;
-  background: color-mix(in srgb, var(--selected-bg) 72%, var(--panel-bg));
+  background: color-mix(in srgb, var(--selected-bg) 72%, var(--panel-bg, #fff));
   color: var(--text-muted);
   font-size: 0.8125rem;
   line-height: 1.45;
@@ -1626,7 +1629,7 @@ button.metric {
   padding: 8px 0.8125rem;
   border: 1px solid var(--border);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--shell-bg-alt) 60%, var(--panel-bg));
+  background: color-mix(in srgb, var(--shell-bg-alt) 60%, var(--panel-bg, #fff));
   color: var(--text-strong);
   font: 500 13px/1.4 var(--font-body);
 }
@@ -1735,7 +1738,7 @@ button.metric {
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--ops-attention) 38%, var(--border));
   border-radius: 7px;
-  background: color-mix(in srgb, var(--ops-attention) 7%, var(--panel-bg));
+  background: color-mix(in srgb, var(--ops-attention) 7%, var(--panel-bg, #fff));
 }
 
 .duplicateWarning > div {
@@ -1816,7 +1819,7 @@ button.metric {
   align-items: center;
   padding: 8px 0.8125rem;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--ops-attention) 9%, var(--panel-bg));
+  background: color-mix(in srgb, var(--ops-attention) 9%, var(--panel-bg, #fff));
   color: var(--text-strong);
   cursor: pointer;
 }
@@ -2539,3 +2542,32 @@ button.metric {
   .personalCardLinks > :is(a,span,button),
   .statusChip {transition:none;}
 }
+
+/* Semantic filter colors remain visible while the inset border marks selection. */
+.statusFilter.statusChip {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+}
+.statusFilter[data-active="true"] {
+  border-color: currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.statusFilter:hover:not(:disabled) {border-color: currentColor;}
+.statusFilterCheck {font-size: 12px; line-height: 1;}
+@media (prefers-reduced-motion: reduce) {.statusFilter.statusChip {transition: none;}}
+
+.statusFilterMenu {flex-wrap: wrap; overflow: visible; padding: 0;}
+
+.statusFilter.statusChip:hover:not(:disabled), .statusFilter.statusChip[data-active="true"] {
+  background: var(--status-chip-background);
+  color: var(--status-chip-color);
+}
+
+.statusSelectMenu :global(.app-select-item[aria-selected="true"]) {
+  background: var(--panel-bg-subtle, #f4f6f6);
+  color: var(--text, #102026);
+}
+.statusFilterMenu {width: 100%;}
