@@ -14,6 +14,18 @@ export type PersonalOpsTone =
   | "people"
   | "neutral";
 
+/** One semantic palette for Personal cards, details, routines and templates. */
+export function personalOpsToneForState(value: string): PersonalOpsTone {
+  const state = value.trim().toLowerCase().replaceAll(" ", "_");
+  if (["active", "in_progress"].includes(state)) return "active";
+  if (["open", "planned", "pending"].includes(state)) return "open";
+  if (["complete", "completed", "done", "decided", "resolved", "healthy", "reviewed", "current", "ready", "processed", "verified", "received"].includes(state)) return "positive";
+  if (["blocked", "critical", "overdue", "invalid", "failed", "broken"].includes(state)) return "danger";
+  if (["waiting", "deferred", "paused", "attention", "needs_attention", "needs_context", "due_soon", "deprecated", "stale"].includes(state)) return "attention";
+  if (["needs_review", "in_review", "not_reviewed"].includes(state)) return "review";
+  return "neutral";
+}
+
 function toneData(tone?: PersonalOpsTone) {
   return tone && tone !== "default" ? tone : undefined;
 }

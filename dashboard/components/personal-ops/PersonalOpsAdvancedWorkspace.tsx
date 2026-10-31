@@ -51,6 +51,7 @@ import {
   PersonalOpsPanel,
   PersonalOpsStateGrid,
   PersonalOpsStatusChip,
+  personalOpsToneForState as toneFor,
   PersonalOpsStatusLine,
   type PersonalOpsMetricItem,
   type PersonalOpsTone
@@ -318,15 +319,6 @@ function formatRoutineReminder(item: PersonalOpsRoutine) {
 
 function isLegacy(item: AdvancedListItem): item is LegacyCaptureProjection {
   return "source" in item && item.source === "legacy";
-}
-
-function toneFor(value: string): PersonalOpsTone {
-  if (value === "active" || value === "open") return value;
-  if (["active", "healthy", "ready", "reviewed", "current", "processed"].includes(value)) return "positive";
-  if (["blocked", "overdue", "invalid"].includes(value)) return "danger";
-  if (["attention", "needs_attention", "needs_context", "due_soon", "paused", "deprecated"].includes(value)) return "attention";
-  if (["needs_review", "not_reviewed", "in_review"].includes(value)) return "review";
-  return "neutral";
 }
 
 function lifecycleFor(item: AdvancedListItem) {
@@ -1379,7 +1371,7 @@ export default function PersonalOpsAdvancedWorkspace({
       if (column === 1) return formatRoutineNextRun(item);
       if (column === 2) return formatRoutineReminder(item);
       if (column === 3) return item.lastRunAt ? formatDate(item.lastRunAt) : "Not run";
-      return <PersonalOpsStatusChip tone={toneFor(item.cadence)}>{item.lifecycle === "archived" ? "Archived" : cleanLabel(item.cadence)}</PersonalOpsStatusChip>;
+      return <PersonalOpsStatusChip tone={toneFor(item.lifecycle === "archived" ? "archived" : item.cadence)}>{item.lifecycle === "archived" ? "Archived" : cleanLabel(item.cadence)}</PersonalOpsStatusChip>;
     }
     if (initialView === "inbox") {
       if (isLegacy(item)) {

@@ -14,7 +14,7 @@
   --ops-linked: var(--module-icon, #2068c0);
   --ops-review: #7f55c7;
   --ops-people: #c74e90;
-  --ops-neutral: #8a735a;
+  --ops-neutral: #506070;
   display: grid;
   grid-template-columns: var(--ops-sidebar-width) minmax(0, 1fr) var(--ops-inspector-width);
   width: 100%;
@@ -814,6 +814,7 @@ button.metric {
 }
 
 .statusChip {
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease;
   display: inline-flex;
   width: max-content;
   max-width: 100%;
@@ -846,7 +847,7 @@ button.metric {
 
 .statusChip[data-tone="attention"] {
   background: color-mix(in srgb, var(--ops-attention) 11%, var(--panel-bg));
-  color: var(--ops-attention);
+  color: color-mix(in srgb, var(--ops-attention) 68%, #102026);
 }
 
 .statusChip[data-tone="danger"] {
@@ -2535,5 +2536,6 @@ button.metric {
   border-color: var(--module-icon);
 }
 @media(prefers-reduced-motion:reduce) {
-  .personalCardLinks > :is(a,span,button) {transition:none;}
+  .personalCardLinks > :is(a,span,button),
+  .statusChip {transition:none;}
 }

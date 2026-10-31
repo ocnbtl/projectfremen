@@ -8,6 +8,7 @@ import { wellnessOccurrences, wellnessRepeatLabel } from "../../lib/modules/pers
 import WellnessScheduleFields from "./WellnessScheduleFields";
 import { announceWellnessChange, WELLNESS_CHANGE_KEY } from "../../lib/modules/personal-wellness/client";
 import { WorkspaceButton, WorkspaceHeader, WorkspaceSheet, WorkspaceToolbar } from "../admin-shell/WorkspaceKit";
+import { PersonalOpsStatusChip, personalOpsToneForState } from "./PersonalOpsPrimitives";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
@@ -95,7 +96,7 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
         {error && !draft && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
         {!visible.length ? <div className={styles.empty}><UnigentamosIcon role={config.icon} size={30} /><h2>{query ? "No matching entries" : archive ? "No archived entries" : `No ${activeKind.plural.toLowerCase()} yet`}</h2><p>{query ? "Try a different search." : section === "health" ? "Keep check-ins and care notes in one place." : section === "meals" ? "Plan a meal or save a recipe to use again." : "Plan your next session or record a completed workout."}</p>{!query && !archive && <WorkspaceButton icon="plus" disabled={Boolean(initialError)} onClick={() => create()}>Add {activeKind.label.toLowerCase()}</WorkspaceButton>}</div> : <div className={styles.cards} data-kind={kind} data-section={section}>{visible.map(entry => <article key={entry.id} className={styles.card}>
-          <div className={styles.cardTop}><span className={styles.entryKind}>{entry.kind === "recipe" ? <UnigentamosIcon role="meals" size={17} /> : <><UnigentamosIcon role="calendar" size={15} /><time dateTime={entry.date}>{dateLabel(entry.date)}</time></>}</span>{entry.kind !== "recipe" && section !== "health" && <span className={styles.status} data-complete={!entry.schedule?.repeat && entry.status === "completed"}>{entry.schedule?.repeat ? "Repeats" : entry.status === "completed" ? "Completed" : "Planned"}</span>}</div>
+          <div className={styles.cardTop}><span className={styles.entryKind}>{entry.kind === "recipe" ? <UnigentamosIcon role="meals" size={17} /> : <><UnigentamosIcon role="calendar" size={15} /><time dateTime={entry.date}>{dateLabel(entry.date)}</time></>}</span>{entry.kind !== "recipe" && section !== "health" && <PersonalOpsStatusChip tone={personalOpsToneForState(entry.schedule?.repeat ? "active" : entry.status)}>{entry.schedule?.repeat ? "Repeats" : entry.status === "completed" ? "Completed" : "Planned"}</PersonalOpsStatusChip>}</div>
           <button className={styles.title} type="button" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}><h2>{entry.title}</h2></button>
           <div className={styles.metrics}>{activeKind.fields.filter(field => field.type !== "textarea" && entry.fields[field.id] && field.id !== "recipeId").map(field => <span key={field.id} title={field.label}>{entry.fields[field.id]}{field.suffix ? ` ${field.suffix}` : ""}</span>)}</div>
           {entry.kind === "recipe" && entry.fields.ingredients && <p className={styles.recipeIngredients}>{entry.fields.ingredients}</p>}

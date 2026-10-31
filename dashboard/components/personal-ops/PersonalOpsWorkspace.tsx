@@ -57,6 +57,7 @@ import {
   PersonalOpsPanel,
   PersonalOpsStateGrid,
   PersonalOpsStatusChip,
+  personalOpsToneForState as toneForState,
   PersonalOpsStatusLine,
   type PersonalOpsMetricItem,
   type PersonalOpsTone
@@ -389,15 +390,6 @@ function stateLabel(item: PersonalOpsListItem) {
 
 function decisionReviewState(item: PersonalOpsDecision) {
   return item.lifecycle === "complete" ? "reviewed" : item.review;
-}
-
-function toneForState(value: string): PersonalOpsTone {
-  if (value === "active" || value === "open") return value;
-  if (["complete", "decided", "healthy", "reviewed", "current"].includes(value)) return "positive";
-  if (["blocked", "critical", "overdue"].includes(value)) return "danger";
-  if (["attention", "needs_review", "due_soon", "waiting", "deferred"].includes(value)) return "attention";
-  if (["in_review", "not_reviewed"].includes(value)) return "review";
-  return "neutral";
 }
 
 function cleanLabel(value: string) {
@@ -1558,8 +1550,6 @@ export default function PersonalOpsWorkspace({
           <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<>{filterItems.map(item=><WorkspaceButton key={item.id} aria-pressed={item.active} onClick={item.onSelect}>{item.label}</WorkspaceButton>)}<strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
           </WorkspaceToolbar>
-
-
 
 
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
