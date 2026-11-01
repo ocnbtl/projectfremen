@@ -465,7 +465,7 @@ export function serializePersonalOpsUrlState(
 }
 
 const NOTES_VIEWS = [
-  "all",
+  "all", "plain-notes", "interactions", "event-notes",
   "recent",
   "pinned",
   "active",

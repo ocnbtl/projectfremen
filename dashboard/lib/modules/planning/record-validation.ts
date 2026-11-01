@@ -1,3 +1,4 @@
+import { interactionKind } from "./interaction-kinds";
 import { normalizePlaceImage } from "./place-presentation";
 import { GROUP_ICONS } from "./calendar-groups";
 import { validateRepeatAnchor } from "./repeat-language";
@@ -110,6 +111,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       allDay: raw.allDay === true,
       isTask: raw.isTask === true,
       completed: raw.completed === true,
+      interactionKind: raw.interactionKind === undefined ? undefined : interactionKind(raw.interactionKind),
       calendarId: string(raw.calendarId, "Calendar", 300, true),
       groupId: string(raw.groupId, "Color group", 100),
       placeId: string(raw.placeId, "Place", 300),

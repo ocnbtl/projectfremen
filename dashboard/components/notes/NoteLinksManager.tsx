@@ -1,4 +1,5 @@
 "use client";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
@@ -81,7 +82,7 @@ export default function NoteLinksManager({
     }
     return [...unique.values()];
   }, [candidates, linkedTargetKeys]);
-  const selected = links.find((link) => link.id === selectedLinkId) || links[0] || null;
+  const selected = links.find((link) => link.id === selectedLinkId) || null;
   const [targetKey, setTargetKey] = useState("");
   const [createRelationship, setCreateRelationship] = useState<NoteLinkRelationship>("reference");
   const [createContextNote, setCreateContextNote] = useState("");
@@ -153,27 +154,27 @@ export default function NoteLinksManager({
     <section className={styles.manager} data-note-links-manager={noteRef.objectId}>
       <header className={styles.managerHeader}>
         <div>
-          <span className={styles.eyebrow}>Notes-owned relationship records</span>
-          <h2>Resource and Media links</h2>
-          <p>Link without copying the target. Every lifecycle change keeps its own audit event.</p>
+
+          <h2><UnigentamosIcon role="link" size={18}/>Linked objects <small>{activeCount}</small></h2>
+          <p>Keep related people, events, work, and files together.</p>
         </div>
-        <button type="button" className={styles.secondaryButton} onClick={onRefresh} disabled={loading || busy}>
-          {loading ? "Refreshing..." : "Refresh links"}
+        <button type="button" aria-label="Refresh links" title="Refresh links" className={styles.secondaryButton} onClick={onRefresh} disabled={loading || busy}>
+          <UnigentamosIcon role="calendar-group-refresh" size={17}/>
         </button>
       </header>
 
       <div className={styles.metrics} aria-label="NoteLink lifecycle summary">
-        <span><strong>{activeCount}</strong> Active</span>
-        <span data-tone={attentionCount ? "attention" : undefined}><strong>{attentionCount}</strong> Need attention</span>
-        <span><strong>{removedCount}</strong> Removed</span>
-        <span><strong>{promotableCandidates.length}</strong> Exact candidates</span>
+
+        {attentionCount>0&&<span data-tone="attention"><strong>{attentionCount}</strong> Need attention</span>}
+        {removedCount>0&&<span><strong>{removedCount}</strong> Removed</span>}
+
       </div>
 
       {error && <p className={styles.error} role="alert">{error}</p>}
       {mutationError && <p className={styles.error} role="alert">{mutationError}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
-      <div className={styles.workspace}>
+      <div className={styles.workspace} data-selected={Boolean(selected)}>
         <div className={styles.directory}>
           {links.length ? (
             <ul className={styles.linkList} aria-label="Persisted NoteLinks">
@@ -200,11 +201,12 @@ export default function NoteLinksManager({
             <SystemState
               compact
               variant={error ? "error" : "empty"}
-              title={error ? "NoteLinks could not be refreshed" : "No persisted NoteLinks"}
+              title={error ? "NoteLinks could not be refreshed" : "No linked objects"}
               description={error || "Promote an exact candidate or choose a current Resource or Media target."}
             />
           )}
 
+          <details className={styles.createDisclosure}><summary><UnigentamosIcon role="plus" size={16}/>Link an object</summary>
           <form
             className={styles.createForm}
             onSubmit={(event) => {
@@ -213,12 +215,12 @@ export default function NoteLinksManager({
             }}
           >
             <div className={styles.formHeading}>
-              <strong>Link an owner object</strong>
-              <span>Protected Notes write</span>
+
+
             </div>
             <label>Target
-              <SelectField value={targetKey} onChange={(event) => setTargetKey(event.target.value)} disabled={busy} required>
-                <option value="">Choose a Resource or Media object</option>
+              <SelectField searchable value={targetKey} onChange={(event) => setTargetKey(event.target.value)} disabled={busy} required>
+                <option value="">Search or choose an object</option>
                 {availableTargets.map((target) => (
                   <option key={noteLinkTargetKey(target)} value={noteLinkTargetKey(target)}>
                     {label(target.module)} - {target.label}
@@ -231,12 +233,12 @@ export default function NoteLinksManager({
                 {NOTE_LINK_RELATIONSHIPS.map((value) => <option key={value} value={value}>{label(value)}</option>)}
               </SelectField>
             </label>
-            <label>Relationship context
+            <label>Context (optional)
               <textarea value={createContextNote} onChange={(event) => setCreateContextNote(event.target.value)} maxLength={4000} disabled={busy} placeholder="Why this source or file matters to the Note." />
-              <small>{createContextNote.length}/4000 - preserved if save fails</small>
+              <small>{createContextNote.length}/4000</small>
             </label>
-            <button type="submit" className={styles.primaryButton} disabled={busy || !chosenTarget}>Create NoteLink</button>
-          </form>
+            <button type="submit" className={styles.primaryButton} disabled={busy || !chosenTarget}><UnigentamosIcon role="link" size={16}/>Link object</button>
+          </form></details>
 
           {promotableCandidates.length > 0 && (
             <div className={styles.candidates}>
@@ -275,7 +277,7 @@ export default function NoteLinksManager({
                   <span>{selected.lastRepair.previousTargetRef.label} - {selected.lastRepair.reason}</span>
                 </div>
               )}
-              <Link className={styles.ownerButton} href={selected.targetRef.route}>Open target owner</Link>
+              <Link className={styles.ownerButton} href={selected.targetRef.route}>Open profile</Link>
 
               {selected.state !== "removed" ? (
                 <>
@@ -347,7 +349,7 @@ export default function NoteLinksManager({
       </div>
 
       <p className={styles.boundary}>
-        Removing a NoteLink never deletes the Note, Resource, or Media object. Broken links remain visible until repaired, restored, or deliberately left in history.
+        Removing a link keeps both records.
       </p>
 
       <ConfirmationSheet

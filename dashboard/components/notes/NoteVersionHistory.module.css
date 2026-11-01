@@ -198,3 +198,5 @@
     margin-left: 0;
   }
 }
+
+.historyPanel{padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--surface-panel,#fff)}.header{align-items:center}.header h2{font-size:16px;font-weight:600}.header p{font-size:13px;max-width:60ch}.actions a,.actions button{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;font-size:13px;padding:8px 12px;background:var(--surface-panel,#fff);color:inherit;border:1px solid var(--border)}.state{border-radius:12px;padding:18px;background:var(--surface-soft,#f6f6f8)}.versionList{display:grid;gap:12px}.versionList li{border-radius:12px}.versionHeading{gap:12px;flex-wrap:wrap}

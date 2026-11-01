@@ -118,6 +118,8 @@ export async function GET(request: Request) {
       ...(ops?.obligations || []),
       ...(ops?.routines || []),
       ...(ops?.followUps || []),
+      ...(ops?.goals || []),
+      ...(ops?.decisions || []),
     ].filter(item => !item.archivedAt))
       refs.push(
         createNativeObjectRef({
@@ -154,7 +156,9 @@ export async function GET(request: Request) {
           label: event.title,
         }),
       );
-    const datedSources = [...(projects?.projects || []), ...(ops?.obligations || []), ...(ops?.routines || []), ...(ops?.followUps || []), ...(life?.trips || []), ...state.places, ...state.events];
+    const datedSources = [...(projects?.projects || []), ...(ops?.obligations || []), ...(ops?.routines || []), ...(ops?.followUps || []),
+      ...(ops?.goals || []),
+      ...(ops?.decisions || []), ...(life?.trips || []), ...state.places, ...state.events];
     for (const ref of refs) {
       const record = datedSources.find(item => item.id === ref.objectId);
       if (record) Object.assign(ref, { createdAt: record.createdAt, updatedAt: record.updatedAt });
@@ -201,14 +205,14 @@ export async function GET(request: Request) {
     }
     return json({
       ok: true,
-      state: { ...state, bookingData: undefined },
+      state: { ...state, bookingData: undefined, outcomeReceipts: undefined },
       refs,
       placeOrganizations: Object.fromEntries(state.places.filter(place => !place.archivedAt).map(place => [place.id, records.filter(record => record.className === "org" && !record.archivedAt && (record.profile?.locations?.some(location => location.placeId === place.id) || place.linkedRefs.some(ref => ref.objectType === "organization" && ref.objectId === record.id))).map(record => ({ objectId: record.id, label: record.title, organizationType: record.profile?.organizationType, industry: record.profile?.industry, href: refs.find(ref => ref.objectId === record.id)?.route || "/admin/people", imageUrl: record.profile?.photoUrl, imageUpdatedAt: record.profile?.photoUpdatedAt, hasProfileLocation: Boolean(record.profile?.locations?.some(location => location.placeId === place.id)) }))])),
       birthdays: records.filter(record => record.className === "person" && !record.archivedAt && record.profile?.birthday).map(record => ({ ref: refs.find(ref => ref.module === "people" && ref.objectId === record.id)!, birthday: record.profile!.birthday! })),
       trips: life?.trips || [],
       dated,
       wellnessEvents: sources[5].status === "fulfilled" ? sources[5].value : [],
-      workEvents: personalCalendarEvents({ followUps: ops?.followUps || [], routines: ops?.routines || [] }),
+      workEvents: personalCalendarEvents({ followUps: ops?.followUps || [], routines: ops?.routines || [], decisions:ops?.decisions || [] }),
       sourceErrors: sources.flatMap((x, i) =>
         x.status === "rejected"
           ? [["Records", "Personal", "Work", "Projects", "Travel", "Meals and Fitness"][i]]

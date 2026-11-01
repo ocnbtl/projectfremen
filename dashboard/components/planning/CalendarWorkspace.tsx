@@ -1,4 +1,6 @@
 "use client";
+import EventOutcomeSheet from "./EventOutcomeSheet";
+import type { OutcomeSource } from "../../lib/modules/planning/event-outcome-types";
 import PetScheduleDialog from "../personal-ops/PetScheduleDialog";
 import { updatePetCare, PET_CHANGE_KEY } from "../../lib/modules/dog-tracker/client";
 import WellnessScheduleDialog from "../personal-ops/WellnessScheduleDialog";
@@ -233,6 +235,8 @@ export default function CalendarWorkspace() {
     return job;
   }
   const [petTarget,setPetTarget]=useState<NonNullable<EventOccurrence["petSource"]>>();
+  const [outcome,setOutcome]=useState<{event:EventOccurrence;source:OutcomeSource}>();
+  function openOutcome(event:EventOccurrence){const original=confirmed.current?.state.events.find(e=>e.id===event.eventId);const work=event.workSource;if(work?.family==="routines"||(!work&&!original))return;setPreviewOpen(false);setOutcome({event,source:{family:work?.family||"events",id:work?.id||event.eventId,occurrenceKey:event.occurrenceKey,expectedUpdatedAt:work?.updatedAt||original!.updatedAt}});}
   const [wellnessTarget, setWellnessTarget] = useState<NonNullable<EventOccurrence["wellnessSource"]>>();
   const nativeCalendar = snapshot?.state.calendars.find(c => c.id === "native");
   const observanceSettings = useMemo(() => nativeCalendar?.observances || defaultObservances(), [nativeCalendar?.observances]);
@@ -585,6 +589,8 @@ export default function CalendarWorkspace() {
     if (busy) return;
     if (item.wellnessSource) { const source = item.wellnessSource; await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, source.repeating ? {} : { status: item.completed ? "planned" : "completed" }, source.repeating ? { date: item.occurrenceKey.slice(0,10), completed: !item.completed } : undefined); setPreviewOpen(false); }, item.completed ? "Plan reopened" : "Plan completed"); return; }
     if(item.petSource){const source=item.petSource;await action(async()=>{await updatePetCare(source.id,source.updatedAt,{status:item.completed?"planned":"completed"});setPreviewOpen(false);},item.completed?"Care reopened":"Care completed");return;}
+    if (!item.completed) {openOutcome(item);return;}
+    if (item.workSource?.family === "decisions") {const source=item.workSource;await action(async()=>{const result=await createPersonalOpsRepository().update("decisions",source.id,{decisionState:"open",lifecycle:"active"},source.updatedAt);if(!result.ok)throw new Error(result.error.message);setPreviewOpen(false);},"Decision reopened");return;}
     if (item.workSource?.family === "followUps") {
       const source = item.workSource;
       await action(async () => {
@@ -596,7 +602,7 @@ export default function CalendarWorkspace() {
     }
     const original = confirmed.current?.state.events.find(event => event.id === item.eventId);
     if (!original) return;
-    await action(() => savePlanning("events", taskCompletionPatch(original, item.occurrenceKey, !item.completed), original.updatedAt), item.completed ? "Task reopened" : "Task completed");
+    await action(() => savePlanning("events", taskCompletionPatch(original, item.occurrenceKey, !item.completed, true), original.updatedAt), item.completed ? "Task reopened" : "Task completed");
   }
   const timeline = view === "day" || view === "3-day" || view === "week";
   const changeView = (next: View, day?: string) => morph(() => { setView(next); if (day) setDate(day); });
@@ -973,7 +979,8 @@ export default function CalendarWorkspace() {
       </WorkspaceSheet>
       {petTarget && <PetScheduleDialog target={petTarget} onClose={()=>setPetTarget(undefined)} onSaved={()=>{setPetTarget(undefined);void refresh();}}/>}
       {wellnessTarget && <WellnessScheduleDialog target={wellnessTarget} onClose={() => setWellnessTarget(undefined)} onSaved={() => { setWellnessTarget(undefined); void refresh(); }} />}
-      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onComplete={() => void completeTask(preview.event)} onSkip={() => { const item=preview.event,source=item.wellnessSource; if(!source?.repeating || busy)return; void action(async()=>{await updateWellnessEntry(source.section,source.id,source.updatedAt,{}, {date:item.occurrenceKey.slice(0,10),skipped:true});setPreviewOpen(false);},"Occurrence skipped. Restore it from Personal."); }} onEdit={()=>{if(preview.event.petSource){setPetTarget(preview.event.petSource);setPreviewOpen(false);return;}if (preview.event.wellnessSource) { setWellnessTarget({ ...preview.event.wellnessSource, occurrenceDate: preview.event.occurrenceKey.slice(0,10) }); setPreviewOpen(false); return; } const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
+      {outcome && <EventOutcomeSheet event={outcome.event} source={outcome.source} onClose={()=>setOutcome(undefined)} onSaved={()=>{void refresh();setNotice("Event completed and linked records saved");}}/>}
+      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onReview={()=>openOutcome(preview.event)} onComplete={() => void completeTask(preview.event)} onSkip={() => { const item=preview.event,source=item.wellnessSource; if(!source?.repeating || busy)return; void action(async()=>{await updateWellnessEntry(source.section,source.id,source.updatedAt,{}, {date:item.occurrenceKey.slice(0,10),skipped:true});setPreviewOpen(false);},"Occurrence skipped. Restore it from Personal."); }} onEdit={()=>{if(preview.event.petSource){setPetTarget(preview.event.petSource);setPreviewOpen(false);return;}if (preview.event.wellnessSource) { setWellnessTarget({ ...preview.event.wellnessSource, occurrenceDate: preview.event.occurrenceKey.slice(0,10) }); setPreviewOpen(false); return; } const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
       <CalendarSharePanel open={sharing} onClose={() => setSharing(false)} calendars={snapshot?.state.calendars || []} />
       <WorkspaceSheet
         open={connections}

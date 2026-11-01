@@ -1,4 +1,4 @@
-import { readJsonFile, writeJsonFile } from "../../file-store";
+import { readJsonFile, writeJsonFile, mutateJsonFile } from "../../file-store";
 import { createAuditEvent, type AuditEvent, type AuditSnapshot } from "../../native-objects/audit";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import { createNativeObjectRef } from "../../native-objects/routes";
@@ -105,6 +105,17 @@ function provenance(value: unknown): NoteLinkProvenance {
   return normalized as NoteLinkProvenance;
 }
 
+export function supportsNoteLinkTarget({module,objectType}:{module:string;objectType:string}):boolean{
+  return (module === "resources" && objectType === "resource") ||
+      (module === "media" && objectType === "media_asset") ||
+      (module === "calendar" && objectType === "event") ||
+      (module === "people" && ["person","org","organization","interaction"].includes(objectType)) ||
+      (module === "map" && objectType === "place") ||
+      (module === "projects" && objectType === "project") ||
+      (module === "notes" && objectType === "note") ||
+      (module === "personal_ops" && ["goal","decision","follow_up","obligation","routine","trip"].includes(objectType));
+}
+
 function normalizeNativeRef(value: unknown, field: string): NativeObjectRef {
   if (!isRecord(value)) validation(`${field} must be a native object reference`, field);
   const module = requiredText(value.module, `${field}.module`, 40);
@@ -118,16 +129,14 @@ function normalizeNativeRef(value: unknown, field: string): NativeObjectRef {
     validation("noteRef must reference a Notes-owned Note", field);
   }
   if (field === "targetRef") {
-    const supported =
-      (module === "resources" && objectType === "resource") ||
-      (module === "media" && objectType === "media_asset");
+    const supported = supportsNoteLinkTarget({module,objectType});
     if (!supported) {
-      validation("targetRef must reference a Resource or Media asset", field);
+      validation("Choose a supported linked object", field);
     }
   }
 
   return createNativeObjectRef({
-    module: module as "notes" | "resources" | "media",
+    module: module as NativeObjectRef["module"],
     objectType,
     objectId,
     label,
@@ -234,14 +243,14 @@ export async function createNoteLink(
   rawInput: unknown,
   options: { actorId?: string } = {}
 ): Promise<NoteLinkCreateResult> {
-  return withMutationLock(async () => {
+  return withMutationLock(() => mutateJsonFile<NoteLinksState,NoteLinkCreateResult>(FILE_NAME,createEmptyNoteLinksState(),raw=>{
     const input = normalizeCreateInput(rawInput);
-    const state = await readNoteLinksState();
+    const state = assertState(raw);
     const exact = state.links.find(
       (link) => sameNote(link.noteRef, input.noteRef) && sameNoteLinkTarget(link.targetRef, input.targetRef)
     );
     if (exact && exact.state !== "removed") {
-      return { item: exact, state, created: false };
+      return {value:state,result:{ item: exact, state, created: false },changed:false};
     }
     if (exact?.state === "removed") {
       throw new NoteLinksStoreError(
@@ -272,9 +281,8 @@ export async function createNoteLink(
       links: [...state.links, item],
       auditEvents: appendAudit(state, event)
     };
-    await writeJsonFile(FILE_NAME, nextState);
-    return { item, state: nextState, created: true, auditEvent: event };
-  });
+    return {value:nextState,result:{ item, state: nextState, created: true, auditEvent: event }};
+  }));
 }
 
 function normalizePatch(value: unknown): NoteLinkPatch {
@@ -313,9 +321,9 @@ export async function updateNoteLink(
   rawPatch: unknown,
   options: { expectedUpdatedAt: string; actorId?: string }
 ): Promise<NoteLinkUpdateResult> {
-  return withMutationLock(async () => {
+  return withMutationLock(() => mutateJsonFile<NoteLinksState,NoteLinkUpdateResult>(FILE_NAME,createEmptyNoteLinksState(),raw=>{
     const patch = normalizePatch(rawPatch);
-    const state = await readNoteLinksState();
+    const state = assertState(raw);
     const index = state.links.findIndex((link) => link.id === id);
     if (index < 0) {
       throw new NoteLinksStoreError("not_found", "NoteLink not found", { status: 404 });
@@ -414,9 +422,8 @@ export async function updateNoteLink(
       links,
       auditEvents: appendAudit(state, event)
     };
-    await writeJsonFile(FILE_NAME, nextState);
-    return { item, state: nextState, auditEvent: event };
-  });
+    return {value:nextState,result:{ item, state: nextState, auditEvent: event }};
+  }));
 }
 
 export function noteLinkIdentity(link: NoteLink): string {

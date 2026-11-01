@@ -49,6 +49,7 @@ export type Calendar = PlanningBase & {
   accountId?: string;
 };
 export type EventFields = {
+  interactionKind?: import("../../personal-records-store").PersonalInteractionKind | "none";
   title: string;
   description: string;
   start: string;
@@ -125,13 +126,13 @@ export type PlanningCollections = {
   reminders: ReminderReceipt;
 };
 export type PlanningCollection = keyof PlanningCollections;
-export type PlanningState = { schemaVersion: 1; bookingData?: import("./booking-types").BookingData } & {
+export type PlanningState = { schemaVersion: 1; outcomeReceipts?: import("./event-outcome-types").OutcomeReceipt[]; bookingData?: import("./booking-types").BookingData } & {
   [K in PlanningCollection]: PlanningCollections[K][];
 };
 export type EventOccurrence = EventFields & {
   petSource?: { id:string; petId:string; updatedAt:string };
   wellnessSource?: { section: "meals" | "fitness"; id: string; updatedAt: string; repeating?: boolean; occurrenceDate?: string };
-  workSource?: { family: "followUps" | "routines"; id: string; updatedAt: string };
+  workSource?: { family: "followUps" | "routines" | "decisions"; id: string; updatedAt: string };
   id: string;
   eventId: string;
   occurrenceKey: string;

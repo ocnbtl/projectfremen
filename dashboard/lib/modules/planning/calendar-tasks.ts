@@ -1,10 +1,10 @@
 import { effectiveEvent, type CalendarEvent, type EventOccurrence, type ReminderReceipt } from "./types";
 
 /** Completion belongs to an occurrence, never implicitly to a repeating series. */
-export function taskCompletionPatch(record: CalendarEvent, occurrenceKey: string, completed: boolean) {
+export function taskCompletionPatch(record: CalendarEvent, occurrenceKey: string, completed: boolean, allowEvent = false) {
   const event = effectiveEvent(record);
   const exception = { ...record.sourceExceptions?.[occurrenceKey], ...record.exceptions?.[occurrenceKey] };
-  if (record.archivedAt || !(exception.isTask ?? event.isTask) || exception.cancelled || record.overrides?.cancelled || event.source?.cancelled)
+  if (record.archivedAt || (!allowEvent && !(exception.isTask ?? event.isTask)) || exception.cancelled || record.overrides?.cancelled || event.source?.cancelled)
     throw new Error("This task is no longer available. Refresh your calendar.");
   if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?$/.test(occurrenceKey))
     throw new Error("Choose a valid task occurrence");

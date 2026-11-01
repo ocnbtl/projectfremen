@@ -1,4 +1,7 @@
 "use client";
+import { motion, useReducedMotion } from "framer-motion";
+import detailStyles from "./notes/NoteDetails.module.css";
+import ConnectedWork, { type ConnectedWorkItem } from "./notes/ConnectedWork";
 import { DirectoryLayout } from "./ui/DirectoryLayout";
 import SelectField from "./ui/SelectField";
 import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
@@ -93,10 +96,13 @@ import {
   type NotesTab,
   type NotesView
 } from "../lib/native-objects/url-state";
-import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
+import type { NativeObjectRef } from "../lib/native-objects/types";
+import { createNativeObjectRef, getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
 import styles from "./content-graph/ContentGraphWorkspace.module.css";
 
 type NotesWorkspaceProps = {
+  peopleTargets?: NativeObjectRef[];
+  connectedWork?: ConnectedWorkItem[];
   initialNotes: NoteRecord[];
   contentGraph: LegacyContentGraph;
   referenceEvidence: NoteReferenceEvidenceIndex;
@@ -164,7 +170,8 @@ const NOTES_RECENT_WINDOW_DAYS = 30;
 const NOTES_RECENT_WINDOW_MS = NOTES_RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
 const TYPE_LABELS: Readonly<Record<NoteRecord["type"], string>> = {
-  decision: "Decision Candidate",
+  note:"Note", interaction:"Interaction", event:"Event notes",
+  decision: "Decision",
   meeting: "Meeting",
   idea: "Idea",
   research: "Research",
@@ -203,6 +210,7 @@ const VIEW_LABELS: Readonly<Record<NotesView, string>> = {
   meetings: "Meetings",
   ideas: "Ideas",
   research: "Research",
+  "plain-notes":"Notes", interactions:"Interactions", "event-notes":"Event notes",
   "personal-context": "Personal Context",
   "project-notes": "Project Notes",
   "missing-properties": "Missing Properties",
@@ -317,6 +325,9 @@ function matchesView(
   if (view === "drafts") return note.lifecycleStatus === "draft";
   if (view === "archived") return note.lifecycleStatus === "archived";
   if (view === "decisions") return note.type === "decision";
+  if (view === "plain-notes") return note.type === "note";
+  if (view === "interactions") return note.type === "interaction";
+  if (view === "event-notes") return note.type === "event";
   if (view === "meetings") return note.type === "meeting";
   if (view === "ideas") return note.type === "idea";
   if (view === "research") return note.type === "research";
@@ -445,6 +456,8 @@ export default function NotesWorkspace({
   initialMode = "index",
   initialSelectedId,
   initialLoadError = "",
+  peopleTargets = [],
+  connectedWork = [],
   initialPersonalOpsDecisions = [],
   initialDecisionMappings = [],
   initialDecisionLoadError = "",
@@ -505,11 +518,12 @@ export default function NotesWorkspace({
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [noteType, setNoteType] = useState<LegacyWritableNoteType>("idea");
+  const [noteType, setNoteType] = useState<LegacyWritableNoteType>("note");
   const [lifecycle, setLifecycle] = useState<NoteWritableLifecycleStatus>("draft");
   const [captureSaving, setCaptureSaving] = useState(false);
   const [captureError, setCaptureError] = useState("");
   const [notice, setNotice] = useState("");
+  const [draftType,setDraftType]=useState<LegacyWritableNoteType>("note");
   const [draftTitle, setDraftTitle] = useState("");
   const [noteSource, setNoteSource] = useState(false);
   const [draftBody, setDraftBody] = useState("");
@@ -572,10 +586,11 @@ export default function NotesWorkspace({
       }),
     [projectsState.projects]
   );
+  const reducedMotion=useReducedMotion();
   const noteLinkTargets = useMemo(
-    () => [...initialResources.map((resource) => resource.nativeRef), ...initialMediaAssets.map((asset) => asset.nativeRef)]
+    () => [...initialResources.map((resource) => resource.nativeRef), ...initialMediaAssets.map((asset) => asset.nativeRef),...peopleTargets,...connectedWork.filter(item=>item.lifecycle!=="archived").map(item=>createNativeObjectRef({module:"personal_ops",objectType:item.objectType,objectId:item.id,label:item.title})),...projectsState.projects.filter(item=>!item.archivedAt).map(item=>createNativeObjectRef({module:"projects",objectType:"project",objectId:item.id,label:item.name})),...notes.filter(item=>item.id!==selectedNote?.id).map(item=>item.nativeRef)]
       .sort((left, right) => left.label.localeCompare(right.label)),
-    [initialMediaAssets, initialResources]
+    [initialMediaAssets, initialResources, peopleTargets, connectedWork, projectsState.projects, notes, selectedNote?.id]
   );
   const counts = useMemo(() => buildNoteViewCounts(notes), [notes]);
   const referenceEvidenceByNoteId = useMemo(
@@ -657,6 +672,7 @@ export default function NotesWorkspace({
 
   useEffect(() => {
     if (!selectedNote) return;
+    setDraftType(selectedNote.type === "interaction" ? "note" : selectedNote.type);
     setDraftTitle(selectedNote.title);
     setDraftBody(selectedNote.body);
     setDraftLifecycle(writableLifecycleFor(selectedNote) || "active");
@@ -821,6 +837,7 @@ export default function NotesWorkspace({
 
   const editorDirty = Boolean(
     initialMode === "detail" && selectedNote && (
+      (selectedNote.type !== "interaction" && draftType !== selectedNote.type) ||
       draftTitle !== selectedNote.title ||
       draftBody !== selectedNote.body ||
       (writableSelectedLifecycle !== null && draftLifecycle !== writableSelectedLifecycle)
@@ -937,6 +954,7 @@ export default function NotesWorkspace({
     setSaveError("");
     const lifecycleChanged = writableSelectedLifecycle !== null && draftLifecycle !== writableSelectedLifecycle;
     const result = await repository.update(selectedNote.id, {
+      ...(selectedNote.type!=="interaction"?{type:draftType}:{}),
       title: draftTitle,
       body: draftBody,
       ...(lifecycleChanged ? { lifecycleStatus: draftLifecycle } : {})
@@ -1007,7 +1025,8 @@ export default function NotesWorkspace({
     }
     await releaseDirtyHistoryGuard();
     if (selectedNote) {
-      setDraftTitle(selectedNote.title);
+      setDraftType(selectedNote.type === "interaction" ? "note" : selectedNote.type);
+    setDraftTitle(selectedNote.title);
       setDraftBody(selectedNote.body);
       setDraftLifecycle(writableLifecycleFor(selectedNote) || "active");
     }
@@ -1024,6 +1043,9 @@ export default function NotesWorkspace({
     if (item === "drafts") return counts.drafts;
     if (item === "archived") return counts.archived;
     if (item === "decisions") return notes.filter((note) => note.type === "decision").length;
+    if(item==="plain-notes")return notes.filter(note=>note.type==="note").length;
+    if(item==="interactions")return notes.filter(note=>note.type==="interaction").length;
+    if(item==="event-notes")return notes.filter(note=>note.type==="event").length;
     if (item === "meetings") return notes.filter((note) => note.type === "meeting").length;
     if (item === "ideas") return notes.filter((note) => note.type === "idea").length;
     if (item === "research") return notes.filter((note) => note.type === "research").length;
@@ -1092,7 +1114,7 @@ export default function NotesWorkspace({
       id: "types",
       label: "Types",
       items: [
-        ["decisions", "Decision Candidates"], ["meetings", "Meetings"], ["ideas", "Ideas"],
+        ["plain-notes","Notes"],["interactions","Interactions"],["event-notes","Event notes"],["decisions", "Decisions"], ["meetings", "Meetings"], ["ideas", "Ideas"],
         ["research", "Research"], ["personal-context", "Personal Context"], ["project-notes", "Project Notes"]
       ].map(([id, label]) => ({
         id,
@@ -1201,27 +1223,6 @@ export default function NotesWorkspace({
     return (
       <DetailTabPanel tabsId={tabsId} tabId="links" active>
         <div className={styles.overviewGrid}>
-          <section className={styles.panel} data-wide="true">
-            <MetricStrip
-              ariaLabel="Note link evidence summary"
-              items={[
-                { id: "url", label: "Exact normalized URL candidates", value: exactUrlCandidates.length },
-                { id: "id", label: "Exact ID candidates", value: exactIdCandidates.length },
-                { id: "persisted", label: "Persisted NoteLinks", value: persistedNoteLinks.filter((link) => link.state !== "removed").length, tone: persistedNoteLinks.length ? "positive" : "attention" },
-                { id: "projects", label: "Projects-owned links", value: projectLinks.length },
-                { id: "unresolved", label: "Unresolved references", value: unresolved.length, tone: unresolved.length ? "attention" : "positive" },
-                { id: "resources", label: "Resource targets", value: resourceTargets.length },
-                { id: "media", label: "Media targets", value: mediaTargets.length }
-              ]}
-            />
-            <div className={styles.readOnlyNotice}>
-              <strong>Candidate graph - separate from persisted NoteLinks</strong>
-              <span>
-                Exact URL and retained-ID rows are candidates until explicitly promoted below. Persisted NoteLinks have their own relationship, health, repair, removal, and audit lifecycle; they still are not citations or backlinks.
-              </span>
-            </div>
-          </section>
-
           <div className={styles.panel} data-wide="true">
             <NoteLinksManager
               noteRef={note.nativeRef}
@@ -1241,6 +1242,7 @@ export default function NotesWorkspace({
             />
           </div>
 
+<details className={styles.panel} data-wide="true"><summary>Projects, sources & other connections</summary><div className={styles.overviewGrid}>
           <section className={styles.panel} data-wide="true">
             <div className={styles.panelHeader}>
               <div>
@@ -1535,6 +1537,7 @@ export default function NotesWorkspace({
               ]}
             />
           </section>
+</div></details>
         </div>
       </DetailTabPanel>
     );
@@ -1887,25 +1890,12 @@ export default function NotesWorkspace({
   }
 
   const inspectorTitle = selectedNote ? (
-    <ObjectHeader
-      objectType="Internal note"
-      title={selectedNote.title}
-      subtitle={TYPE_LABELS[selectedNote.type]}
-      identity={initials(selectedNote.title)}
-      states={
-        <>
-          <span className={styles.stateChip} data-tone={selectedNote.lifecycleStatus === "active" ? "green" : "amber"}>{displayLabel(selectedNote.lifecycleStatus)}</span>
-
-
-        </>
-      }
-      actions={
-        <>
-
-          <Link className={styles.linkButton} href={getNativeObjectRoute({ module: "notes", objectType: "note", objectId: selectedNote.id })}>Edit</Link>
-        </>
-      }
-    />
+    <div className={detailStyles.previewHeading}>
+      <UnigentamosIcon role="module-notes" size={24}/>
+      <div><h2>{selectedNote.title}</h2><p>{TYPE_LABELS[selectedNote.type]} · Updated {formatDate(selectedNote.updatedAt)}</p></div>
+      <span className={styles.stateChip} data-tone={selectedNote.lifecycleStatus === "active" ? "green" : "amber"}>{displayLabel(selectedNote.lifecycleStatus)}</span>
+      <Link prefetch={false} className={styles.linkButton} href={selectedNote.nativeRef.route}><UnigentamosIcon role="edit" size={15}/>Edit</Link>
+    </div>
   ) : undefined;
 
   const inspectorDisplayTab =
@@ -2207,7 +2197,7 @@ export default function NotesWorkspace({
       overlay={isInspectorOverlay}
       overlayOpen={isInspectorOverlay ? inspectorOpen : true}
       onRequestClose={() => setInspectorOpen(false)}
-      className={inspectorOpen ? "is-open" : undefined}
+      className={`${detailStyles.inlineDetail} ${inspectorOpen ? "is-open" : ""}`}
       ariaLabel={selectedNote ? `${selectedNote.title} Note inspector` : "Note inspector"}
 
     >
@@ -2242,7 +2232,7 @@ export default function NotesWorkspace({
           ariaLabel="Selected Note preview"
         />
       )}
-      {renderInspectorPanel()}
+      <motion.div key={inspectorDisplayTab} initial={{opacity:reducedMotion?1:0,y:reducedMotion?0:5}} animate={{opacity:1,y:0}} transition={{duration:.2,ease:"easeOut"}}>{renderInspectorPanel()}</motion.div>
     </InspectorRail>
   );
 
@@ -2279,7 +2269,7 @@ export default function NotesWorkspace({
         aiDock={isInspectorOverlay && inspectorOpen ? undefined : aiDock}
         mode="editor"
         ariaLabel="Note editor"
-        className={`${styles.shell} ${styles.detailShell}`}
+        className={`${styles.shell} ${styles.detailShell} ${detailStyles.detail}`}
       >
         {propertyEditor}
         {reviewScheduleEditor}
@@ -2293,7 +2283,7 @@ export default function NotesWorkspace({
             <SystemState variant="empty" title="Note not found" description="The requested Note is not available in the current adapter." />
           ) : (
             <>
-              <header className={styles.editorHeader}>
+              <header className={`${styles.editorHeader} ${detailStyles.heading}`}>
                 <div className={styles.editorHeadingRow}>
                   <div>
                     <h1>{currentNote.title}</h1>
@@ -2311,6 +2301,7 @@ export default function NotesWorkspace({
                 <DetailTabs id={detailTabsId} tabs={DETAIL_TABS} activeTab={activeTab === "overview" ? "body" : visibleNoteTab(activeTab)} onTabChange={(tab) => { setActiveTab(tab as NotesTab); updateUrl({ tab: tab as NotesTab }); }} className={styles.tabs} ariaLabel="Note detail tabs" />
               </header>
 
+              <motion.div key={activeTab} initial={{opacity:reducedMotion?1:0,y:reducedMotion?0:5}} animate={{opacity:1,y:0}} transition={{duration:.2,ease:"easeOut"}}>
               {activeTab === "body" || activeTab === "overview" ? (
                 <DetailTabPanel tabsId={detailTabsId} tabId="body" active>
                   <div className={styles.editorToolbar} role="toolbar" aria-label="Note formatting and object actions">
@@ -2327,14 +2318,14 @@ export default function NotesWorkspace({
                       Decision
                     </button>
                     <span className={styles.saveState} data-state={saveState}>{saveState === "failed" ? "Save failed" : displayLabel(saveState)}</span>
-                    <span className={styles.technicalRow}>legacy current revision</span>
+
                   </div>
                   {saveError && <p className={styles.errorBanner} role="alert">{saveError}</p>}
                   {notice && <p className={styles.successBanner} role="status">{notice}</p>}
                   <details className={styles.readOnlyNotice}><summary>Saving and history</summary><span>Choose Save to keep your changes. Autosave is off. History shows saved versions; open Vault to restore one. Unavailable fields retain their existing values.</span></details>
                   <form className={styles.editorSurface} onSubmit={(event) => { event.preventDefault(); void saveNote(); }}>
                     <label className={`${styles.editorField} ${styles.editorTitle}`}>
-                      Editable title
+                      Title
                       <input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} required />
                     </label>
                     <div className={styles.controlRow}>
@@ -2343,15 +2334,14 @@ export default function NotesWorkspace({
                       ) : (
                         <label className={styles.field}>Lifecycle<input value={displayLabel(currentNote.lifecycleStatus)} readOnly aria-describedby="note-lifecycle-readonly" /></label>
                       )}
-                      <label className={styles.field}>Type<input value={TYPE_LABELS[currentNote.type]} readOnly aria-describedby="note-type-readonly" /></label>
-                      <span id="note-type-readonly" className={styles.readOnlyNotice}>This note’s type is read-only.</span>
+                      <label className={styles.field}>Type{currentNote.type==="interaction"?<span>Interaction · shared with People</span>:<SelectField aria-label="Note type" value={draftType} onChange={e=>setDraftType(e.target.value as LegacyWritableNoteType)}>{Object.entries(TYPE_LABELS).filter(([type])=>type!=="interaction").map(([type,label])=><option key={type} value={type}>{label}</option>)}</SelectField>}</label>
                       {!writableSelectedLifecycle && <span id="note-lifecycle-readonly" className={styles.readOnlyNotice}>This lifecycle is inferred from legacy status {displayLabel(currentNote.provenance.status)}. Saving title or body preserves that source status.</span>}
                     </div>
                     {noteSource ? <label className={`${styles.editorField} ${styles.editorBody}`}>
                       Markdown source
                       <textarea value={draftBody} onChange={(event) => setDraftBody(event.target.value)} placeholder="Capture authored internal knowledge." />
                     </label> : <NoteProse>{draftBody || "This note is empty. Choose Edit Markdown to begin."}</NoteProse>}
-                    <div className={styles.bodyBoundary}><strong>Source-safe editor</strong><span>Downstream objects are never created silently and the body is not rewritten by AI.</span></div>
+
                     <div className={styles.editorSaveRow}>
                       <Link href={workspaceReturnUrl("notes", getModuleRoute("notes"))}>Back to All Notes</Link>
                       <button type="submit" className={styles.button} data-primary="true" disabled={!editorDirty || saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save Note"}</button>
@@ -2381,6 +2371,7 @@ export default function NotesWorkspace({
                   />
                 </DetailTabPanel>
               )}
+              </motion.div>
             </>
           )}
         </div>
@@ -2440,7 +2431,7 @@ export default function NotesWorkspace({
               </div>
               <div className={styles.captureGrid}>
                 <label className={styles.field}>Title<input ref={captureTitleRef} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Decision, meeting, idea, or context" required /></label>
-                <label className={styles.field}>Type<SelectField value={noteType} onChange={(event) => setNoteType(event.target.value as LegacyWritableNoteType)}><option value="idea">Idea</option><option value="meeting">Meeting</option><option value="decision">Decision candidate</option></SelectField></label>
+                <label className={styles.field}>Type<SelectField value={noteType} onChange={(event) => setNoteType(event.target.value as LegacyWritableNoteType)}>{Object.entries(TYPE_LABELS).filter(([type])=>type!=="interaction").map(([type,label])=><option key={type} value={type}>{label}</option>)}</SelectField></label>
                 <label className={styles.field}>Lifecycle<SelectField value={lifecycle} onChange={(event) => setLifecycle(event.target.value as NoteWritableLifecycleStatus)}><option value="draft">Draft</option><option value="active">Active</option></SelectField></label>
               </div>
               <div className={styles.captureBody}>
@@ -2649,6 +2640,7 @@ export default function NotesWorkspace({
           ) : (
             <SystemState variant="empty" title={notes.length ? "No Notes match this view" : "No Notes yet"} description={notes.length ? "Try a different search or filter." : "Choose New Note to capture an idea, meeting, or decision."} />
           )}
+        {view==="all"&&<ConnectedWork items={connectedWork} query={query}/>}
         </div>
       </DirectoryPane>
     </ModuleShell>

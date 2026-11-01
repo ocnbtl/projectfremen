@@ -53,7 +53,7 @@ export default function PersonalHome({ state, projectGoalCount = 0 }: { state: P
     finally { setBusy(false); }
   }
   const shortcuts = [...HOME_SHORTCUTS.filter(item => item.id !== "travel"), ...settings.sections.map(section => ({...section, href:`/admin/personal/lists?list=${encodeURIComponent(section.listId)}`}))];
-  const active = (items: { lifecycle: string }[]) => items.filter(item => !["complete", "archived"].includes(item.lifecycle)).length;
+  const active = (items: { lifecycle: string; goalState?: string }[]) => items.filter(item => item.goalState!=="cancelled" && !["complete", "archived"].includes(item.lifecycle)).length;
   const operations = [
     {label:"Goals", icon:"goal" as const, href:"goals", count:active(state.goals)+projectGoalCount, description:"Personal and project outcomes"},
     {label:"Routines", icon:"routine" as const, href:"routines", count:active(state.routines), description:"Habits and recurring work"},

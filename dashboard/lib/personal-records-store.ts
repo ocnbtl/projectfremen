@@ -315,7 +315,12 @@ export type PersonalContactProfile = {
   locations: PersonalLocationEntry[];
 };
 
+export const NOTE_KINDS = ["note","idea","meeting","decision","research","personal_context","project_note","event"] as const;
+export type StoredNoteType = typeof NOTE_KINDS[number];
+function storedNoteType(value:unknown):StoredNoteType|undefined {if(value===undefined)return undefined;if(!(NOTE_KINDS as readonly unknown[]).includes(value))throw new Error("Choose a valid note type");return value as StoredNoteType;}
+
 export type PersonalRecord = {
+  noteType?: StoredNoteType;
   importMeta?: { key: string; batch: string; importedAt: string; extra: Record<string,string> };
   id: string;
   domain: string;
@@ -349,6 +354,7 @@ export type PersonalRecord = {
 };
 
 export type PersonalRecordInput = {
+  noteType?: StoredNoteType;
   domain: string;
   title: string;
   className?: string;
@@ -377,7 +383,7 @@ export type PersonalRecordInput = {
 export type PersonalRecordPatch = Partial<
   Pick<
     PersonalRecord,
-    "title" | "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources" | "starred"
+    "noteType" | "title" | "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources" | "starred"
   >
 > & {
   action?: "review" | "archive" | "restore";
@@ -2059,6 +2065,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     resourceProfile,
     mediaProfile: className === "file" ? normalizeMediaProfile(raw.mediaProfile) : undefined,
     interaction: className === "interaction" ? normalizeInteractionDetails(raw.interaction) : undefined,
+    noteType: (NOTE_KINDS as readonly unknown[]).includes(raw.noteType) ? raw.noteType as StoredNoteType : undefined,
     createdMeta,
     createdAt,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : createdAt,
@@ -2249,6 +2256,7 @@ export async function createPersonalRecord(
     status: pickStatus(input.status),
     growth: "seed",
     body: input.body?.trim() || "",
+    noteType: storedNoteType(input.noteType),
     url,
     areas: sanitizeList(input.areas),
     subjects: sanitizeSubjectsForClass(input.subjects, className),
@@ -2740,6 +2748,7 @@ export async function updatePersonalRecord(
     ...current,
     title: typeof patch.title === "string" ? sanitizeTitle(patch.title) : current.title,
     body: typeof patch.body === "string" ? patch.body.trim() : current.body,
+    noteType: patch.noteType === undefined ? current.noteType : storedNoteType(patch.noteType),
     url,
     areas: Array.isArray(patch.areas) ? sanitizeList(patch.areas) : current.areas,
     subjects: Array.isArray(patch.subjects)

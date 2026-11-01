@@ -13,6 +13,7 @@ import type {
 } from "../../personal-records-store";
 
 export type NoteType =
+  | "note" | "interaction" | "event"
   | "decision"
   | "meeting"
   | "idea"
@@ -32,7 +33,7 @@ export type NoteReviewState =
   | "archived";
 
 /** Values the legacy Personal Records API can round-trip without inventing storage. */
-export type LegacyWritableNoteType = "idea" | "decision" | "meeting";
+export type LegacyWritableNoteType = import("../../personal-records-store").StoredNoteType;
 export type NoteWritableLifecycleStatus = "draft" | "active";
 
 export type NoteMappingConfidence = "direct" | "inferred" | "unavailable";
@@ -105,6 +106,7 @@ export type NoteCreateInput = {
 };
 
 export type NoteUpdateInput = {
+  type?: LegacyWritableNoteType;
   title?: string;
   body?: string;
   lifecycleStatus?: NoteWritableLifecycleStatus;

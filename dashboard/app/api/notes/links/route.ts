@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { resolveActiveNativeObjectRef } from "../../../../lib/native-objects/resolve-reference";
+import { createNativeObjectRef } from "../../../../lib/native-objects/routes";
+import { supportsNoteLinkTarget } from "../../../../lib/modules/notes/links-store";
+import { readPlanningState } from "../../../../lib/modules/planning/store";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { appendAuditEvent as appendGlobalAuditEvent, getRequestIp } from "../../../../lib/audit-log";
 import { isCsrfRequestValid } from "../../../../lib/csrf";
@@ -136,11 +140,18 @@ async function canonicalReferences(noteValue: unknown, targetValue: unknown): Pr
     return { noteRef: note.nativeRef, targetRef: asset.nativeRef };
   }
 
-  throw new NoteLinksStoreError(
-    "validation",
-    "NoteLinks currently support Resource and Media targets only.",
-    { status: 400 }
-  );
+  if(supportsNoteLinkTarget(targetIdentity)){
+    if(targetIdentity.module === "calendar" || targetIdentity.module === "map"){
+      const state=await readPlanningState();
+      const item=targetIdentity.module === "calendar" ? state.events.find(item=>item.id===targetIdentity.objectId) : state.places.find(item=>item.id===targetIdentity.objectId);
+      if(item&&!item.archivedAt)return {noteRef:note.nativeRef,targetRef:createNativeObjectRef({...targetIdentity,module:targetIdentity.module,label:"title" in item?item.title:item.name})};
+    }else{
+      const target=await resolveActiveNativeObjectRef({...targetIdentity,module:targetIdentity.module as NativeObjectRef["module"],label:"",route:""});
+      if(target)return {noteRef:note.nativeRef,targetRef:target};
+    }
+    throw new NoteLinksStoreError("conflict","This object is no longer available. Choose a current object.",{status:409});
+  }
+  throw new NoteLinksStoreError("validation","Choose a supported linked object.",{status:400});
 }
 
 export async function GET(request: Request) {

@@ -136,7 +136,8 @@ type FormDraft = {
   targetPeriod: string;
   keyResults: string;
   question: string;
-  decisionState: "open" | "decided" | "deferred" | "superseded";
+  decisionState: PersonalOpsDecision["decisionState"];
+  goalState: NonNullable<PersonalOpsGoal["goalState"]>;
   finalDecision: string;
   rationale: string;
   deferReason: string;
@@ -369,7 +370,7 @@ function nativeStateLabel(item: PersonalOpsObject) {
   if (item.objectType === "decision") return item.decisionState;
   if (item.objectType === "obligation") return item.obligationState;
   if (item.objectType === "follow_up") return item.followUpState;
-  return item.lifecycle;
+  return item.goalState || item.lifecycle;
 }
 
 function summaryForItem(item: PersonalOpsListItem) {
@@ -448,6 +449,7 @@ function defaultDraft(family: PersonalOpsFamily, item?: PersonalOpsObject, sourc
         : sourceLabel
           ? `What decision should be made about ${sourceLabel}?`
           : "",
+    goalState: item?.objectType === "goal" ? item.goalState || (item.lifecycle === "archived" ? "active" : item.lifecycle) : "draft",
     decisionState: item?.objectType === "decision" ? item.decisionState : "open",
     finalDecision: item?.objectType === "decision" ? item.finalDecision || "" : "",
     rationale: item?.objectType === "decision" ? item.rationale || "" : "",
@@ -517,7 +519,8 @@ function createInput(form: OpenForm, draft: FormDraft): PersonalOpsCreateInputBy
     return withSource(
       {
         ...common,
-        outcome: draft.outcome,
+        goalState: draft.goalState,
+      outcome: draft.outcome,
         targetPeriod: draft.targetPeriod || undefined,
         keyResults: lines(draft.keyResults).map((title) => ({ title, complete: false }))
       },
@@ -599,6 +602,7 @@ function updateInput(form: OpenForm, draft: FormDraft): PersonalOpsUpdateInputBy
     const completedByTitle = new Map(current?.keyResults.map((result) => [result.title, result]) || []);
     return {
       ...common,
+      goalState: draft.goalState,
       outcome: draft.outcome,
       targetPeriod: draft.targetPeriod || undefined,
       keyResults: lines(draft.keyResults).map((title) => completedByTitle.get(title) || { title, complete: false })
@@ -960,6 +964,7 @@ function ObjectForm({
 
             {form.family === "goals" && (
               <>
+                <Field label="Status"><PersonalOpsStatusSelect aria-label="Goal status" value={draft.goalState} onChange={event=>update("goalState",event.target.value as FormDraft["goalState"])}>{PERSONAL_STATUS_OPTIONS.goal.filter(value=>value!=="archived").map(value=><option key={value} value={value}>{personalStatusLabel(value)}</option>)}</PersonalOpsStatusSelect></Field>
                 <Field label="Outcome" full hint="Describe the result, not a container of tasks.">
                   <textarea value={draft.outcome} onChange={(event) => update("outcome", event.target.value)} required />
                 </Field>
@@ -993,10 +998,7 @@ function ObjectForm({
                       });
                     }}
                   >
-                    <option value="open">Open</option>
-                    <option value="decided">Decided</option>
-                    <option value="deferred">Deferred</option>
-                    <option value="superseded">Replaced</option>
+                    {PERSONAL_STATUS_OPTIONS.decision.filter(value=>value!=="archived").map(value=><option key={value} value={value}>{personalStatusLabel(value)}</option>)}
                   </PersonalOpsStatusSelect>
                 </Field>
                 {draft.decisionState === "superseded" && <Field label="Replacement decision" full>
@@ -1186,7 +1188,7 @@ export default function PersonalOpsWorkspace({
       if (query && !`${item.title} ${summaryForItem(item)} ${item.source === "native" ? item.domain : item.entity}`.toLowerCase().includes(query)) return false;
       const filter = urlState.filter;
       if (filter.startsWith("status-")) return stateLabel(item) === filter.slice(7).replaceAll("-", "_");
-      if (filter === "all") return stateLabel(item) !== "archived" && (initialView !== "command" || !["complete","decided","superseded"].includes(stateLabel(item)));
+      if (filter === "all") return stateLabel(item) !== "archived" && (initialView !== "command" || !["complete","decided","superseded","cancelled"].includes(stateLabel(item)));
       if (filter === "archived") return item.source === "native" && item.lifecycle === "archived";
       if (item.source === "legacy-goal") return filter === "active" ? !item.done : filter === "complete" ? item.done : false;
       if (filter === "today") return isDueToday(item.dueAt);
@@ -1413,14 +1415,14 @@ export default function PersonalOpsWorkspace({
 
   async function saveCardStatus(item: PersonalOpsListItem, next: string, details?: StatusDetails): Promise<string | null> {
     if (stateLabel(item) === next) return null;
-    if (item.source === "legacy-goal") return ["draft","planned","active","complete"].includes(next) ? toggleLegacyGoal(item, next === "complete", next === "complete" ? item.status : next as EntityGoalItem["status"]) : "This status is not available.";
+    if (item.source === "legacy-goal") return ["draft","planned","active","waiting","blocked","paused","cancelled","complete"].includes(next) ? toggleLegacyGoal(item, next === "complete", next === "complete" ? item.status : next as EntityGoalItem["status"]) : "This status is not available.";
     const choice = personalCardStatusChoices(item).find(option => option.value === next);
     if (!choice || (choice.reason && !details)) return choice?.reason || "This status is not available.";
     const family = familyForObject(item);
-    const reopen = (item.lifecycle === "archived" && next !== "archived") || (item.lifecycle === "complete" && !["complete", "decided", "superseded", "archived"].includes(next)) ? { lifecycle: "active" as const } : {};
+    const reopen = (item.lifecycle === "archived" && next !== "archived") || (item.lifecycle === "complete" && !["complete", "decided", "superseded", "cancelled", "archived"].includes(next)) ? { lifecycle: "active" as const } : {};
     let patch: PersonalOpsUpdateInputByFamily[PersonalOpsFamily];
     if (next === "archived") patch = {lifecycle:"archived"};
-    else if (item.objectType === "goal") patch = { lifecycle: next as PersonalOpsGoal["lifecycle"] };
+    else if (item.objectType === "goal") patch = { goalState: next as PersonalOpsGoal["goalState"], lifecycle: ["draft","planned","complete"].includes(next) ? next as PersonalOpsGoal["lifecycle"] : "active" };
     else if (item.objectType === "decision") patch = { ...reopen, decisionState: next as PersonalOpsDecision["decisionState"] };
     else if (item.objectType === "obligation") patch = { ...reopen, obligationState: next as PersonalOpsObligation["obligationState"] };
     else if (item.objectType === "follow_up") patch = { ...reopen, followUpState: next as PersonalOpsFollowUp["followUpState"] };
@@ -1457,7 +1459,7 @@ export default function PersonalOpsWorkspace({
 
   const metrics = useMemo<PersonalOpsMetricItem[]>(() => {
     const nativeScope = baseItems.filter((item): item is NativeListItem => item.source === "native" && item.lifecycle !== "archived");
-    const active = baseItems.filter((item) => !["complete", "decided", "superseded", "archived"].includes(stateLabel(item))).length;
+    const active = baseItems.filter((item) => !["complete", "decided", "superseded", "cancelled", "archived"].includes(stateLabel(item))).length;
     const dueSoon = nativeScope.filter((item) => isDueWithin(item.dueAt, 7) && item.lifecycle !== "complete").length;
     const overdue = nativeScope.filter((item) => item.dueAt && new Date(item.dueAt).getTime() < Date.now() && item.lifecycle !== "complete").length;
     const review = nativeScope.filter((item) => item.review === "needs_review" || item.review === "not_reviewed").length;
@@ -1628,7 +1630,7 @@ export default function PersonalOpsWorkspace({
               </MorphingDiv>
               <MorphingButton type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></MorphingButton>
               <MorphingP className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</MorphingP>
-              <MorphingDiv className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? ["draft","planned","active","complete"].map(value=>({value})) : personalCardStatusChoices(item)} onRequirements={next => {if(item.source === "native")setStatusRequirements({item,next});}} disabled={busy} onSave={next => saveCardStatus(item, next)} /></MorphingDiv>
+              <MorphingDiv className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? ["draft","planned","active","waiting","blocked","paused","cancelled","complete"].map(value=>({value})) : personalCardStatusChoices(item)} onRequirements={next => {if(item.source === "native")setStatusRequirements({item,next});}} disabled={busy} onSave={next => saveCardStatus(item, next)} /></MorphingDiv>
             </MorphingArticle>)}</DirectoryLayout>
           )}
         </div>
@@ -1656,7 +1658,7 @@ export default function PersonalOpsWorkspace({
                 <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector" data-icon-button="standard"><PersonalOpsIcon name="close" /></button>
               </div>
               <div className={styles.chipRow}>
-                <PersonalCardStatusControl title={selectedItem.title} value={stateLabel(selectedItem)} choices={selectedItem.source === "legacy-goal" ? ["draft","planned","active","complete"].map(value=>({value})) : personalCardStatusChoices(selectedItem)} disabled={busy} onSave={next=>saveCardStatus(selectedItem,next)} onRequirements={next=>{if(selectedItem.source === "native")setStatusRequirements({item:selectedItem,next});}}/>
+                <PersonalCardStatusControl title={selectedItem.title} value={stateLabel(selectedItem)} choices={selectedItem.source === "legacy-goal" ? ["draft","planned","active","waiting","blocked","paused","cancelled","complete"].map(value=>({value})) : personalCardStatusChoices(selectedItem)} disabled={busy} onSave={next=>saveCardStatus(selectedItem,next)} onRequirements={next=>{if(selectedItem.source === "native")setStatusRequirements({item:selectedItem,next});}}/>
                 {selectedItem.source === "native" && selectedItem.objectType === "decision" && <PersonalOpsStatusChip tone={toneForState(decisionReviewState(selectedItem))}>{cleanLabel(decisionReviewState(selectedItem))}</PersonalOpsStatusChip>}
                 {selectedItem.source === "native" && selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && ["blocked","attention"].includes(selectedItem.health) && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
                 {selectedItem.source === "legacy-goal" && <PersonalOpsStatusChip tone="attention">Existing Current Goals</PersonalOpsStatusChip>}

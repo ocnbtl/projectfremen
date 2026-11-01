@@ -1,3 +1,4 @@
+import { createNativeObjectRef } from "../../../lib/native-objects/routes";
 import { notFound } from "next/navigation";
 import AdminChrome from "../../../components/AdminChrome";
 import NotesWorkspace from "../../../components/NotesWorkspace";
@@ -99,6 +100,8 @@ export default async function NotesRoutePage({
         sidebarSummary="Authored internal knowledge, explicit links, and note-local review state."
       />
       <NotesWorkspace
+        peopleTargets={records.filter(r=>!r.archivedAt&&(r.className==="person"||r.className==="org")).map(r=>createNativeObjectRef({module:"people",objectType:r.className==="org"?"organization":"person",objectId:r.id,label:r.title}))}
+        connectedWork={personalOpsResult.ok?[...personalOpsResult.state.goals,...personalOpsResult.state.decisions,...personalOpsResult.state.followUps].filter(item=>item.lifecycle!=="archived").map(item=>({id:item.id,title:item.title,objectType:item.objectType,lifecycle:item.lifecycle,updatedAt:item.updatedAt,description:item.description,status:item.objectType==="goal"?item.goalState||item.lifecycle:item.objectType==="decision"?item.decisionState:item.followUpState,summary:item.objectType==="goal"?item.outcome:item.objectType==="decision"?item.finalDecision||item.question:item.context||item.description})):[]}
         initialNotes={notes}
         contentGraph={contentGraph}
         referenceEvidence={referenceEvidence}

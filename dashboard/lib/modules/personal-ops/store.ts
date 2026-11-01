@@ -1,4 +1,4 @@
-import { readJsonFile, writeJsonFile } from "../../file-store";
+import { readJsonFile, writeJsonFile, mutateJsonFile } from "../../file-store";
 import { createAuditEvent, type AuditEvent, type AuditSnapshot } from "../../native-objects/audit";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import { createNativeObjectRef } from "../../native-objects/routes";
@@ -124,7 +124,8 @@ const REVIEW_STATES: ReviewState[] = [
 ];
 const CADENCE_STATES: CadenceState[] = ["current", "due_soon", "overdue", "dormant", "paused"];
 const PRIORITIES: PersonalOpsPriority[] = ["low", "medium", "high", "critical"];
-const DECISION_STATES: DecisionState[] = ["open", "decided", "deferred", "superseded"];
+const DECISION_STATES: DecisionState[] = ["open", "considering", "waiting", "decided", "deferred", "superseded", "cancelled"];
+const GOAL_STATES = ["draft", "planned", "active", "waiting", "blocked", "paused", "complete", "cancelled"] as const;
 const REVERSIBILITY_STATES: DecisionReversibility[] = [
   "reversible",
   "reversible_costly",
@@ -767,6 +768,7 @@ function buildGoal(input: GoalCreateInput, now: string, actorId: string): Person
   const item: PersonalOpsGoal = {
     ...commonFromCreate("goals", raw, now, actorId),
     objectType: "goal",
+    goalState: raw.goalState === undefined ? undefined : enumValue(raw.goalState, [...GOAL_STATES], "draft", "goalState"),
     outcome: requiredText(raw.outcome, "outcome", 4000),
     targetPeriod: optionalText(raw.targetPeriod, "targetPeriod", 160),
     keyResults: normalizeKeyResults(raw.keyResults)
@@ -832,6 +834,7 @@ function buildFollowUp(input: FollowUpCreateInput, now: string, actorId: string)
 }
 
 function validateGoal(item: PersonalOpsGoal): void {
+  if (item.lifecycle !== "archived" && item.goalState) item.lifecycle = ["draft","planned","complete"].includes(item.goalState) ? item.goalState as LifecycleState : "active";
   if (!item.outcome) validation("outcome is required", "outcome");
   if (item.lifecycle === "complete" && item.keyResults.some((result) => !result.complete)) {
     validation("Complete every key result before completing the goal", "keyResults");
@@ -840,7 +843,7 @@ function validateGoal(item: PersonalOpsGoal): void {
 
 function synchronizeDecision(item: PersonalOpsDecision): void {
   if (item.lifecycle === "archived") return;
-  if (item.decisionState === "decided" || item.decisionState === "superseded") {
+  if (["decided", "superseded", "cancelled"].includes(item.decisionState)) {
     item.lifecycle = "complete";
     item.review = "reviewed";
   }
@@ -850,7 +853,7 @@ function synchronizeDecision(item: PersonalOpsDecision): void {
 }
 
 function validateDecision(item: PersonalOpsDecision): void {
-  if (item.lifecycle === "complete" && item.decisionState !== "decided" && item.decisionState !== "superseded") {
+  if (item.lifecycle === "complete" && !["decided", "superseded", "cancelled"].includes(item.decisionState)) {
     validation("Only a decided or superseded Decision can be complete", "decisionState");
   }
   if (item.decisionState === "decided") {
@@ -1032,8 +1035,8 @@ export async function createPersonalOpsObject<Family extends PersonalOpsFamily>(
   const actorId = options.actorId || "admin";
   const now = (options.now || new Date()).toISOString();
 
-  return withMutationLock(async () => {
-    const state = await readPersonalOpsState();
+  return withMutationLock(() => mutateJsonFile<PersonalOpsState,PersonalOpsStoreCreateResult<Family>>(FILE_NAME,newEmptyState(),raw=>{
+    const state = normalizeState(raw);
     const rawInput = input as unknown as Record<string, unknown>;
     const legacy = normalizeLegacySource(rawInput.legacySource, family);
 
@@ -1059,11 +1062,11 @@ export async function createPersonalOpsObject<Family extends PersonalOpsFamily>(
             { status: 409 }
           );
         }
-        return {
+        return {value:state,changed:false,result:{
           item: mapped as PersonalOpsObjectByFamily[Family],
           created: false,
           mapping: existingMapping
-        };
+        }};
       }
     }
 
@@ -1104,14 +1107,13 @@ export async function createPersonalOpsObject<Family extends PersonalOpsFamily>(
       auditEvents: appendModuleAudit(state, auditEvent),
       legacyMappings: mapping ? [...state.legacyMappings, mapping] : state.legacyMappings
     };
-    await writeJsonFile(FILE_NAME, nextState);
-    return {
+    return {value:nextState,result:{
       item,
       created: true,
       ...(mapping ? { mapping } : {}),
       auditEvent
-    };
-  });
+    }};
+  }));
 }
 
 function applyCommonPatch<Item extends PersonalOpsCommon>(
@@ -1157,6 +1159,8 @@ function updateGoal(
   now: string
 ): PersonalOpsGoal {
   const next = applyCommonPatch(current, patch, now);
+  if (hasOwn(patch, "goalState")) next.goalState = enumValue(patch.goalState, [...GOAL_STATES], "draft", "goalState");
+  else if (hasOwn(patch, "lifecycle") && patch.lifecycle !== "archived") next.goalState = patch.lifecycle as PersonalOpsGoal["goalState"];
   if (hasOwn(patch, "outcome")) next.outcome = requiredText(patch.outcome, "outcome", 4000);
   if (hasOwn(patch, "targetPeriod")) {
     next.targetPeriod = optionalText(patch.targetPeriod, "targetPeriod", 160);
@@ -1339,8 +1343,8 @@ export async function updatePersonalOpsObject<Family extends PersonalOpsFamily>(
   const actorId = options.actorId || "admin";
   const requestedAt = options.now?.toISOString();
 
-  return withMutationLock(async () => {
-    const state = await readPersonalOpsState();
+  return withMutationLock(() => mutateJsonFile<PersonalOpsState,PersonalOpsStoreUpdateResult<Family>>(FILE_NAME,newEmptyState(),raw=>{
+    const state = normalizeState(raw);
     const collection = collectionFor(state, family);
     const index = collection.findIndex((item) => item.id === cleanId);
     if (index === -1) {
@@ -1381,9 +1385,8 @@ export async function updatePersonalOpsObject<Family extends PersonalOpsFamily>(
       [family]: nextCollection,
       auditEvents: appendModuleAudit(state, auditEvent)
     };
-    await writeJsonFile(FILE_NAME, nextState);
-    return { item, auditEvent };
-  });
+    return {value:nextState,result:{ item, auditEvent }};
+  }));
 }
 
 function positiveInteger(value: unknown, field: string, fallback: number, maximum = 365): number {
@@ -3141,4 +3144,15 @@ export async function instantiatePersonalOpsTemplate(
     await writeJsonFile(FILE_NAME, nextState);
     return { item, usage, created: true, auditEvents };
   });
+}
+
+export async function createCalendarWorkOnce<Family extends PersonalOpsFamily>(family:Family,input:PersonalOpsCreateInputByFamily[Family],id:string) {
+ if (!/^calendar-work-[a-f0-9]{64}$/.test(id)) throw new Error("Invalid calendar work identity");
+ return withMutationLock(() => mutateJsonFile<PersonalOpsState,PersonalOpsObjectByFamily[Family]>(FILE_NAME,newEmptyState(),raw=>{
+  const state=normalizeState(raw), existing=collectionFor(state,family).find(item=>item.id===id);
+  if(existing)return {value:state,result:existing,changed:false};
+  const now=new Date().toISOString(), item={...buildByFamily(family,input,now,"admin"),id};
+  const audit=moduleAuditEvent({item,action:item.objectType+".created_from_calendar",actorId:"admin",occurredAt:now,before:null});
+  return {value:{...state,[family]:[item,...collectionFor(state,family)],auditEvents:appendModuleAudit(state,audit)},result:item};
+ }));
 }

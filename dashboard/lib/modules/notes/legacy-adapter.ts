@@ -39,6 +39,7 @@ function copyRelations(record: PersonalRecord) {
 }
 
 function mapLegacyType(className: PersonalRecordClass): Mapping<NoteType> {
+  if(className === "interaction")return {value:"interaction",note:{code:"interaction",field:"type",confidence:"direct",message:"Shared with People interactions."}};
   if (className === "decision") {
     return {
       value: "decision",
@@ -76,12 +77,12 @@ function mapLegacyType(className: PersonalRecordClass): Mapping<NoteType> {
     };
   }
   return {
-    value: "idea",
+    value: "note",
     note: {
       code: "legacy_type_generic_note",
       field: "type",
       confidence: "inferred",
-      message: "The legacy record has no canonical Notes subtype; it is presented as Idea without rewriting the source record.",
+      message: "The legacy record has no canonical Notes subtype; it is presented as Note without rewriting the source record.",
       legacyValue: className
     }
   };
@@ -220,7 +221,7 @@ export function legacyPersonalRecordToNoteRecord(
   record: PersonalRecord,
   options: { now?: Date } = {}
 ): NoteRecord {
-  const type = mapLegacyType(record.className);
+  const type:Mapping<NoteType> = record.className === "interaction" ? mapLegacyType(record.className) : record.noteType ? {value:record.noteType,note:{code:"explicit_type",field:"type",confidence:"direct",message:"Saved note type."}} : record.status === "idea" ? {value:"idea",note:{code:"legacy_idea",field:"type",confidence:"direct",message:"Previously marked as an idea."}} : mapLegacyType(record.className);
   const lifecycle = mapLegacyLifecycle(record.status);
   const review = mapLegacyReview(record, options.now || new Date());
 
@@ -309,11 +310,12 @@ function legacyStatusForLifecycle(status: NoteWritableLifecycleStatus): Personal
 }
 
 export function noteCreateInputToLegacy(input: NoteCreateInput): PersonalRecordInput {
-  const type = input.type || "idea";
+  const type = input.type || "note";
   return {
     domain: "notes-docs",
     title: input.title,
     className: legacyClassForType(type),
+    noteType:type,
     status: legacyStatusForLifecycle(input.lifecycleStatus || "draft"),
     body: input.body || "",
     privacy: input.privacy || "private",
@@ -332,6 +334,7 @@ export function noteUpdateInputToLegacy(input: NoteUpdateInput): PersonalRecordP
   const hasTimeUpdate = input.reviewCadence !== undefined || input.nextReviewAt !== undefined;
   return {
     title: input.title,
+    noteType: input.type,
     body: input.body,
     status: input.lifecycleStatus
       ? legacyStatusForLifecycle(input.lifecycleStatus)

@@ -71,14 +71,17 @@ export type GoalKeyResult = {
   complete: boolean;
 };
 
+export type GoalState = "draft" | "planned" | "active" | "waiting" | "blocked" | "paused" | "complete" | "cancelled";
+
 export type PersonalOpsGoal = PersonalOpsCommon & {
   objectType: "goal";
+  goalState?: GoalState;
   outcome: string;
   targetPeriod?: string;
   keyResults: GoalKeyResult[];
 };
 
-export type DecisionState = "open" | "decided" | "deferred" | "superseded";
+export type DecisionState = "open" | "considering" | "waiting" | "decided" | "deferred" | "superseded" | "cancelled";
 export type DecisionReversibility =
   | "reversible"
   | "reversible_costly"
@@ -466,6 +469,7 @@ export type PersonalOpsSecondaryObjectByFamily = {
 };
 
 export type GoalCreateInput = {
+  goalState?: GoalState;
   title: string;
   outcome: string;
   domain?: string;
@@ -589,6 +593,7 @@ type CommonUpdateInput = {
 };
 
 export type GoalUpdateInput = CommonUpdateInput & {
+  goalState?: GoalState;
   outcome?: string;
   targetPeriod?: string;
   keyResults?: Array<Partial<GoalKeyResult> & { title: string }>;

@@ -89,9 +89,9 @@ export default function NoteVersionHistory({ noteId, noteTitle }: { noteId: stri
     >
       <header className={styles.header}>
         <div>
-          <span>Same canonical Note</span>
-          <h2 id={`note-version-history-${noteId}`}>Encrypted version history</h2>
-          <p>Read-only history from this browser&apos;s local Vault. The Personal Records API remains the Note writer.</p>
+
+          <h2 id={`note-version-history-${noteId}`}>History</h2>
+          <p>Saved versions are kept encrypted in your Vault.</p>
         </div>
         <div className={styles.actions}>
           <button type="button" onClick={() => setReloadToken((value) => value + 1)}>Refresh</button>
@@ -116,7 +116,7 @@ export default function NoteVersionHistory({ noteId, noteTitle }: { noteId: stri
       {state.status === "missing" && (
         <div className={styles.state} role="status">
           <strong>No encrypted versions are stored on this device yet</strong>
-          <span>Save this Note while Vault is unlocked, or import current module records from Vault. No owner record was created here.</span>
+          <span>Save this note while Vault is unlocked to keep its version history on this device.</span>
         </div>
       )}
 
@@ -152,7 +152,7 @@ export default function NoteVersionHistory({ noteId, noteTitle }: { noteId: stri
               <span>The local object exists, but its encrypted history does not yet contain a distinct saved version.</span>
             </div>
           )}
-          <p className={styles.restoreBoundary}>Restore remains in Vault so it can create a new encrypted version, retain later history, and reconcile through the canonical Note command path.</p>
+          <p className={styles.restoreBoundary}>Open Vault to restore a version. Your later versions are kept.</p>
         </>
       )}
     </section>

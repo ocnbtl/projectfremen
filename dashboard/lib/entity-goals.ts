@@ -1,7 +1,7 @@
 export type EntityGoalItem = {
   text: string;
   done: boolean;
-  status?: "draft" | "planned" | "active";
+  status?: "draft" | "planned" | "active" | "waiting" | "blocked" | "paused" | "cancelled";
 };
 
 function normalizeGoalText(value: unknown): string {
@@ -20,7 +20,7 @@ export function normalizeGoalItems(
       return {
         text: normalizeGoalText(item?.text),
         done: Boolean(item?.done),
-        ...(item && "status" in item && ["draft", "planned", "active"].includes(String(item.status)) ? {status:item.status as EntityGoalItem["status"]} : {})
+        ...(item && "status" in item && ["draft", "planned", "active", "waiting", "blocked", "paused", "cancelled"].includes(String(item.status)) ? {status:item.status as EntityGoalItem["status"]} : {})
       };
     })
     .filter((item) => item.text.length > 0)

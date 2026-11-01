@@ -889,6 +889,8 @@ button.metric {
 }
 
 /* Distinct workflow states, shared by cards, filters and detail controls. */
+.statusChip[data-tone="cancelled"] { --status-chip-background:#f4dee2; --status-chip-color:#8b344a; }
+.statusChip[data-tone="considering"] { --status-chip-background:#e3e9fa; --status-chip-color:#3b5690; }
 .statusChip[data-tone="draft"] { --status-chip-background:#edf2f7; --status-chip-color:#465d75; }
 .statusChip[data-tone="planned"] { --status-chip-background:#e0f3f6; --status-chip-color:#176778; }
 .statusChip[data-tone="scheduled"] { --status-chip-background:#e9edff; --status-chip-color:#424b9c; }
@@ -2653,3 +2655,5 @@ button.metric {
 @media(max-width:900px){.personalCards[data-directory-view="comfortable"],.personalCards[data-directory-view="compact"]{grid-template-columns:1fr;}}
 @media(max-width:600px){.personalCards[data-directory-view="grid"]{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-inline:12px;}.personalCards[data-directory-view="grid"] article{padding:10px;row-gap:8px;}.personalCards[data-directory-view="grid"] .personalCardTop{display:flex;flex-direction:column;align-items:flex-start;}.personalCards[data-directory-view="grid"] .personalCardDates{align-items:flex-start;flex-direction:column;gap:4px;font-size:10px;}.personalCards[data-directory-view="grid"] .personalCardLinks{max-width:100%;}.personalCards[data-directory-view="grid"] .personalCardOpen strong{font-size:13px;}.personalCards[data-directory-view="grid"] .personalCardMeta{gap:4px;}}
 @media(max-width:359px){.personalCards[data-directory-view="grid"]{grid-template-columns:1fr;}}
+
+.statusGroup{padding:7px 8px 3px;font-size:11px;color:var(--muted);font-weight:500;}

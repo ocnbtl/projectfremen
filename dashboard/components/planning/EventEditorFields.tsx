@@ -1,6 +1,7 @@
 "use client";
 import { useState, type CSSProperties } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import { INTERACTION_KINDS } from "../../lib/modules/planning/interaction-kinds";
 import SelectField from "../ui/SelectField";
 import RecordLinks from "./RecordLinks";
 import EventLocationField from "./EventLocationField";
@@ -60,6 +61,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
           }} />
           <SelectField aria-label="Reminder unit" value={String(reminderUnit)} disabled={fields.reminderMinutes === null} onChange={e => { const next=Number(e.target.value); reminder(Math.min(43200,Math.round(reminderDraft/reminderUnit*next))); setReminderUnit(next); }}><option value="1">minutes before</option><option value="60">hours before</option><option value="1440">days before</option><option value="10080">weeks before</option></SelectField>
         </div>
+<label>Interaction<SelectField aria-label="Event interaction type" value={fields.interactionKind||"auto"} onChange={e=>update("interactionKind",e.target.value==="auto"?undefined:e.target.value as EventFields["interactionKind"])}><option value="auto">Meeting when people are linked</option><option value="none">No interaction</option>{INTERACTION_KINDS.map(kind=><option key={kind.value} value={kind.value}>{kind.label}</option>)}</SelectField></label>
         <EventRepeatField fields={fields} update={update} birthdays={snapshot?.birthdays} />
         <EventDateSegments label="Starts" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.start} onChange={value => update("start",value)} />
         <EventDateSegments label="Ends" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.allDay ? addDays(fields.end,-1) : fields.end} onChange={value => update("end",fields.allDay ? addDays(value,1) : value)} />

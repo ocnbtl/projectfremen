@@ -59,6 +59,7 @@ export async function POST(request: Request) {
     let items = await createPersonalRecord({
       domain: String(body.domain ?? ""),
       title: String(body.title ?? ""),
+      noteType: body.noteType,
       className: String(body.className ?? body.kind ?? ""),
       kind: String(body.kind ?? ""),
       knowledgeShape: String(body.knowledgeShape ?? ""),
@@ -140,6 +141,7 @@ export async function PATCH(request: Request) {
       archiveReason: typeof body.archiveReason === "string" ? body.archiveReason : undefined,
       starred: typeof body.starred === "boolean" ? body.starred : undefined,
       body: typeof body.body === "string" ? body.body : undefined,
+      noteType: body.noteType,
       url: typeof body.url === "string" ? body.url : undefined,
       areas: Array.isArray(body.areas) ? body.areas.map(String) : undefined,
       subjects: Array.isArray(body.subjects) ? body.subjects.map(String) : undefined,
