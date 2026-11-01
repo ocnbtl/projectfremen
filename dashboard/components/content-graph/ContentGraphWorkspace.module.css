@@ -1938,3 +1938,11 @@
 @media(prefers-reduced-motion:reduce){.resourceTypeFilters button{transition:none;}}
 
 .resourceTypeFilters>button{display:inline-flex;align-items:center;justify-content:center;width:auto!important;min-width:0;flex:0 0 auto;box-shadow:none!important;}.resourceDuplicates article button{width:auto!important;flex:0 1 auto;}.resourceDuplicates>div>button{width:auto!important;flex:none;}.resourceDuplicateButton{width:38px!important;min-width:38px!important;height:38px;flex:0 0 38px!important;padding:0!important;display:grid!important;place-items:center;}.resourceTypeFilters>button:hover{background:var(--module-primary-100);}
+/* Shared full-page detail surface; keep individual content panels readable. */
+.shell[data-module="notes"] :global(.workspace-detail-page) {padding-inline:20px;}
+.shell[data-module="notes"] :global(.workspace-detail-page .inspector-rail__content) {padding:0;}
+.shell[data-module="notes"] .overviewGrid > :is(.panel,:global(.work-related)) {border:1px solid var(--border);border-radius:14px;padding:18px;background:var(--panel-bg,#fff);box-shadow:none;}
+.shell[data-module="notes"] .overviewGrid {gap:16px;}
+.shell[data-module="notes"] .editorHeader {background:transparent;}
+.shell[data-module="notes"] .editorSurface {border-radius:14px;}
+@media(max-width:760px){.shell[data-module="notes"] :global(.workspace-detail-page){padding-inline:12px;}.shell[data-module="notes"] .overviewGrid > :is(.panel,:global(.work-related)){padding:14px;}}

@@ -84,3 +84,67 @@
   .workspace-people-pages .people-directory-list.is-grid .people-directory-row-body { grid-template-columns:minmax(0,1fr);grid-template-rows:60px auto auto auto; }
   .workspace-people-pages .people-directory-list.is-grid .people-directory-row-body > .people-row-avatar {width:60px !important;height:60px !important;min-width:60px !important;}
 }
+/* Properties use one field language, including manually entered and saved places. */
+.people-redesign-shell .people-properties-column > :is(.people-profile-section,.people-repeatable-section,.people-themed-section) {
+  background: var(--surface-panel, #fff) !important;
+  padding: 16px !important;
+}
+.people-properties-column :is(.people-profile-section-heading,.people-repeatable-heading) h4 {font:600 14px/1.4 var(--font-body);}
+.people-redesign-shell .people-properties-column :is(input,textarea,.app-select-trigger) {font:400 13px/1.45 var(--font-body); color:var(--text-strong);}
+.people-redesign-shell .people-properties-column :is(.people-field-label,label > span:first-child) {font-size:12px;font-weight:500;}
+.people-redesign-shell .people-properties-column .people-repeatable-heading > button,
+.people-redesign-shell .people-properties-column .people-about-additions > button,
+.people-redesign-shell .people-properties-column .people-profile-section-heading > button,
+.people-redesign-shell .people-properties-column .people-contact-channel-grid button {
+  background:var(--module-quiet) !important;color:var(--module-icon) !important;border:1px solid var(--module-border);box-shadow:none;
+}
+.people-redesign-shell .people-properties-column .people-repeatable-inline-remove {
+  background:transparent !important;color:var(--text-subtle) !important;box-shadow:none;border:1px solid var(--border-soft);
+}
+.people-redesign-shell .people-properties-column .people-repeatable-inline-remove:hover {background:#fff0ec !important;color:#a13e32 !important;}
+.people-redesign-shell .people-place-origin {display:grid;gap:6px;margin:0;min-width:0;font:500 12px/1.4 var(--font-body);color:var(--text-subtle);}
+.people-place-origin-input {display:flex;align-items:center;gap:8px;height:42px;padding:0 11px;border:1px solid var(--border-soft);border-radius:9px;background:var(--surface-panel,#fff);color:var(--module-icon);transition:border-color 180ms ease,box-shadow 180ms ease;}
+.people-place-origin-input > svg {flex:none;}
+.people-redesign-shell .people-place-origin-input input {min-width:0;width:100%;height:100%;padding:0;margin:0;font-weight:400;}
+.people-redesign-shell [data-people-location-editor] > .people-place-card {display:grid;gap:12px;padding:12px !important;margin:0 !important;border:1px solid var(--border-soft);border-radius:12px;background:var(--workspace-canvas,#f6f8f7);}
+.people-place-card-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;}
+.people-redesign-shell .people-place-card-heading .people-place-label-trigger {display:inline-flex;align-items:center;gap:7px;width:auto;max-width:calc(100% - 40px);height:34px;min-height:34px;padding:5px 9px;border:1px solid var(--module-border);border-radius:9px;background:var(--module-quiet);color:var(--module-icon);font:500 12px/1.4 var(--font-body);box-shadow:none;transition:background 180ms ease;}
+.people-place-label-trigger > span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.people-place-label-trigger > svg {flex:none;}
+.people-redesign-shell .people-place-card-remove {display:flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:32px;min-height:32px;padding:0 !important;margin:0 !important;border:0 !important;border-radius:8px;background:transparent !important;color:var(--text-subtle) !important;box-shadow:none !important;}
+.people-redesign-shell .people-place-card-remove:hover {background:#fff0ec !important;color:#a13e32 !important;}
+.people-place-address-fields {display:grid;grid-template-columns:1fr;gap:10px;min-width:0;}
+.people-redesign-shell .people-place-address-fields > label {display:grid;gap:5px;margin:0;min-width:0;font:500 12px/1.4 var(--font-body);color:var(--text-subtle);}
+.people-redesign-shell .people-place-address-fields input {width:100%;min-width:0;height:40px;padding:8px 10px;box-sizing:border-box;}
+@layer search-controls {
+ .people-redesign-shell :is(.people-properties-column,.people-capture-form) :is(input,textarea,.app-select-trigger):focus-visible {outline:2px solid var(--module-focus) !important;outline-offset:2px !important;box-shadow:none !important;}
+ .people-redesign-shell .people-place-origin-input input,
+ .people-redesign-shell .people-place-origin-input input:focus-visible {border:0 !important;border-radius:0 !important;outline:0 !important;box-shadow:none !important;background:transparent !important;}
+ .people-redesign-shell .people-place-origin-input:focus-within {border-color:var(--module-focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--module-focus) 16%,transparent);outline:0;}
+}
+@media(max-width:760px) {
+ .people-redesign-shell .people-properties-column > :is(.people-profile-section,.people-repeatable-section,.people-themed-section) {padding:14px !important;}
+ .people-redesign-shell .people-properties-column :is(input,textarea) {font-size:16px;}
+}
+@media(prefers-reduced-motion:reduce){.people-place-origin-input,.people-place-label-trigger{transition:none;}}
+.people-place-address-reveal {overflow:hidden;margin:-4px;padding:4px;}
+/* Compound fields have one outline; legacy destructive fills stay off at rest. */
+@layer search-controls {
+ .people-redesign-shell :is(.people-properties-column,.people-capture-form) .people-place-origin-input input:not([type="checkbox"]):not([type="radio"]) {border:0 !important;border-radius:0 !important;outline:0 !important;box-shadow:none !important;background:transparent !important;}
+ .people-redesign-shell .people-properties-column :is(.people-remove-icon,.people-note-remove,.people-contact-remove) {background:transparent !important;border-color:var(--border-soft) !important;color:var(--text-subtle) !important;box-shadow:none !important;}
+ .people-redesign-shell .people-properties-column :is(.people-remove-icon,.people-note-remove,.people-contact-remove):hover {background:#fff0ec !important;border-color:#dfbbb5 !important;color:#a13e32 !important;}
+ .people-redesign-shell .people-properties-column :is(.people-add-action,.people-about-additions > button,.people-note-add) {background:var(--module-quiet) !important;border-color:var(--module-border) !important;color:var(--module-icon) !important;box-shadow:none !important;}
+}
+/* The portalled label picker uses the same People controls as its parent card. */
+.people-place-label-menu {padding:12px;border-radius:14px;color:var(--text-strong,#233840);}
+.people-place-label-menu > strong {display:block;margin:0 0 10px;font:600 14px/1.4 var(--font-body);}
+.people-place-label-menu .people-place-label-options {gap:6px;margin-bottom:12px;}
+.people-place-label-menu .people-place-label-options button {min-height:62px;padding:8px 5px;border:1px solid var(--border-soft,#cbd6dc);border-radius:9px;background:#fff;color:var(--text-subtle,#586a72);font:500 12px/1.3 var(--font-body);transition:background 180ms ease,color 180ms ease;}
+.people-place-label-menu .people-place-label-options button:is(:hover,[aria-pressed=true]) {background:#fff5ed;border-color:#e8b995;color:#963a08;}
+.people-place-label-menu > label {display:grid;gap:6px;margin:0;font:500 12px/1.4 var(--font-body);}
+.people-place-label-menu > label > input {width:100%;box-sizing:border-box;min-height:40px;padding:8px 10px;border:1px solid var(--border-soft,#cbd6dc);border-radius:9px;background:#fff;font:400 14px/1.4 var(--font-body);}
+.people-place-label-menu .people-place-label-apply {min-height:38px;margin-top:10px;background:#963a08;color:white;border:1px solid #963a08;border-radius:9px;font:500 13px/1.4 var(--font-body);}
+.people-place-label-menu .people-place-label-apply:disabled {opacity:.45;cursor:not-allowed;}
+@media(prefers-reduced-motion:reduce){.people-place-label-menu .people-place-label-options button{transition:none;}}
+
+@layer search-controls { .people-redesign-shell button[form='people-profile-properties-form'] {background:var(--module-action,#963a08) !important;border-color:var(--module-action,#963a08) !important;color:var(--module-action-contrast,#fff) !important;} }

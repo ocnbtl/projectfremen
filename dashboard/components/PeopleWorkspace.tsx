@@ -12,7 +12,7 @@ import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/pe
 import RelatedRecords from "./planning/RelatedRecords";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Children, cloneElement, isValidElement, type ReactNode, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import { mirrorPersonalRecord, removePersonalRecordMirror } from "../lib/local-first/domain-mirror";
@@ -1760,6 +1760,7 @@ function LocationEntriesEditor({
   onRemove: (id: string) => void;
 }) {
   const [places, setPlaces] = useState<Place[]>([]);
+  const reducedMotion = useReducedMotion();
   useEffect(() => { let active = true; void planningRequest<PlanningSnapshot>().then(snapshot => { if (active) setPlaces(snapshot.state.places.filter(place => !place.archivedAt)); }).catch(() => {}); return () => { active = false; }; }, []);
   return (
     <section className="people-repeatable-section people-themed-section module-ref-tone-cyan" data-people-location-editor data-profile-section="locations">
@@ -1767,16 +1768,18 @@ function LocationEntriesEditor({
         <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>Places</h4></div>
         <PeopleAddButton label="Place" onClick={onAdd} />
       </header>
-      {!organization && onComesFromChange && <label className="people-origin-field"><span>Origin</span><span className="people-comes-from-field is-standalone"><UnigentamosIcon role="location" candidate="map-pin" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="City or region" /></span></label>}
+      {!organization && onComesFromChange && <label className="people-place-origin"><span>Origin</span><span className="people-place-origin-input" data-field-shell><UnigentamosIcon role="hometown" size={17} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="City or region" /></span></label>}
       {entries.length > 0 ? entries.map((entry, index) => (
-        <motion.article layout="position" transition={{ duration: .24 }} className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
-          <ProfilePlaceField places={places} placeId={entry.placeId} index={index} onSelect={place => onChange(entry.id, { placeId: place.id, address: place.address || "", location: "" })} onEdit={() => onChange(entry.id, { placeId: "" })} />
-          <div className={`people-repeatable-fields people-repeatable-fields-location people-place-row${organization ? " is-organization" : ""}`} style={entry.placeId ? { gridTemplateColumns: "minmax(0, 1fr) auto" } : undefined}>
+        <motion.article layout={reducedMotion ? false : "position"} transition={{ duration: .24 }} className="people-repeatable-entry people-place-card" data-location-entry={entry.id} key={entry.id}>
+          <div className="people-place-card-heading">
             <PlaceLabelPicker value={entry.label || ""} index={index} onChange={label => onChange(entry.id, { label })} />
-            {!entry.placeId && <><label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value, placeId: "" })} placeholder="Start typing…" /></label>
-            <label className="people-location-address-field"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value, placeId: "" })} placeholder="Street address" /></label></>}
-            <RemoveIconButton className="people-location-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
+            <RemoveIconButton className="people-place-card-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
+          <ProfilePlaceField places={places} placeId={entry.placeId} index={index} onSelect={place => onChange(entry.id, { placeId: place.id, address: place.address || "", location: "" })} onEdit={() => onChange(entry.id, { placeId: "" })} />
+          <AnimatePresence initial={false}>{!entry.placeId && <motion.div key="address-fields" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : .22 }} className="people-place-address-reveal"><div className="people-place-address-fields">
+            <label><span>City / region</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value, placeId: "" })} placeholder="City, state or region" /></label>
+            <label><span>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value, placeId: "" })} placeholder="Street address" /></label>
+          </div></motion.div>}</AnimatePresence>
         </motion.article>
       )) : <p className="people-repeatable-empty">No place added.</p>}
     </section>

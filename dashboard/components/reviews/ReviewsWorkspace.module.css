@@ -1333,3 +1333,9 @@
 .reviewFilters{display:flex;flex-wrap:wrap;gap:6px;max-width:340px;}.reviewFilters>strong{flex-basis:100%;font-size:12px;font-weight:600;}.reviewFilters>strong:not(:first-child){margin-top:10px;}.reviewFilters>button{font-size:12px;padding:7px 10px;}
 
 .reviewFilters>button[aria-pressed="true"]{background:var(--module-primary-100);border-color:var(--module-primary-300);color:var(--module-primary-800);box-shadow:none;}
+/* Match the People detail canvas while retaining distinct content cards. */
+.shell .detailHead,.shell .inspectorHead {background:transparent;border:0;padding:18px 0;}
+.shell .tabBar {background:var(--workspace-canvas,#f6f8f7);border:0;margin:0 0 16px;padding:0;}
+.shell .summaryPanel {background:var(--panel-bg,#fff);border:1px solid var(--border);border-radius:14px;padding:18px;}
+.shell .detailScroll {background:var(--workspace-canvas,#f6f8f7);}
+@media(max-width:760px){.shell .summaryPanel{padding:14px;}}

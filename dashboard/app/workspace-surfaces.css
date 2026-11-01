@@ -49,3 +49,13 @@ html[data-active-module], html[data-active-module] body {
 .workspace-people-pages .people-profile-panel { background:var(--workspace-canvas,#f6f8f7); padding-top:var(--workspace-content-gap,16px); }
 
 .workspace-home-link{display:inline-flex;align-items:center;padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:none;border-radius:6px;cursor:pointer}.workspace-home-link:hover{color:var(--module-icon)}.workspace-home-link:focus-visible{outline:2px solid var(--module-focus);outline-offset:5px}
+/* Detail pages share People's gray canvas. White surfaces belong to the content,
+   not an enclosing rail that still looks like the old split view. */
+.workspace-pages:is([data-module="projects"],[data-module="notes"],[data-module="reviews"]) .workspace-detail-page > .inspector-rail,
+.workspace-pages:is([data-module="projects"],[data-module="notes"],[data-module="reviews"]) .workspace-detail-page > .inspector-rail > :is(.inspector-rail__header,.inspector-rail__content) {
+ background:transparent !important;border:0 !important;
+}
+.workspace-pages:is([data-module="projects"],[data-module="notes"],[data-module="reviews"]) .workspace-detail-page > .inspector-rail > .inspector-rail__content {padding:0;}
+.workspace-pages:is([data-module="projects"],[data-module="notes"],[data-module="reviews"]) .workspace-detail-page .object-header {background:transparent;border:0;}
+.workspace-pages:is([data-module="projects"],[data-module="notes"],[data-module="reviews"]) .workspace-detail-page > .inspector-rail > .inspector-rail__header {padding:0 0 12px;}
+.workspace-pages:is([data-module="projects"],[data-module="notes"],[data-module="reviews"]) .workspace-detail-page :is(.detail-tabs,[role="tablist"]) {background:transparent !important;}
