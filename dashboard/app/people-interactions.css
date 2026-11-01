@@ -290,3 +290,20 @@
 .people-interaction-dialog .people-participant-box .people-participant-scroll {flex:0 1 auto;max-height:250px;}
 .people-interaction-dialog .people-participant-columns {align-items:start;}
 @media(max-width:760px) {.people-interaction-dialog .people-participant-box{height:auto;max-height:240px;}.people-interaction-dialog .people-participant-box .people-participant-scroll{max-height:190px;}}
+
+.people-time-label-short {display:none;}
+@media(max-width:600px) {
+ .people-interaction-dialog .people-interaction-when {display:grid;grid-template-columns:minmax(116px,1.05fr) minmax(0,1.65fr);gap:8px;align-items:end;}
+ .people-interaction-dialog .people-interaction-when .people-interaction-date {width:auto;min-width:0;padding:0;align-self:end;}
+ .people-interaction-dialog .people-interaction-when .people-interaction-range {width:auto;min-width:0;grid-template-columns:minmax(0,1fr) 10px minmax(0,1fr);gap:3px;}
+ .people-interaction-dialog .people-time-inline input {padding:7px 0;width:100%;min-width:0;text-align:center;}
+ .people-interaction-dialog .people-time-inline-trigger {top:-3px;bottom:auto;right:0;min-height:28px;height:28px;width:24px;}
+ .people-interaction-dialog .people-time-inline label > span {padding-right:22px;min-height:22px;display:flex;align-items:center;}
+ .people-interaction-dialog .people-time-inline :is(.people-time-label-full,small) {display:none;}
+ .people-interaction-dialog .people-time-label-short {display:inline;}
+ .people-interaction-dialog .people-interaction-date input {width:2ch;}
+ .people-interaction-dialog .people-interaction-date input[data-segment="year"] {width:4ch;}
+ .people-interaction-dialog .people-interaction-date [class*="segments"] {gap:0;}
+ .people-interaction-dialog .people-interaction-date button {width:26px;min-width:26px;padding:0;}
+ .people-interaction-dialog .people-interaction-overnight {grid-column:1/-1;}
+}

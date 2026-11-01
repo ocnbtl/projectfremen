@@ -1,11 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useState, type HTMLAttributes } from "react";
+import { createContext, useContext, useEffect, useId, useState, useRef, useImperativeHandle, type Ref, type HTMLAttributes } from "react";
 import { LayoutGroup, motion, useReducedMotion, type HTMLMotionProps } from "motion/react";
 import type { DirectoryView } from "./ViewCycleButton";
 
 const DirectoryViewContext = createContext<string | null>(null);
-const layoutTransition = { duration: 0.42, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+// One critically damped spring preserves velocity when a view change is interrupted.
+const layoutTransition = { type: "spring" as const, stiffness: 400, damping: 36, mass: 0.8, restDelta: 0.1, restSpeed: 3 };
 
 /** Stable cards share a layout pass when their directory changes view. No remounts or requests. */
 export function DirectoryLayout({ view, children, ...props }: HTMLAttributes<HTMLDivElement> & { view: string }) {
@@ -16,10 +17,17 @@ function useLayoutMotion(position = false) {
   const view = useContext(DirectoryViewContext);
   const reduced = useReducedMotion();
   return { layout: view !== null && !reduced ? (position ? "position" as const : true) : false,
-    layoutDependency: view, initial: false as const, transition: { layout: reduced ? { duration: 0 } : layoutTransition } };
+    "data-directory-motion-part": true, layoutDependency: view, initial: false as const, transition: { layout: reduced ? { duration: 0 } : layoutTransition } };
 }
-export function MorphingArticle(props: HTMLMotionProps<"article">) { return <motion.article {...props} {...useLayoutMotion()} data-directory-motion-card />; }
-export function MorphingLi(props: HTMLMotionProps<"li">) { return <motion.li {...props} {...useLayoutMotion()} data-directory-motion-card />; }
+function useCardBounds<T extends HTMLElement>(forwardedRef: Ref<T> | undefined) {
+  const ref = useRef<T>(null);
+  useImperativeHandle(forwardedRef, () => ref.current!, []);
+  return { ref,
+    onLayoutAnimationStart: () => ref.current?.setAttribute("data-layout-animating", "true"),
+    onLayoutAnimationComplete: () => ref.current?.removeAttribute("data-layout-animating") };
+}
+export function MorphingArticle({ref, ...props}: HTMLMotionProps<"article">) { return <motion.article {...props} {...useLayoutMotion()} {...useCardBounds(ref)} data-directory-motion-card />; }
+export function MorphingLi({ref, ...props}: HTMLMotionProps<"li">) { return <motion.li {...props} {...useLayoutMotion()} {...useCardBounds(ref)} data-directory-motion-card />; }
 // Position-only children cancel the parent's scale so text and controls don't stretch.
 export function MorphingDiv({ resize = false, ...props }: HTMLMotionProps<"div"> & { resize?: boolean }) { return <motion.div {...props} {...useLayoutMotion(!resize)} />; }
 export function MorphingSpan({ resize = false, ...props }: HTMLMotionProps<"span"> & { resize?: boolean }) { return <motion.span {...props} {...useLayoutMotion(!resize)} />; }

@@ -334,3 +334,35 @@ html[data-active-module] button.workspace-actions-trigger:is(:hover,[data-state=
 @media(max-width:700px) {
  .resource-directory[data-notes].is-grid .resource-directory-card {grid-template-columns:minmax(0,1fr);grid-template-rows:44px minmax(36px,auto) auto auto;gap:6px;}
 }
+
+/* Action menus share rows, while each module supplies its own choices. */
+.workspace-actions-menu {z-index:1400;width:min(288px,calc(100vw - 24px));padding:8px;max-height:min(540px,var(--radix-popover-content-available-height));}
+.workspace-actions-heading {display:flex;align-items:center;gap:9px;padding:8px 10px 10px;color:var(--text-strong);font:600 14px/1.4 var(--font-body);}
+.workspace-actions-heading svg {color:var(--module-icon);flex:none;}
+.workspace-actions-menu .workspace-topnav__actions {display:grid;gap:6px;width:100%;margin:0;}
+.workspace-actions-menu :is(.work-actions,.people-header-actions,.finance-page-actions,.finance-native-action-bar,.workspace-space-actions) {display:flex!important;flex-direction:column;align-items:stretch;gap:3px;width:100%;margin:0;padding:0;border:0;}
+html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a) {display:flex!important;align-items:center;justify-content:flex-start!important;gap:10px!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:44px!important;height:auto!important;padding:8px 10px!important;margin:0!important;border:0!important;border-radius:10px!important;background:#fff!important;background-image:none!important;color:#23383f!important;box-shadow:none!important;text-align:left;font:500 14px/1.4 var(--font-body)!important;text-decoration:none;transition:background-color 180ms ease,color 180ms ease;}
+html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a):is(:hover,:focus-visible,[aria-expanded="true"]) {background:var(--module-quiet,#eef2f5)!important;color:#23383f!important;}
+html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a):focus-visible {outline:2px solid var(--module-focus);outline-offset:-2px;}
+html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a):disabled {opacity:.5;}
+.workspace-actions-menu .workspace-topnav__actions :is(button,a)>svg {width:20px!important;height:20px!important;flex:0 0 20px;align-self:center;color:var(--module-icon);}
+html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(.work-mobile-only,[class*="mobileMenuButton"],.finance-mobile-menu,.people-mobile-nav-trigger) {display:none!important;}
+.workspace-action-label,.workspace-action-group-label,.workspace-create-actions {display:none;}
+.workspace-actions-menu .workspace-action-label {display:inline;}
+.workspace-actions-menu .workspace-create-select {display:none;}
+.workspace-actions-menu .workspace-create-actions {display:grid;gap:3px;}
+.workspace-actions-menu .workspace-action-group-label {display:block;padding:8px 10px 3px;color:var(--text-muted);font:500 12px/1.4 var(--font-body);}
+.workspace-nav-status:empty {display:none;}
+.workspace-nav-status {display:flex;align-items:center;gap:6px;}
+@media(prefers-reduced-motion:reduce) {.workspace-actions-menu * {transition:none!important;}}
+
+.workspace-actions-menu .workspace-topnav__actions button > span {display:inline-flex!important;align-items:center;color:inherit!important;}
+.workspace-actions-menu .workspace-space-actions {order:2;}
+.workspace-actions-menu .finance-native-action-bar {order:-1;}
+
+.workspace-actions-menu .work-button--primary {order:-1;}
+[data-directory-motion-card] {isolation:isolate;}
+[data-directory-motion-card][data-layout-animating="true"] {overflow:clip;}
+
+/* CSS must not tween transforms already driven frame-by-frame by layout motion. */
+[data-directory-motion-card], [data-directory-motion-part] {transition-property:background-color,border-color,box-shadow,color,opacity!important;}

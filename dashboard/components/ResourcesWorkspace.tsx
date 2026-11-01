@@ -562,6 +562,7 @@ export default function ResourcesWorkspace({
   const sidebar = (
     <ModuleSidebar
       id="resources-module-sidebar"
+      status={<WorkspaceButton className={styles.resourceDuplicateButton} icon={duplicateEvidence.summary.affectedResources ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={duplicateEvidence.summary.affectedResources ? `${duplicateEvidence.summary.affectedResources} resources with matching URLs` : "No matching resource URLs"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} />}
       title="Resources"
       description="Saved references and useful source material."
       sections={sidebarSections.map(section=>({...section,items:section.items.filter(item=>!item.disabled)})).filter(section=>section.items.length)}
@@ -974,7 +975,7 @@ export default function ResourcesWorkspace({
       )}
       <DirectoryPane className={styles.directory} ariaLabel="Resources directory">
         <div className={styles.mainScroll}>
-          <WorkspaceHeader title="Resources" count={visibleResources.length}><WorkspaceButton className={styles.resourceDuplicateButton} icon={duplicateEvidence.summary.affectedResources ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={duplicateEvidence.summary.affectedResources ? `${duplicateEvidence.summary.affectedResources} resources with matching URLs` : "No matching resource URLs"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} /><WorkspaceButton intent="primary" icon="plus" aria-label="Add Resource" onClick={() => openResourceEditor("create")}>Resource</WorkspaceButton></WorkspaceHeader>
+          <WorkspaceHeader title="Resources" count={visibleResources.length}><WorkspaceButton intent="primary" icon="plus" aria-label="Add Resource" onClick={() => openResourceEditor("create")}>Add resource</WorkspaceButton></WorkspaceHeader>
 
           {view === "needs-review" && !unavailableViewReason && (
             <section className={styles.reviewQueueSummary} aria-label="Resource review queue summary">

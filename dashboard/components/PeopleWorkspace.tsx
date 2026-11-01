@@ -4108,14 +4108,14 @@ export default function PeopleWorkspace({
           </div>
           <div className="people-header-actions">
             <button type="button" aria-label="Log interaction" onClick={() => openInteractionComposer()}>
-              <PeopleIcon name="interaction" /><span>Interaction</span>
+              <PeopleIcon name="interaction" /><span>Log interaction</span>
             </button>
 
             <button type="button" aria-label="Add organization" onClick={() => openAddPerson("org")}>
-              <UnigentamosIcon role="organization-add" size={18} /><span>Organization</span>
+              <UnigentamosIcon role="organization-add" size={18} /><span>Add organization</span>
             </button>
             <button type="button" aria-label="Add person" onClick={() => openAddPerson("person")}>
-              <PeopleIcon name="new-person" /><span>Person</span>
+              <PeopleIcon name="new-person" /><span>Add person</span>
             </button>
 
           </div>
@@ -4325,7 +4325,7 @@ export default function PeopleWorkspace({
                   data-record-kind={record.className} data-record-id={record.id}
                   key={record.id}
                 >
-                  <MorphingDiv className="people-directory-row-body">
+                  <MorphingDiv resize className="people-directory-row-body">
                     <button type="button" className="people-card-open" aria-label={`Open ${record.title}`} aria-pressed={selectedPerson?.id === record.id} onClick={() => selectPerson(record)} />
                     <PeopleProfileAvatar organization={record.className === "org"}
                       label={record.title}

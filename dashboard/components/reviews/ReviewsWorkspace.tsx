@@ -1962,7 +1962,7 @@ export default function ReviewsWorkspace({
 
       <div className={styles.scroll}>
         <WorkspaceHeader title="Reviews" count={visibleItems.length}>
-          <WorkspaceButton icon="plus" intent="primary" onClick={() => openCreate("weekly")}>Weekly review</WorkspaceButton><WorkspaceButton icon="plus" onClick={() => openCreate("monthly")}>Monthly review</WorkspaceButton>
+          <WorkspaceButton icon="week" intent="primary" onClick={() => openCreate("weekly")}>Weekly review</WorkspaceButton><WorkspaceButton icon="calendar" onClick={() => openCreate("monthly")}>Monthly review</WorkspaceButton>
         </WorkspaceHeader>
         {!selectedRun && renderSourceHandoff(null)}
         {initialLoadError && <SystemState variant="error" description={initialLoadError} action={{ label: "Retry", onSelect: () => void refreshState() }} />}
