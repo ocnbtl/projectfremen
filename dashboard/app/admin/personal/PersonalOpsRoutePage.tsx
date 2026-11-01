@@ -161,6 +161,7 @@ export default async function PersonalOpsRoutePage({
           projectLabel: result.hub.projectLabel,
           text: goal.text,
           done: goal.done,
+          status: goal.status,
           organizationId: identityRecords.find(record => record.className === "org" && record.title.toLowerCase() === result.hub.entity.toLowerCase())?.id,
           imageUrl: identityRecords.find(record => record.className === "org" && record.title.toLowerCase() === result.hub.entity.toLowerCase())?.profile?.photoUrl,
           imageUpdatedAt: identityRecords.find(record => record.className === "org" && record.title.toLowerCase() === result.hub.entity.toLowerCase())?.profile?.photoUpdatedAt,

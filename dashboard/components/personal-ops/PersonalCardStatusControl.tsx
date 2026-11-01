@@ -4,41 +4,47 @@ import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { useId, useRef, useState } from "react";
 import type { PersonalOpsObject } from "../../lib/modules/personal-ops/types";
-import { PersonalOpsStatusChip } from "./PersonalOpsPrimitives";
+import { PersonalOpsStatusChip, personalOpsToneForState } from "./PersonalOpsPrimitives";
 import styles from "./PersonalOpsWorkspace.module.css";
 
-type StatusChoice = { value: string; reason?: string };
+export type StatusChoice = { value: string; reason?: string };
+export const statusLabel = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
 export function personalCardStatusChoices(item: PersonalOpsObject): StatusChoice[] {
-  if (item.lifecycle === "archived") return [{ value: item.objectType === "goal" ? item.lifecycle : item.objectType === "decision" ? item.decisionState : item.objectType === "obligation" ? item.obligationState : item.followUpState, reason: "Restore this item from its details first." }];
-  const active = item.objectType === "goal" ? "active" : "open";
-  const complete = item.objectType === "decision" ? "decided" : "complete";
-  const reason = item.objectType === "goal" && item.keyResults.some(result => !result.complete)
-    ? "Complete every key result in details first."
-    : item.objectType === "obligation" && (!item.completionCriteria.length || item.completionCriteria.some(criterion => !criterion.satisfied) || item.requiredEvidence.some(evidence => evidence.required && evidence.state === "missing"))
-      ? "Satisfy completion criteria and required evidence in details first."
-      : item.objectType === "decision" && !item.finalDecision ? "Add the final decision in details first." : undefined;
-  return [{ value: active }, { value: complete, reason }];
+  let choices: StatusChoice[];
+  if (item.objectType === "goal") choices = ["draft", "planned", "active", "complete"].map(value => ({value, reason: value === "complete" && item.keyResults.some(result => !result.complete) ? "Confirm the remaining key results." : undefined}));
+  else if (item.objectType === "decision") choices = [
+    {value:"open"}, {value:"decided",reason:!item.finalDecision ? "Record your decision." : undefined},
+    {value:"deferred",reason:!item.deferReason || !item.revisitAt ? "Choose a revisit date and reason." : undefined},
+    {value:"superseded",reason:!item.supersededBy ? "Choose the replacement decision." : undefined}
+  ];
+  else if (item.objectType === "obligation") choices = ["open","waiting","blocked","complete"].map(value => ({value,reason:value === "complete" && (!item.completionCriteria.length || item.completionCriteria.some(criterion => !criterion.satisfied) || item.requiredEvidence.some(evidence => evidence.required && evidence.state === "missing")) ? "Confirm completion and required evidence." : undefined}));
+  else choices = ["open","scheduled","waiting","deferred","complete","carried_forward"].map(value => ({value,reason:value === "deferred" && (!item.deferReason || !item.deferredUntil) ? "Choose a new date and reason." : undefined}));
+  return [...choices, {value:"archived",reason:"Add an archive reason."}];
 }
-
-export default function PersonalCardStatusControl({ title, value, choices, disabled, onSave }: {
+export default function PersonalCardStatusControl({ title, value, choices, disabled, onSave, onRequirements }: {
   title: string;
   value: string;
   choices: StatusChoice[];
   disabled?: boolean;
+  onRequirements?: (value: string) => void;
   onSave: (value: string) => Promise<string | null>;
 }) {
   const errorId = useId();
   const listId = useId();
   const menu = useRef<HTMLDivElement>(null);
+  const requirementsAfterClose = useRef<string | null>(null);
   const [open, setOpen] = useState(false);
   const saving = useRef(false);
   const [pending, setPending] = useState<string>();
   const [error, setError] = useState("");
-  const archived = choices.length === 1 && Boolean(choices[0]?.reason);
-  const completed = ["complete", "decided", "superseded"].includes(pending ?? value);
+
+
   async function choose(next: string) {
     setOpen(false);
-    if (saving.current || disabled || next === value || !choices.some(choice => choice.value === next && !choice.reason)) return;
+    if (saving.current || disabled || next === value) return;
+    const choice = choices.find(choice => choice.value === next);
+    if (!choice) return;
+    if (choice.reason && onRequirements) { requirementsAfterClose.current = next; return; }
     saving.current = true;
     setPending(next);
     setError("");
@@ -57,16 +63,17 @@ export default function PersonalCardStatusControl({ title, value, choices, disab
       <Popover.Trigger asChild><button type="button" className={styles.cardStatusPill}
         aria-label={"Change status for " + title} aria-describedby={error ? errorId : undefined}
         role="combobox" aria-haspopup="listbox" aria-controls={open ? listId : undefined} aria-expanded={open}
-        data-value={pending ?? value} disabled={disabled || pending !== undefined || choices.every(choice => choice.reason)}
+        data-value={pending ?? value} disabled={disabled || pending !== undefined}
         onKeyDown={event => { if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); setOpen(true); } }}>
-        <PersonalOpsStatusChip tone={archived ? "neutral" : completed ? "positive" : "active"}>{archived ? "Archived" : completed ? "Complete" : "Active"}</PersonalOpsStatusChip>
+        <PersonalOpsStatusChip tone={personalOpsToneForState(pending ?? value)}>{statusLabel(pending ?? value)}</PersonalOpsStatusChip>
       </button></Popover.Trigger>
       <Popover.Portal><Popover.Content ref={menu} className={styles.cardStatusRoll} sideOffset={3} align="start" collisionPadding={12}
+        onCloseAutoFocus={event => { const next = requirementsAfterClose.current; if (next) { event.preventDefault(); requirementsAfterClose.current = null; onRequirements?.(next); } }}
         onOpenAutoFocus={event => { event.preventDefault(); (menu.current?.querySelector<HTMLElement>('[aria-selected="true"]:not(:disabled)') || menu.current?.querySelector<HTMLElement>('button:not(:disabled)'))?.focus(); }}
         onKeyDown={event => { const options = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || []); const index = options.indexOf(document.activeElement as HTMLButtonElement); if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {event.preventDefault(); options[event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowUp" ? -1 : 1) + options.length) % options.length]?.focus();} }}>
-        <div id={listId} role="listbox" aria-label={"Change status for " + title}>{choices.map((choice, index) => <button type="button" role="option" key={choice.value} aria-selected={index === (completed ? 1 : 0)} disabled={Boolean(choice.reason)} title={choice.reason} onClick={() => void choose(choice.value)}>
-          <PersonalOpsStatusChip tone={index === 1 ? "positive" : "active"}>{index === 1 ? "Complete" : "Active"}</PersonalOpsStatusChip>
-          {index === (completed ? 1 : 0) && <UnigentamosIcon role="check" size={14} />}
+        <div id={listId} role="listbox" aria-label={"Change status for " + title}>{choices.map((choice) => <button type="button" role="option" key={choice.value} aria-selected={choice.value === (pending ?? value)} title={choice.reason} onClick={() => void choose(choice.value)}>
+          <PersonalOpsStatusChip tone={personalOpsToneForState(choice.value)}>{statusLabel(choice.value)}</PersonalOpsStatusChip>
+          {choice.value === (pending ?? value) && <UnigentamosIcon role="check" size={14} />}
         </button>)}</div>
       </Popover.Content></Popover.Portal>
     </Popover.Root>

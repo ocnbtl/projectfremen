@@ -20,7 +20,7 @@ export type PersonalOpsTone =
 export function personalOpsToneForState(value: string): PersonalOpsTone {
   const state = value.trim().toLowerCase().replace(/[ -]+/g, "_");
   if (["active", "in_progress"].includes(state)) return "active";
-  if (["open", "planned", "pending"].includes(state)) return "open";
+  if (["open", "planned", "pending", "scheduled"].includes(state)) return "open";
   if (["complete", "completed", "done", "decided", "resolved", "healthy", "reviewed", "current", "ready", "processed", "verified", "received"].includes(state)) return "positive";
   if (["blocked", "critical", "overdue", "invalid", "failed", "broken"].includes(state)) return "danger";
   if (["waiting", "deferred", "paused", "attention", "needs_attention", "needs_context", "due_soon", "due_today", "deprecated", "stale"].includes(state)) return "attention";

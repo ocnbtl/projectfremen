@@ -1,6 +1,8 @@
 "use client";
 import { DirectoryLayout, MorphingArticle, MorphingDiv, MorphingButton, MorphingP, usePersonalDirectoryView } from "../ui/DirectoryLayout";
 import PersonalCardStatusControl, { personalCardStatusChoices } from "./PersonalCardStatusControl";
+import PersonalStatusRequirements, { type StatusDetails } from "./PersonalStatusRequirements";
+import type { EntityGoalItem } from "../../lib/entity-goals";
 import ViewCycleButton from "../ui/ViewCycleButton";
 import PersonalHome from "./PersonalHome";
 import { EventObjectPreview } from "../planning/EventLinksPreview";
@@ -89,6 +91,7 @@ export type LegacyEntityGoalProjection = {
   projectLabel: string;
   text: string;
   done: boolean;
+  status?: EntityGoalItem["status"];
   index: number;
   organizationId?: string;
   imageUrl?: string;
@@ -360,6 +363,7 @@ function nativeItems(state: PersonalOpsState): PersonalOpsObject[] {
 }
 
 function nativeStateLabel(item: PersonalOpsObject) {
+  if (item.lifecycle === "archived") return "archived";
   if (item.objectType === "decision") return item.decisionState;
   if (item.objectType === "obligation") return item.obligationState;
   if (item.objectType === "follow_up") return item.followUpState;
@@ -389,7 +393,7 @@ function cardLinks(item: PersonalOpsListItem): NativeObjectRef[] {
 }
 
 function stateLabel(item: PersonalOpsListItem) {
-  if (item.source === "legacy-goal") return item.done ? "complete" : "active";
+  if (item.source === "legacy-goal") return item.done ? "complete" : item.status || "active";
   return nativeStateLabel(item);
 }
 
@@ -1081,6 +1085,7 @@ export default function PersonalOpsWorkspace({
   const [error, setError] = useState(initialLoadError);
   const [notice, setNotice] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [statusRequirements, setStatusRequirements] = useState<{item: NativeListItem; next: string} | null>(null);
   const [archiveReason, setArchiveReason] = useState("");
   const [queryDraft, setQueryDraft] = useState(urlState.query);
   const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1357,24 +1362,24 @@ export default function PersonalOpsWorkspace({
     return true;
   }
 
-  async function toggleLegacyGoal(goal: LegacyEntityGoalProjection, done = !goal.done): Promise<string | null> {
+  async function toggleLegacyGoal(goal: LegacyEntityGoalProjection, done = !goal.done, status = goal.status): Promise<string | null> {
     setBusy(true);
     setError("");
     try {
       const response = await fetch(`/api/entity-goals?slug=${encodeURIComponent(goal.slug)}`, { cache: "no-store" });
-      const current = (await response.json()) as { ok?: boolean; goals?: Array<{ text: string; done: boolean }>; error?: string };
+      const current = (await response.json()) as { ok?: boolean; goals?: EntityGoalItem[]; error?: string };
       if (!response.ok || !current.ok || !current.goals) throw new Error(current.error || "Current Goals could not be refreshed.");
       const target = current.goals.findIndex((item, index) => index === goal.index && item.text === goal.text);
       if (target === -1) throw new Error("This Current Goal changed elsewhere. Refresh before updating it.");
-      const goals = current.goals.map((item, index) => index === target ? { ...item, done } : item);
+      const goals = current.goals.map((item, index) => index === target ? { ...item, done, ...(status ? {status} : {}) } : item);
       const save = await fetch("/api/entity-goals", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
         body: JSON.stringify({ slug: goal.slug, goals })
       });
-      const saved = (await save.json()) as { ok?: boolean; goals?: Array<{ text: string; done: boolean }>; error?: string };
+      const saved = (await save.json()) as { ok?: boolean; goals?: EntityGoalItem[]; error?: string };
       if (!save.ok || !saved.ok || !saved.goals) throw new Error(saved.error || "Current Goal could not be saved.");
-      setLegacyGoals((items) => items.map((item) => item.slug === goal.slug && item.index === goal.index ? { ...item, done: Boolean(saved.goals?.[goal.index]?.done) } : item));
+      setLegacyGoals((items) => items.map((item) => item.slug === goal.slug && item.index === goal.index ? { ...item, done: Boolean(saved.goals?.[goal.index]?.done), status:saved.goals?.[goal.index]?.status } : item));
       return null;
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Current Goal could not be saved.";
@@ -1385,20 +1390,21 @@ export default function PersonalOpsWorkspace({
     }
   }
 
-  async function saveCardStatus(item: PersonalOpsListItem, next: string): Promise<string | null> {
+  async function saveCardStatus(item: PersonalOpsListItem, next: string, details?: StatusDetails): Promise<string | null> {
     if (stateLabel(item) === next) return null;
-    if (item.source === "legacy-goal") return toggleLegacyGoal(item, next === "complete");
+    if (item.source === "legacy-goal") return ["draft","planned","active","complete"].includes(next) ? toggleLegacyGoal(item, next === "complete", next === "complete" ? item.status : next as EntityGoalItem["status"]) : "This status is not available.";
     const choice = personalCardStatusChoices(item).find(option => option.value === next);
-    if (!choice || choice.reason) return choice?.reason || "This status is not available.";
+    if (!choice || (choice.reason && !details)) return choice?.reason || "This status is not available.";
     const family = familyForObject(item);
-    const reopen = item.lifecycle === "complete" && !["complete", "decided", "superseded"].includes(next) ? { lifecycle: "active" as const } : {};
+    const reopen = (item.lifecycle === "archived" && next !== "archived") || (item.lifecycle === "complete" && !["complete", "decided", "superseded", "archived"].includes(next)) ? { lifecycle: "active" as const } : {};
     let patch: PersonalOpsUpdateInputByFamily[PersonalOpsFamily];
-    if (item.objectType === "goal") patch = { lifecycle: next as PersonalOpsGoal["lifecycle"] };
+    if (next === "archived") patch = {lifecycle:"archived"};
+    else if (item.objectType === "goal") patch = { lifecycle: next as PersonalOpsGoal["lifecycle"] };
     else if (item.objectType === "decision") patch = { ...reopen, decisionState: next as PersonalOpsDecision["decisionState"] };
     else if (item.objectType === "obligation") patch = { ...reopen, obligationState: next as PersonalOpsObligation["obligationState"] };
     else if (item.objectType === "follow_up") patch = { ...reopen, followUpState: next as PersonalOpsFollowUp["followUpState"] };
     else return "This status is not available.";
-    const saved = await updateByFamily(family, item, patch);
+    const saved = await updateByFamily(family, item, { ...patch, ...details });
     if (!saved.ok) return saved.error.message;
     setState(current => replaceInState(current, family, saved.data as never));
     return null;
@@ -1608,7 +1614,7 @@ export default function PersonalOpsWorkspace({
               </MorphingDiv>
               <MorphingButton type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></MorphingButton>
               <MorphingP className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</MorphingP>
-              <MorphingDiv className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? [{value:"active"}, {value:"complete"}] : personalCardStatusChoices(item)} disabled={busy} onSave={next => saveCardStatus(item, next)} /></MorphingDiv>
+              <MorphingDiv className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? ["draft","planned","active","complete"].map(value=>({value})) : personalCardStatusChoices(item)} onRequirements={next => {if(item.source === "native")setStatusRequirements({item,next});}} disabled={busy} onSave={next => saveCardStatus(item, next)} /></MorphingDiv>
             </MorphingArticle>)}</DirectoryLayout>
           )}
         </div>
@@ -1636,7 +1642,7 @@ export default function PersonalOpsWorkspace({
                 <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector" data-icon-button="standard"><PersonalOpsIcon name="close" /></button>
               </div>
               <div className={styles.chipRow}>
-                <PersonalOpsStatusChip tone={["complete","decided","superseded"].includes(stateLabel(selectedItem)) ? "positive" : "active"}>{["complete","decided","superseded"].includes(stateLabel(selectedItem)) ? "Complete" : "Active"}</PersonalOpsStatusChip>
+                <PersonalOpsStatusChip tone={toneForState(stateLabel(selectedItem))}>{cleanLabel(stateLabel(selectedItem))}</PersonalOpsStatusChip>
                 {selectedItem.source === "native" && selectedItem.objectType === "decision" && <PersonalOpsStatusChip tone={toneForState(decisionReviewState(selectedItem))}>{cleanLabel(decisionReviewState(selectedItem))}</PersonalOpsStatusChip>}
                 {selectedItem.source === "native" && selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && ["blocked","attention"].includes(selectedItem.health) && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
                 {selectedItem.source === "legacy-goal" && <PersonalOpsStatusChip tone="attention">Existing Current Goals</PersonalOpsStatusChip>}
@@ -1803,6 +1809,7 @@ export default function PersonalOpsWorkspace({
         />
       )}
 
+      {statusRequirements && <PersonalStatusRequirements key={`${statusRequirements.item.id}:${statusRequirements.next}`} item={statusRequirements.item} next={statusRequirements.next} decisions={state.decisions} onClose={()=>setStatusRequirements(null)} onSave={details=>saveCardStatus(statusRequirements.item,statusRequirements.next,details)} />}
       <ConfirmationSheet
         open={Boolean(pendingAction)}
         onOpenChange={(open) => { if (!open && !busy) setPendingAction(null); }}

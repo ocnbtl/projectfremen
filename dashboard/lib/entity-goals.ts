@@ -1,6 +1,7 @@
 export type EntityGoalItem = {
   text: string;
   done: boolean;
+  status?: "draft" | "planned" | "active";
 };
 
 function normalizeGoalText(value: unknown): string {
@@ -18,7 +19,8 @@ export function normalizeGoalItems(
 
       return {
         text: normalizeGoalText(item?.text),
-        done: Boolean(item?.done)
+        done: Boolean(item?.done),
+        ...(item && "status" in item && ["draft", "planned", "active"].includes(String(item.status)) ? {status:item.status as EntityGoalItem["status"]} : {})
       };
     })
     .filter((item) => item.text.length > 0)
@@ -31,7 +33,7 @@ export function areGoalListsEqual(a: EntityGoalItem[], b: EntityGoalItem[]): boo
   }
 
   for (let i = 0; i < a.length; i += 1) {
-    if (a[i].text !== b[i].text || a[i].done !== b[i].done) {
+    if (a[i].text !== b[i].text || a[i].done !== b[i].done || a[i].status !== b[i].status) {
       return false;
     }
   }
