@@ -127,12 +127,13 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
     return () => query.removeEventListener("change", sync);
   }, []);
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const currentSection = sections.flatMap(section => section.items).find(item => item.active);
   const close = () => { if (!keepSelectionOpen) { setOpenSection(null); onClose?.(); } };
   return <nav id={id} className="workspace-topnav" aria-label={ariaLabel}>
     <h1 className="workspace-topnav__title">{onHome || returnHome?<button type="button" className="workspace-home-link" onClick={onHome || returnHome} aria-label={"Return to "+title}>{title}</button>:<Link prefetch={false} className="workspace-home-link" href={home} aria-label={"Return to "+title}>{title}</Link>}</h1>
     {bar && <div className="workspace-topnav__search" ref={bar.setSearch} />}
     {compact && sections.length > 0 && <Popover.Root open={openSection === "compact"} onOpenChange={open => setOpenSection(open ? "compact" : null)}>
-      <Popover.Trigger className="workspace-nav-trigger" aria-label={`${title} views`} title="Views"><UnigentamosIcon role="menu" size={18} /><span>Views</span></Popover.Trigger>
+      <Popover.Trigger className="workspace-nav-trigger workspace-browse-trigger" aria-label={`${title} views`} title={`Browse ${title}`}><UnigentamosIcon role="workspace-navigation" size={18} /><span>{currentSection?.label || "Browse"}</span><UnigentamosIcon role="chevron-down" size={14} /></Popover.Trigger>
       <Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>
         {sections.map(section => <LayoutGroup id={`${layoutId}-${section.id}`} key={section.id}><section><p>{section.label}</p><ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul></section></LayoutGroup>)}
         {footer}
