@@ -510,6 +510,7 @@ export default function CalendarWorkspace() {
       finishEditing(editor);
   }
   const [timeHistory, setTimeHistory] = useState<EventTimeChange[]>([]);
+  const [undoNoticeOpen, setUndoNoticeOpen] = useState(false);
   const changingTime = useRef(false);
   async function commitTime(change: EventTimeChange, undo = false) {
     if (changingTime.current || busy) return;
@@ -533,8 +534,9 @@ export default function CalendarWorkspace() {
         confirmed.current = { ...confirmed.current, state: { ...confirmed.current.state, events: confirmed.current.state.events.map(event => event.id === saved.id ? saved : event) } };
         setSnapshot(confirmed.current);
       }
+      setUndoNoticeOpen(!undo);
       setTimeHistory(history => undo ? history.slice(0, -1) : [...history.slice(-19), change]);
-      setNotice(undo ? "Previous event time restored" : "Event time updated · Ctrl+Z or Undo to restore");
+      setNotice(undo ? "Previous event time restored" : "");
     } catch (error) {
       setSnapshot(confirmed.current);
       setError((error as Error).message);
@@ -720,7 +722,11 @@ export default function CalendarWorkspace() {
         message={notice}
         onRetry={error || holidayError ? () => { void refresh(); setHolidayRetry(value => value + 1); } : undefined}
       />
-      {!!timeHistory.length && <button type="button" className={styles.undoTime} disabled={busy} onClick={undoLatest} title="Undo last event time change (Ctrl+Z / Cmd+Z)"><UnigentamosIcon role="chevron-right" size={15} style={{ transform: "rotate(180deg)" }} />Undo move · {timeHistory.at(-1)?.title}</button>}
+      {undoNoticeOpen && !!timeHistory.length && <aside className={styles.undoTime} aria-label="Event move saved">
+        <UnigentamosIcon role="check" size={18} /><div role="status"><strong>Event moved</strong><span>{timeHistory.at(-1)?.title}</span></div>
+        <button type="button" className={styles.undoAction} disabled={busy} onClick={undoLatest} title="Undo last move (Ctrl+Z / Cmd+Z)">Undo</button>
+        <button type="button" className={styles.undoDismiss} onClick={()=>setUndoNoticeOpen(false)} aria-label="Dismiss move notification"><UnigentamosIcon role="close" size={17}/></button>
+      </aside>}
       {query.trim() && <p className={styles.searchStatus} role="status">{occurrences.length + dated.length ? `${occurrences.length + dated.length} matching events in this view` : "No matching events in this view"}</p>}
       {snapshot?.persistence === "device" && (
         <p className={styles.contextNotice} role="status">

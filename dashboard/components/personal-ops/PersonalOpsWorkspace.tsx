@@ -1624,7 +1624,7 @@ export default function PersonalOpsWorkspace({
           >
             <header className={styles.inspectorHeader}>
               <div className={styles.inspectorTop}>
-                <span className={styles.objectIcon} aria-hidden="true">{selectedItem.source === "legacy-goal" ? "G" : selectedItem.objectType === "decision" ? "D" : selectedItem.objectType === "obligation" ? "O" : selectedItem.objectType === "follow_up" ? "F" : "G"}</span>
+                <span className={styles.objectIcon} aria-hidden="true"><PersonalOpsIcon name={cardIcon(selectedItem)} /></span>
                 <div>
                   <h2>{selectedItem.title}</h2>
                   <p>{typeLabel(selectedItem)} · {selectedItem.source === "legacy-goal" ? selectedItem.projectLabel : selectedItem.domain}</p>
@@ -1632,9 +1632,9 @@ export default function PersonalOpsWorkspace({
                 <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector" data-icon-button="standard"><PersonalOpsIcon name="close" /></button>
               </div>
               <div className={styles.chipRow}>
-                <PersonalOpsStatusChip tone={toneForState(stateLabel(selectedItem))}>{cleanLabel(stateLabel(selectedItem))}</PersonalOpsStatusChip>
+                <PersonalOpsStatusChip tone={["complete","decided","superseded"].includes(stateLabel(selectedItem)) ? "positive" : "active"}>{["complete","decided","superseded"].includes(stateLabel(selectedItem)) ? "Complete" : "Active"}</PersonalOpsStatusChip>
                 {selectedItem.source === "native" && selectedItem.objectType === "decision" && <PersonalOpsStatusChip tone={toneForState(decisionReviewState(selectedItem))}>{cleanLabel(decisionReviewState(selectedItem))}</PersonalOpsStatusChip>}
-                {selectedItem.source === "native" && selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
+                {selectedItem.source === "native" && selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && ["blocked","attention"].includes(selectedItem.health) && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
                 {selectedItem.source === "legacy-goal" && <PersonalOpsStatusChip tone="attention">Existing Current Goals</PersonalOpsStatusChip>}
               </div>
               <div className={styles.inspectorTabs}>
@@ -1668,7 +1668,7 @@ export default function PersonalOpsWorkspace({
                     { id: "due", label: "Due", value: formatDate(selectedItem.dueAt) },
                     { id: "reversibility", label: "Reversibility", value: cleanLabel(selectedItem.reversibility) }
                   ] : [
-                    { id: "lifecycle", label: "Lifecycle", value: cleanLabel(selectedItem.lifecycle), tone: toneForState(selectedItem.lifecycle) },
+                    { id: "lifecycle", label: "Status", value: cleanLabel(selectedItem.lifecycle), tone: toneForState(selectedItem.lifecycle) },
                     { id: "health", label: "Health", value: cleanLabel(selectedItem.health), tone: toneForState(selectedItem.health) },
                     { id: "review", label: "Review", value: cleanLabel(selectedItem.review), tone: toneForState(selectedItem.review) },
                     { id: "cadence", label: "Cadence", value: cleanLabel(selectedItem.cadence), tone: toneForState(selectedItem.cadence) }
@@ -1694,8 +1694,8 @@ export default function PersonalOpsWorkspace({
                             <p>{summaryForItem(selectedItem)}</p>
                           </PersonalOpsPanel>
                           {selectedItem.description && selectedItem.objectType !== "follow_up" && <PersonalOpsPanel title="Description" wide><p>{selectedItem.description}</p></PersonalOpsPanel>}
-                          <PersonalOpsPanel title="Next safe action" wide>
-                            <p>{completionDisabledReason || (selectedItem.lifecycle === "complete" ? "This object is complete; archive it when it should leave active history." : "Completion requirements are satisfied. Review the object, then complete it explicitly.")}</p>
+                          <PersonalOpsPanel title="Next step" wide>
+                            <p>{completionDisabledReason || (selectedItem.lifecycle === "complete" ? "Complete. You can archive this item when you no longer need it in the active list." : "Ready to complete.")}</p>
                           </PersonalOpsPanel>
                         </>
                       )
@@ -1738,15 +1738,15 @@ export default function PersonalOpsWorkspace({
                     )}
 
                     {urlState.tab === "links" && (
-                      <PersonalOpsPanel title="Native links" meta={`${selectedItem.sourceRefs.length + selectedItem.linkedRefs.length} total`} wide>
+                      <PersonalOpsPanel title="Linked items" meta={`${selectedItem.sourceRefs.length + selectedItem.linkedRefs.length} total`} wide>
                         {selectedItem.sourceRefs.length + selectedItem.linkedRefs.length ? (
                           <ul>{[...selectedItem.sourceRefs, ...selectedItem.linkedRefs].map((ref) => <li key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || "root"}:${ref.objectId}`}><Link prefetch={false} href={ref.route} style={{display:"inline-flex",alignItems:"center",gap:6}}><EventObjectIdentity record={{...ref,preview:linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`]}} />{ref.label}</Link> <small>({cleanLabel(ref.module)})</small></li>)}</ul>
-                        ) : <p>No links. Creating a link never moves or deletes either object.</p>}
+                        ) : <p>No linked items.</p>}
                       </PersonalOpsPanel>
                     )}
 
                     {urlState.tab === "activity" && (
-                      <PersonalOpsPanel title="Audit activity" meta={`${selectedItem.history.length} events`} wide>
+                      <PersonalOpsPanel title="Activity" meta={`${selectedItem.history.length} events`} wide>
                         <ol>{selectedItem.history.slice().reverse().map((entry) => <li key={entry.id}><strong>{cleanLabel(entry.action)}</strong> · <span className={styles.mono}>{formatTimestamp(entry.occurredAt)}</span>{entry.detail ? ` · ${entry.detail}` : ""}</li>)}</ol>
                       </PersonalOpsPanel>
                     )}
@@ -1770,13 +1770,13 @@ export default function PersonalOpsWorkspace({
               ) : (
                 <>
                   <span>{completionDisabledReason && <small>{completionDisabledReason}</small>}</span>
-                  <button type="button" className={styles.button} onClick={() => openEdit(selectedItem)} disabled={busy || selectedItem.lifecycle === "archived"}>Edit</button>
+                  <button type="button" className={styles.button} onClick={() => openEdit(selectedItem)} disabled={busy || selectedItem.lifecycle === "archived"}><PersonalOpsIcon name="edit"/>Edit</button>
                   {selectedItem.lifecycle === "archived" ? (
                     <button type="button" className={styles.primaryButton} onClick={() => setPendingAction({ type: "restore", item: selectedItem })} disabled={busy}>Restore</button>
                   ) : selectedItem.lifecycle === "complete" ? (
                     <button type="button" className={styles.button} onClick={() => setPendingAction({ type: "archive", item: selectedItem })} disabled={busy}>Archive</button>
                   ) : (
-                    <button type="button" className={styles.primaryButton} onClick={() => setPendingAction({ type: "complete", item: selectedItem })} disabled={busy || Boolean(completionDisabledReason)} title={completionDisabledReason || undefined}>Complete</button>
+                    <button type="button" className={styles.primaryButton} onClick={() => setPendingAction({ type: "complete", item: selectedItem })} disabled={busy || Boolean(completionDisabledReason)} title={completionDisabledReason || undefined}><PersonalOpsIcon name="check"/>Complete</button>
                   )}
                 </>
               )}

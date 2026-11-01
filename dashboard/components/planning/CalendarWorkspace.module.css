@@ -2346,8 +2346,13 @@
 .eventDragPreview { position:absolute; top:0; left:0; z-index:8; pointer-events:none; box-sizing:border-box; display:flex; flex-direction:column; gap:4px; padding:8px; overflow:hidden; border:2px solid var(--event-outline,var(--event-color)); border-radius:9px; color:var(--text-strong); background:color-mix(in srgb,var(--event-color) 18%,white); box-shadow:0 5px 18px #25213924; font:500 11px/1.4 var(--font-body); }
 .eventDragPreview strong { font-weight:600; }
 .eventDragPreview span { font-size:10px; }
-.undoTime { position:fixed; bottom:max(22px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:30; display:flex; align-items:center; gap:6px; max-width:75vw; padding:9px 14px; border:1px solid var(--module-primary-300); border-radius:12px; background:var(--module-quiet,#f3f2f9); box-shadow:0 4px 18px #25213918; color:var(--module-primary-700); font:500 12px/1.4 var(--font-body); cursor:pointer; }
-.undoTime:disabled { opacity:.5; cursor:wait; }
+.undoTime {position:fixed;top:calc(var(--app-content-offset,76px) + 88px);right:20px;z-index:1100;display:flex;align-items:center;gap:10px;width:max-content;max-width:min(440px,calc(100vw - 32px));padding:12px 14px;border:1px solid var(--module-primary-200);border-radius:14px;background:var(--surface-panel,#fff);box-shadow:0 8px 28px #10202620;color:var(--module-primary-700);animation:undoNoticeIn 220ms ease-out;}
+.undoTime>div {display:grid;gap:3px;min-width:0;}.undoTime strong {font-size:13px;font-weight:600;}.undoTime span {font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px;}
+.undoAction {width:auto!important;flex:none;padding:7px 12px;border:0;border-radius:9px;background:var(--module-primary-100);color:var(--module-primary-700);font:600 13px var(--font-body);cursor:pointer;}
+.undoAction:disabled {opacity:.5;cursor:wait;}.undoDismiss {display:grid;place-items:center;width:30px;height:30px;flex:none;border:0;border-radius:9px;padding:0;background:transparent;color:var(--text-muted);cursor:pointer;}.undoDismiss:hover{background:var(--module-primary-50);}
+@keyframes undoNoticeIn {from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+@media(max-width:600px){.undoTime{right:12px;max-width:calc(100vw - 24px);gap:7px;padding:10px;}.undoTime span{max-width:140px;}}
+@media(prefers-reduced-motion:reduce){.undoTime{animation:none;}}
 @media(prefers-reduced-motion:reduce) { .fittedEvent { transition:none; } }
 
 .compactLinks { display:inline-flex; align-items:center; gap:2px; flex:none; font:600 9px/1 var(--font-body); color:var(--event-color); }

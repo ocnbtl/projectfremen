@@ -138,19 +138,6 @@ const VIEW_LABELS: Readonly<Record<ResourcesView, string>> = {
   "duplicate-urls": "Duplicate URLs"
 };
 
-const TYPE_ROWS = [
-  "Articles",
-  "Books",
-  "Components",
-  "Contracts / Invoices",
-  "Datasets",
-  "Documents",
-  "Tools",
-  "Vendors",
-  "Video / Media",
-  "Websites"
-] as const;
-
 const CONTEXT_ROWS: ReadonlyArray<
   [ResourceLinkedContextModule, ResourceLinkedContextView, string]
 > = [
@@ -309,6 +296,18 @@ export default function ResourcesWorkspace({
   );
   const [activeTab, setActiveTab] = useState<ResourcesTab>(firstUrlState.tab);
   const [collection, setCollection] = useState<ResourceCollection>("all");
+  const resourceKinds = [...Object.keys(TYPE_LABELS), "components"];
+  const selectedTypes = new Set((searchParams.get("types") ?? resourceKinds.join(",")).split(",").filter(type => resourceKinds.includes(type)));
+  const selectedTypeKey = [...selectedTypes].sort().join(",");
+  function toggleResourceType(type?: string) {
+    const next = new Set(selectedTypes);
+    if (!type) resourceKinds.forEach(kind => next.add(kind));
+    else if (next.has(type)) next.delete(type); else next.add(type);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next.size === resourceKinds.length) params.delete("types"); else params.set("types", [...next].join(",") || "none");
+    router.replace(pathname + (params.size ? "?" + params.toString() : ""), {scroll:false});
+  }
+
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(initialMode === "detail" || Boolean(firstUrlState.selected));
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
@@ -385,6 +384,7 @@ export default function ResourcesWorkspace({
               !resource.deletedAt &&
               matchesQuery(resource, query) &&
               matchesCollection(resource, collection) &&
+              selectedTypes.has(isStyleGuideComponent(resource) ? "components" : resource.type) &&
               (view === "archived" ? resource.lifecycleState === "archived" : resource.lifecycleState !== "archived") &&
               (view !== "pinned" || resource.pinned === true) &&
               (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id)) &&
@@ -400,7 +400,7 @@ export default function ResourcesWorkspace({
           sort,
           reviewPriorityById
         ),
-    [collection, duplicateEvidence, linkedContextByResourceId, linkedContextModule, query, resources, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
+    [selectedTypeKey, collection, duplicateEvidence, linkedContextByResourceId, linkedContextModule, query, resources, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
   );
 
   useEffect(() => {
@@ -541,23 +541,6 @@ export default function ResourcesWorkspace({
       }))
     },
     {
-      id: "types",
-      label: "Types",
-      items: TYPE_ROWS.map((label) => ({
-        id: `type-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`,
-        label,
-        count: label === "Components" ? resources.filter(isStyleGuideComponent).length : undefined,
-        active: label === "Components" && collection === "components",
-        onSelect: label === "Components" ? () => {
-          setCollection("components");
-          setMobileSidebarOpen(false);
-          setInspectorOpen(false);
-        } : undefined,
-        disabled: label !== "Components",
-        disabledReason: label === "Components" ? undefined : "Native Resource type is not available in the legacy adapter; records are not guessed from titles."
-      }))
-    },
-    {
       id: "linked-context",
       label: "Linked Context",
       items: CONTEXT_ROWS.map(([module, contextView, label]) => ({
@@ -572,23 +555,7 @@ export default function ResourcesWorkspace({
         onSelect: () => selectLibraryView(contextView)
       }))
     },
-    {
-      id: "data",
-      label: "Data",
-      items: [
-        { id: "imports", label: "Imports", disabled: true, disabledReason: "Resource import persistence is not connected." },
-        {
-          id: "duplicate-urls",
-          label: "Duplicate URLs",
-          count: duplicateEvidence.summary.affectedResources,
-          tone: duplicateEvidence.summary.affectedResources ? "attention" : undefined,
-          active: view === "duplicate-urls",
-          onSelect: () => selectLibraryView("duplicate-urls")
-        },
-        { id: "broken-links", label: "Broken Links", disabled: true, disabledReason: "URL health checks are not connected." },
-        { id: "resource-settings", label: "Resource Settings", disabled: true, disabledReason: "Resource settings are not implemented." }
-      ]
-    }
+
   ];
 
   const sidebar = (
@@ -1006,7 +973,7 @@ export default function ResourcesWorkspace({
       )}
       <DirectoryPane className={styles.directory} ariaLabel="Resources directory">
         <div className={styles.mainScroll}>
-          <WorkspaceHeader title="Resources" count={visibleResources.length}><WorkspaceButton intent="primary" icon="plus" aria-label="Add Resource" onClick={() => openResourceEditor("create")}>Resource</WorkspaceButton></WorkspaceHeader>
+          <WorkspaceHeader title="Resources" count={visibleResources.length}><WorkspaceButton className={styles.resourceDuplicateButton} icon={duplicateEvidence.summary.affectedResources ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={duplicateEvidence.summary.affectedResources ? `${duplicateEvidence.summary.affectedResources} resources with matching URLs` : "No matching resource URLs"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} /><WorkspaceButton intent="primary" icon="plus" aria-label="Add Resource" onClick={() => openResourceEditor("create")}>Resource</WorkspaceButton></WorkspaceHeader>
 
           {view === "needs-review" && !unavailableViewReason && (
             <section className={styles.reviewQueueSummary} aria-label="Resource review queue summary">
@@ -1034,28 +1001,11 @@ export default function ResourcesWorkspace({
             </section>
           )}
 
-          {view === "duplicate-urls" && !unavailableViewReason && (
-            <section className={styles.reviewQueueSummary} aria-label="Resource duplicate URL evidence summary">
-              <MetricStrip
-                ariaLabel="Resource exact URL collision evidence"
-                items={[
-                  { id: "affected", label: "Affected Resources", value: duplicateEvidence.summary.affectedResources, tone: duplicateEvidence.summary.affectedResources ? "attention" : "positive" },
-                  { id: "groups", label: "Exact URL groups", value: duplicateEvidence.summary.collisionGroups, tone: duplicateEvidence.summary.collisionGroups ? "attention" : "positive" },
-                  { id: "indexed", label: "Safe URLs indexed", value: duplicateEvidence.summary.acceptedCandidatesIndexed, detail: "syntax accepted" },
-                  { id: "excluded", label: "Withheld excluded", value: duplicateEvidence.summary.withheldEvidenceExcluded, detail: "never matched", tone: duplicateEvidence.summary.withheldEvidenceExcluded ? "attention" : "default" }
-                ]}
-              />
-              <div className={styles.reviewQueueBoundary}>
-                <strong>Exact accepted URL evidence · not a duplicate scan</strong>
-                <span>
-                  This queue groups Resources only when their safe, fragment-free normalized URL keys are identical.
-                  It does not fetch a source, detect fuzzy similarity, confirm a duplicate, choose a canonical record,
-                  merge, replace, unlink, or write Resource state. Credential-bearing, malformed, and unsupported
-                  values are excluded.
-                </span>
-              </div>
-            </section>
-          )}
+          {view === "duplicate-urls" && !unavailableViewReason && <section className={styles.resourceDuplicates} aria-label="Resource duplicate review">
+            <div><UnigentamosIcon role={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} size={22}/><h2>{duplicateEvidence.groups.length ? "Matching resource URLs" : "No matching URLs found"}</h2><WorkspaceButton onClick={()=>selectLibraryView("all")}>Done</WorkspaceButton></div>
+            <p>Review resources that share the same URL. Nothing is merged or deleted automatically.</p>
+            {duplicateEvidence.groups.map(group=><article key={group.matchKey}><strong>{group.displayDomain}</strong><div>{group.members.map(member=>{const resource=resources.find(item=>item.id===member.resourceId);return resource ? <button type="button" key={resource.id} onClick={()=>selectResource(resource)}><UnigentamosIcon role="resource" size={16}/>{resource.title}<UnigentamosIcon role="chevron-right" size={14}/></button> : null;})}</div></article>)}
+          </section>}
 
           {linkedContextModule && linkedContextSummary && linkedContextCoverage && (
             <section
@@ -1134,7 +1084,6 @@ export default function ResourcesWorkspace({
 
           <WorkspaceToolbar query={query} onQuery={value=>{setQuery(value);updateUrl({query:value});}} placeholder="Search Resources" activeFilters={collection !== "all" || view !== "all" ? 1 : 0} filters={<>
             <WorkspaceButton aria-pressed={collection === "all" && view === "all"} onClick={()=>{setCollection("all");selectLibraryView("all");}}>All Resources</WorkspaceButton>
-            <WorkspaceButton aria-pressed={collection === "components"} onClick={()=>setCollection("components")}>Components</WorkspaceButton>
             <WorkspaceButton aria-pressed={collection === "all" && view === "needs-review"} onClick={()=>{setCollection("all");selectLibraryView("needs-review");}}>Needs Review</WorkspaceButton>
             <WorkspaceButton aria-pressed={collection === "all" && view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView("duplicate-urls");}}>Duplicate URLs</WorkspaceButton>
           </>}>
@@ -1142,6 +1091,10 @@ export default function ResourcesWorkspace({
             <ViewCycleButton data-toolbar-view value={density} onChange={next => { setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }} />
           </WorkspaceToolbar>
 
+          <div className={styles.resourceTypeFilters} role="group" aria-label="Resource types">
+            <button type="button" aria-pressed={selectedTypes.size===resourceKinds.length} onClick={()=>toggleResourceType()}>All types</button>
+            {resourceKinds.map(type=><button type="button" key={type} aria-pressed={selectedTypes.has(type)} onClick={()=>toggleResourceType(type)}>{type==="components" ? "Components" : TYPE_LABELS[type as ResourceType]}</button>)}
+          </div>
           {initialLoadError ? (
             <SystemState variant="error" title="Resources could not be loaded" description={initialLoadError} />
           ) : unavailableViewReason ? (

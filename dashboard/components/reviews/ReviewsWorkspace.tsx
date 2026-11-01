@@ -827,14 +827,7 @@ export default function ReviewsWorkspace({
         { id: "archive", label: "Archive", count: state.runs.filter((run) => run.lifecycle === "archived").length, active: urlState.view === "archived", onSelect: () => selectDirectoryScope({ view: "archived", filter: "archived" }) }
       ]
     },
-    {
-      id: "cadence",
-      label: "Cadence",
-      items: [
-        { id: "weekly", label: "Weekly", count: directoryItems.filter((item) => item.run.cadence === "weekly").length, active: urlState.cadence === "weekly", onSelect: () => selectDirectoryScope({ cadence: urlState.cadence === "weekly" ? "all" : "weekly" }) },
-        { id: "monthly", label: "Monthly", count: directoryItems.filter((item) => item.run.cadence === "monthly").length, active: urlState.cadence === "monthly", onSelect: () => selectDirectoryScope({ cadence: urlState.cadence === "monthly" ? "all" : "monthly" }) }
-      ]
-    },
+
 
   ], [directoryItems, legacyRuns.length, needsEvidence.length, openNative.length, selectDirectoryScope, state.runs, urlState.cadence, urlState.view]);
 
@@ -1972,8 +1965,8 @@ export default function ReviewsWorkspace({
         </WorkspaceHeader>
         {!selectedRun && renderSourceHandoff(null)}
         {initialLoadError && <SystemState variant="error" description={initialLoadError} action={{ label: "Retry", onSelect: () => void refreshState() }} />}
-        <WorkspaceToolbar query={queryDraft} onQuery={value=>{setQueryDraft(value); if(queryTimer.current)clearTimeout(queryTimer.current);queryTimer.current=setTimeout(()=>updateUrl({query:value}),180);}} placeholder="Search reviews" activeFilters={urlState.filter === "all" ? 0 : 1}
-          filters={<>{(Object.keys(FILTER_LABELS) as ReviewsFilter[]).map(filter=><WorkspaceButton key={filter} aria-pressed={urlState.filter===filter} onClick={()=>updateUrl({filter})}>{FILTER_LABELS[filter]}</WorkspaceButton>)}</>}>
+        <WorkspaceToolbar query={queryDraft} onQuery={value=>{setQueryDraft(value); if(queryTimer.current)clearTimeout(queryTimer.current);queryTimer.current=setTimeout(()=>updateUrl({query:value}),180);}} placeholder="Search reviews" activeFilters={(urlState.filter === "all" ? 0 : 1) + (urlState.cadence === "all" ? 0 : 1)}
+          filters={<div className={styles.reviewFilters}><strong>Period</strong>{(["all","weekly","monthly"] as const).map(cadence => <WorkspaceButton key={cadence} aria-pressed={urlState.cadence===cadence} onClick={()=>selectDirectoryScope({cadence})}>{cadence==="all" ? "All periods" : cadence==="weekly" ? "Weekly" : "Monthly"}</WorkspaceButton>)}<strong>Status</strong>{(Object.keys(FILTER_LABELS) as ReviewsFilter[]).map(filter=><WorkspaceButton key={filter} aria-pressed={urlState.filter===filter} onClick={()=>updateUrl({filter})}>{FILTER_LABELS[filter]}</WorkspaceButton>)}</div>}>
           <SelectField className="work-compact-select" value={urlState.sort} onChange={event=>updateUrl({sort:event.target.value as ReviewsSort})} aria-label="Sort reviews">{(Object.keys(SORT_LABELS) as ReviewsSort[]).map(sort=><option key={sort} value={sort}>{SORT_LABELS[sort]}</option>)}</SelectField>
         <ViewCycleButton data-toolbar-view value={directoryView} onChange={changeDirectoryView}/></WorkspaceToolbar>
         {error && <p className={styles.error} role="alert">{error}</p>}

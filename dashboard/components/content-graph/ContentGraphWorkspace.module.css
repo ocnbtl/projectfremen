@@ -1928,3 +1928,13 @@
  .shell[data-module="notes"]:not(.detailShell) .mobileInspectorButton {display:none;}
  .shell[data-module="notes"] :global(.work-header) .mobileMenuButton {position:static;margin:0;width:44px;padding:8px;}
 }
+
+.resourceTypeFilters {display:flex;flex-wrap:wrap;gap:6px;padding:4px 16px 16px;}
+.resourceTypeFilters button {padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--text-muted);background:var(--surface-panel,#fff);font:500 12px var(--font-body);transition:background-color 200ms ease,border-color 200ms ease,color 200ms ease;cursor:pointer;}
+.resourceTypeFilters button[aria-pressed="true"] {background:var(--module-primary-50);color:var(--module-primary-700);border-color:var(--module-primary-200);}
+.resourceDuplicates {margin:0 16px 16px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-panel,#fff);}
+.resourceDuplicates>div {display:flex;gap:10px;align-items:center;}.resourceDuplicates h2 {font-size:16px;font-weight:600;flex:1;margin:0;}.resourceDuplicates p {font-size:13px;color:var(--text-muted);}
+.resourceDuplicates article {padding:12px 0;}.resourceDuplicates article>strong{font-size:13px;}.resourceDuplicates article>div{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}.resourceDuplicates article button{display:flex;align-items:center;gap:7px;max-width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--module-primary-50);color:var(--text);cursor:pointer;}
+@media(prefers-reduced-motion:reduce){.resourceTypeFilters button{transition:none;}}
+
+.resourceTypeFilters>button{display:inline-flex;align-items:center;justify-content:center;width:auto!important;min-width:0;flex:0 0 auto;box-shadow:none!important;}.resourceDuplicates article button{width:auto!important;flex:0 1 auto;}.resourceDuplicates>div>button{width:auto!important;flex:none;}.resourceDuplicateButton{width:38px!important;min-width:38px!important;height:38px;flex:0 0 38px!important;padding:0!important;display:grid!important;place-items:center;}.resourceTypeFilters>button:hover{background:var(--module-primary-100);}

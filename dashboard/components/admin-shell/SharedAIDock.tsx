@@ -82,8 +82,8 @@ function clampLauncher(point: DockPoint, width: number, height: number): DockPoi
 }
 
 function clampPanel(rect: DockRect): DockRect {
-  const width = Math.min(Math.max(320, rect.width), Math.max(320, window.innerWidth - (DOCK_VIEWPORT_GAP * 2)));
-  const height = Math.min(Math.max(360, rect.height), Math.max(360, window.innerHeight - (DOCK_VIEWPORT_GAP * 2)));
+  const width = Math.min(Math.max(320, rect.width), Math.max(1, window.innerWidth - (DOCK_VIEWPORT_GAP * 2)));
+  const height = Math.min(Math.max(360, rect.height), Math.max(1, window.innerHeight - (DOCK_VIEWPORT_GAP * 2)));
   return {
     width,
     height,
@@ -359,11 +359,11 @@ function SharedAIDockSurface({
             onPointerUp={endPanelDrag}
             onPointerCancel={endPanelDrag}
           >
-            <span className="shared-ai-dock__drag-handle" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
+            <span className="shared-ai-dock__drag-handle" aria-hidden="true"><UnigentamosIcon role="message" size={22}/></span>
             <div className="shared-ai-dock__heading">
-              <span>Workspace assistant</span>
+              <span>{MODULE_LABELS[context.module]}</span>
               <div>
-                <h2 id={titleId}>{title}</h2>
+                <h2 id={titleId}>{title === "Unigentamos AI" ? "Assistant" : title}</h2>
                 <span className="shared-ai-dock__connection-state"><i aria-hidden="true" />Not connected</span>
               </div>
             </div>
@@ -386,30 +386,15 @@ function SharedAIDockSurface({
             </div>
             <div className="shared-ai-dock__empty-state">
               <span className="shared-ai-dock__empty-icon" aria-hidden="true"><UnigentamosIcon role="message" /></span>
-              <div><h3>Connect a local model</h3><p id={descriptionId}>This panel is ready to hold context, but a model connector has not been configured.</p></div>
+              <div><h3>Assistant isn’t connected</h3><p id={descriptionId}>A model hasn’t been connected yet. Your workspace context is ready above.</p></div>
             </div>
-            <div className="shared-ai-dock__local-setup" aria-label="Local AI connection brief">
-              <ol>
-                <li><strong>Run Ollama locally.</strong><span>Install Ollama, download a model, and confirm it responds on your device.</span></li>
-                <li><strong>Add a server-side bridge.</strong><span>Connect the app server to the private Ollama endpoint, normally <code>127.0.0.1:11434</code>. This connector is not included yet.</span></li>
-                <li><strong>Keep access private.</strong><span>For the hosted site, use an authenticated local relay or private network. Do not expose Ollama directly to the public internet.</span></li>
-              </ol>
-              <p>Until that bridge is implemented and authorized, the assistant cannot read records, send prompts, or write changes.</p>
-            </div>
-            {context.allowedActions && context.allowedActions.length > 0 && (
-              <div className="shared-ai-dock__permissions">
-                <span>When connected</span>
-                <ul>
-                  {context.allowedActions.map((action) => <li key={action}>{action}</li>)}
-                </ul>
-              </div>
-            )}
+            <details className="shared-ai-dock__connection-info"><summary><UnigentamosIcon role="settings" size={16}/>Connection details</summary><p>Model setup is not available in this panel yet. No prompts or records are sent while disconnected.</p>{context.allowedActions && context.allowedActions.length>0 && <p>Once connected: {context.allowedActions.map(action=>titleCaseContext(action)).join(" · ")}</p>}</details>
           </div>
 
           <footer className="shared-ai-dock__footer">
             <label htmlFor={promptId}>Ask about this workspace</label>
             <div>
-              <textarea id={promptId} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Draft a prompt while disconnected…" />
+              <textarea id={promptId} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a draft…" />
               <button type="button" disabled title="AI assistant is disconnected" aria-label="Send message" data-icon-button="standard">
                 <UnigentamosIcon role="send" size={20} />
               </button>

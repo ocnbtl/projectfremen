@@ -1329,3 +1329,7 @@
 @media(max-width:700px) { .earlierReview {padding:12px;} .earlierReview :global(.review-form-grid) {grid-template-columns:minmax(0,1fr);} }
 
 .scroll { composes: workspace-canvas from global; }
+
+.reviewFilters{display:flex;flex-wrap:wrap;gap:6px;max-width:340px;}.reviewFilters>strong{flex-basis:100%;font-size:12px;font-weight:600;}.reviewFilters>strong:not(:first-child){margin-top:10px;}.reviewFilters>button{font-size:12px;padding:7px 10px;}
+
+.reviewFilters>button[aria-pressed="true"]{background:var(--module-primary-100);border-color:var(--module-primary-300);color:var(--module-primary-800);box-shadow:none;}

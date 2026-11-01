@@ -775,7 +775,7 @@ function defaultTemplateValues(item: PersonalOpsTemplate): Record<string, Templa
   return Object.fromEntries(item.fields.map((field) => [field.key, field.defaultValue ?? ""]));
 }
 
-function NativeReferenceList({ refs, empty = "No linked native objects." }: { refs: ReturnType<typeof refsFor>; empty?: string }) {
+function NativeReferenceList({ refs, empty = "No linked items." }: { refs: ReturnType<typeof refsFor>; empty?: string }) {
   if (!refs.length) return <p className={styles.mutedCopy}>{empty}</p>;
   return (
     <ul className={styles.referenceList}>
@@ -1669,8 +1669,8 @@ export default function PersonalOpsAdvancedWorkspace({
                     {activeTab === "overview" && (
                       <>
                         <PersonalOpsStateGrid items={selectedItem.objectType === "routine" ? [
-                          { id: "lifecycle", label: "Lifecycle", value: cleanLabel(selectedItem.lifecycle), detail: "definition state", tone: toneFor(selectedItem.lifecycle) },
-                          { id: "cadence", label: "Cadence", value: cleanLabel(selectedItem.cadence), detail: "schedule state", tone: toneFor(selectedItem.cadence) },
+                          { id: "lifecycle", label: "Status", value: cleanLabel(selectedItem.lifecycle), tone: toneFor(selectedItem.lifecycle) },
+                          { id: "cadence", label: "Cadence", value: cleanLabel(selectedItem.cadence), tone: toneFor(selectedItem.cadence) },
                           { id: "frequency", label: "Frequency", value: cleanLabel(selectedItem.cadenceRule.frequency), detail: formatRoutineReminder(selectedItem) },
                           { id: "next-run", label: "Next run", value: formatRoutineNextRun(selectedItem), detail: selectedItem.nextRunDate && selectedItem.nextRunTime ? "date and time" : selectedItem.nextRunDate ? "date only" : selectedItem.nextRunTime ? "time only" : "not scheduled" }
                         ] : selectedItem.objectType === "capture_item" ? [
@@ -1679,7 +1679,7 @@ export default function PersonalOpsAdvancedWorkspace({
                           { id: "health", label: "Health", value: cleanLabel(selectedItem.health), detail: "source confidence not scored", tone: toneFor(selectedItem.health) },
                           { id: "review", label: "Review", value: cleanLabel(selectedItem.review), detail: "manual review state", tone: toneFor(selectedItem.review) }
                         ] : [
-                          { id: "lifecycle", label: "Lifecycle", value: cleanLabel(selectedItem.lifecycle), detail: "definition lifecycle", tone: toneFor(selectedItem.lifecycle) },
+                          { id: "lifecycle", label: "Lifecycle", value: cleanLabel(selectedItem.lifecycle), tone: toneFor(selectedItem.lifecycle) },
                           { id: "availability", label: "Availability", value: cleanLabel(selectedItem.availability), detail: "future use only", tone: toneFor(selectedItem.availability) },
                           { id: "health", label: "Health", value: cleanLabel(selectedItem.health), detail: "validation state", tone: toneFor(selectedItem.health) },
                           { id: "review", label: "Review", value: cleanLabel(selectedItem.review), detail: "manual review state", tone: toneFor(selectedItem.review) }
@@ -1690,7 +1690,7 @@ export default function PersonalOpsAdvancedWorkspace({
                           </PersonalOpsPanel>
                           {selectedItem.objectType === "capture_item" && <PersonalOpsPanel title="Source provenance"><dl className={styles.metadataList}><div><dt>Source</dt><dd>{selectedItem.source.label}</dd></div><div><dt>Captured</dt><dd>{formatTimestamp(selectedItem.source.capturedAt)}</dd></div><div><dt>Raw edited</dt><dd>Never</dd></div></dl></PersonalOpsPanel>}
                           {selectedItem.objectType === "template" && <PersonalOpsPanel title="Creation contract"><p>{selectedItem.generatedDefinitions.length} destination definition{selectedItem.generatedDefinitions.length === 1 ? "" : "s"}; testing is non-writing and confirmed use creates one native object.</p></PersonalOpsPanel>}
-                          <PersonalOpsPanel title="Native links"><NativeReferenceList refs={refsFor(selectedItem)} /></PersonalOpsPanel>
+                          <PersonalOpsPanel title="Linked items"><NativeReferenceList refs={refsFor(selectedItem)} /></PersonalOpsPanel>
                         </div>
                       </>
                     )}

@@ -2588,3 +2588,39 @@ button.metric {
 @media (prefers-reduced-motion:reduce) {.cardStatusControl .cardStatusSelect {transition:none;}}
 
 .personalCardMeta .personalCardType {align-self:flex-start;margin-top:2px;}
+
+/* Card pills roll open without an extra trigger box or arrow. */
+.cardStatusPill {display:inline-flex;align-items:center;padding:0;border:0;border-radius:999px;background:none;cursor:pointer;min-height:30px;}
+.cardStatusPill .statusChip {font-size:12px;padding:5px 9px;transition:background-color 220ms ease,box-shadow 220ms ease;}
+.cardStatusPill:is(:hover,:focus-visible) .statusChip {box-shadow:0 0 0 2px var(--module-primary-200,#bcd7f7);}
+.cardStatusPill:disabled {cursor:default;opacity:.7;}
+.cardStatusRoll {z-index:var(--z-popover,1500);min-width:140px;padding:6px;border:1px solid var(--border,#d6e0e3);border-radius:16px;background:var(--surface-panel,#fff);box-shadow:0 12px 32px #10202616;transform-origin:var(--radix-popover-content-transform-origin);animation:statusRollIn 220ms cubic-bezier(.22,1,.36,1);}
+.cardStatusRoll[data-state="closed"] {animation:statusRollOut 160ms ease-in forwards;}
+.cardStatusRoll [role="option"] {display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;border:0;border-radius:12px;background:transparent;padding:7px;cursor:pointer;transition:background-color 180ms ease;}
+.cardStatusRoll [role="option"]:is(:hover,:focus-visible) {background:var(--module-primary-50,#edf4fd);outline:none;}
+.cardStatusRoll [role="option"]:disabled {opacity:.5;cursor:not-allowed;}
+@keyframes statusRollIn {from {opacity:0;clip-path:inset(0 0 100% 0 round 16px);transform:translateY(-3px);}to {opacity:1;clip-path:inset(0 round 16px);transform:translateY(0);}}
+@keyframes statusRollOut {to {opacity:0;clip-path:inset(0 0 100% 0 round 16px);transform:translateY(-3px);}}
+/* Detail pages use the same compact hierarchy and readable content width. */
+.inspectorHeader {padding:20px clamp(16px,3vw,40px) 0;border-bottom:0;gap:12px;background:var(--surface-panel,#fff);}
+.inspectorTop h2 {font-size:22px;font-weight:600;line-height:1.3;}
+.inspectorTop p {font-size:12px;line-height:1.5;color:var(--text-muted);}
+.inspectorTabs :global(.detail-tabs) {width:max-content;max-width:100%;gap:4px;padding:4px;border-radius:12px;background:var(--module-primary-50);}
+.inspectorTabs :global(.detail-tabs > button) {min-height:34px;border-radius:9px;padding:6px 14px;border:0!important;transition:background-color 220ms ease,color 220ms ease;}
+.inspectorTabs :global(.detail-tabs > button[aria-selected="true"]) {background:var(--surface-panel,#fff);box-shadow:0 1px 4px #10202610;}
+.inspectorScroll {padding:20px clamp(16px,3vw,40px) 28px;background:var(--shell-bg,#f5f7f7);}
+.inspectorScroll > *, .inspectorScroll > :global([role="tabpanel"]) > * {max-width:1240px;margin-inline:auto;}
+.panelGrid {gap:16px;margin-top:16px;align-items:start;}
+.panel {border-radius:14px;padding:18px;}
+.stateCard {min-height:64px;border-radius:12px;gap:6px;padding:12px 14px;}
+.inspectorScroll :is(h3,h4) {font-weight:600;font-size:14px;}
+.inspectorScroll :is(p,li,dd) {line-height:1.55;}
+@media(max-width:700px) {.panelGrid {grid-template-columns:1fr;}.stateGrid {grid-template-columns:repeat(2,minmax(0,1fr));}.panel{padding:14px;}.inspectorTop h2{font-size:19px;}.inspectorTabs :global(.detail-tabs > button){padding-inline:10px;}}
+@media(prefers-reduced-motion:reduce){.cardStatusRoll{animation:none!important;}.cardStatusPill .statusChip,.cardStatusRoll [role="option"],.inspectorTabs :global(.detail-tabs > button){transition:none;}}
+
+.inspectorHeader{box-sizing:border-box;width:100%;max-width:1280px;margin:0 auto;padding:20px;}.inspector .primaryButton{background:var(--module-primary-600);border-color:var(--module-primary-600);}.inspector .primaryButton:hover:not(:disabled){background:var(--module-primary-700);}.actionFooter{border-top:0;gap:8px;}
+
+.inspectorTabs :global(.detail-tabs>button){position:relative;isolation:isolate;}.inspectorTabs :global(.detail-tabs>button[aria-selected="true"]){background:transparent;box-shadow:none;}.inspectorTabs :global(.work-tab-marker){inset:0!important;width:100%!important;height:100%!important;z-index:0;border-radius:9px;background:var(--surface-panel,#fff);box-shadow:0 1px 4px #10202610;}.inspectorTabs :global(.detail-tabs>button>span:not(.work-tab-marker)){position:relative;z-index:1;}.inspectorScroll .mono{overflow-wrap:anywhere;}
+@media(max-width:600px){.inspectorTabs{overflow:visible;}.inspectorTabs :global(.detail-tabs){flex-wrap:wrap;width:100%;overflow:visible;}.inspectorTabs :global(.detail-tabs>button){font-size:11px;padding-inline:6px;flex:1 0 auto;min-width:0;}}
+
+.inspectorScroll .panel dl{display:grid;grid-template-columns:minmax(72px,110px) minmax(0,1fr);gap:10px 16px;margin:12px 0 0;align-items:start;}.inspectorScroll .panel dt{font-size:12px;color:var(--text-muted);}.inspectorScroll .panel dd{margin:0;font-size:13px;overflow-wrap:anywhere;}

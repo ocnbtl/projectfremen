@@ -202,6 +202,7 @@ export default function PersonalOpsSidebar({
           icon: "decision",
           unavailableReason: unavailableViews?.decisions
         }),
+        viewItem({ id: "obligations", label: "Obligations", view: "obligations", activeView, count: counts.obligations, icon: "check" }),
         viewItem({
           id: "routines",
           label: "Routines",
@@ -213,39 +214,9 @@ export default function PersonalOpsSidebar({
         })
       ]
     };
-  const dataSection: ModuleSidebarSection =
-    {
-      id: "data",
-      label: "Tools",
-      items: [
-        viewItem({
-          id: "inbox",
-          label: "Capture Inbox",
-          view: "inbox",
-          activeView,
-          count: counts.captures,
-          unavailableReason: unavailableViews?.inbox
-        }),
-        viewItem({
-          id: "templates",
-          label: "Templates",
-          view: "templates",
-          activeView,
-          count: counts.templates,
-          unavailableReason: unavailableViews?.templates
-        }),
-        ...(!isPersonalSystemView ? [{
-          id: "archived",
-          label: "Archived",
-          href: `${pathname}?filter=archived`,
-          active: filter === "archived",
-          count: counts.archived
-        }] : [])
-      ]
-    };
   const sections: ModuleSidebarSection[] = isPersonalSystemView
-    ? [commandSection, dataSection]
-    : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }, dataSection];
+    ? [commandSection]
+    : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }];
 
   sections.splice(1, 0, { id: "personal-systems", label: "Personal", items: ([ ["passwords", "Passwords", "password"], ["lists", "Lists", "list"], ["travel", "Travel", "travel"], ["personal-build", "Personal build", "build"], ["car", "Car", "car"], ["style-guide", "Style guide", "style-guide"], ["dog", "Pets", "dog"], ["health", "Health", "health"], ["meals", "Meals", "meals"], ["fitness", "Fitness", "fitness"] ] as const).map(([view, label, icon]) => ({ id: view, label, href: VIEW_ROUTES[view], active: activeView === view, icon: <PersonalOpsIcon name={icon}/> })) });
 
@@ -254,7 +225,7 @@ export default function PersonalOpsSidebar({
       title="Personal"
       onHome={onHome}
       description="Daily command, durable records, and personal systems."
-      sections={activeView === "command" ? [commandSection, dataSection] : sections}
+      sections={activeView === "command" ? [commandSection] : sections}
       className={styles.sidebar}
       mobileOpen={mobileOpen}
       onClose={onClose}
