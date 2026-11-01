@@ -1,4 +1,5 @@
 "use client";
+import { DirectoryLayout } from "./ui/DirectoryLayout";
 import ViewCycleButton from "./ui/ViewCycleButton";
 import SelectField from "./ui/SelectField";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "./admin-shell/WorkspaceKit";
@@ -1100,7 +1101,7 @@ export default function ResourcesWorkspace({
           ) : unavailableViewReason ? (
             <SystemState variant="read_only" title="This Resources view is staged" description={unavailableViewReason} />
           ) : visibleResources.length ? (
-            <div className={`${styles.list} resource-directory is-${density}`} data-density={density} data-library role="list" aria-label="Resources">
+            <DirectoryLayout view={density} className={`${styles.list} resource-directory is-${density}`} data-density={density} data-library role="list" aria-label="Resources">
               {visibleResources.map((resource) => {
                 const queueItem = reviewQueue.byResourceId.get(resource.id);
                 const duplicateItem = duplicateEvidence.byResourceId.get(resource.id);
@@ -1174,7 +1175,7 @@ export default function ResourcesWorkspace({
                   />
                 );
               })}
-            </div>
+            </DirectoryLayout>
           ) : (
             <SystemState
               variant="empty"

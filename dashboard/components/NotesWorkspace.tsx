@@ -1,4 +1,5 @@
 "use client";
+import { DirectoryLayout } from "./ui/DirectoryLayout";
 import SelectField from "./ui/SelectField";
 import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
 import RelatedRecords from "./planning/RelatedRecords";
@@ -2607,7 +2608,7 @@ export default function NotesWorkspace({
           ) : unavailableViewReason ? (
             <SystemState variant="read_only" title="This Notes view is staged" description={unavailableViewReason} />
           ) : visibleNotes.length ? (
-            <div className={`resource-directory ${density === "grid" ? "is-grid" : density === "compact" ? "is-compact" : ""}`} data-notes data-density={density} role="list" aria-label="Notes">
+            <DirectoryLayout view={density} className={`resource-directory ${density === "grid" ? "is-grid" : density === "compact" ? "is-compact" : ""}`} data-notes data-density={density} role="list" aria-label="Notes">
               {visibleNotes.map((note) => {
                 const item = noteRecordToDirectoryItem(note);
                 const propertyItem = propertyQueue.byNoteId.get(note.id);
@@ -2644,7 +2645,7 @@ export default function NotesWorkspace({
                   />
                 );
               })}
-            </div>
+            </DirectoryLayout>
           ) : (
             <SystemState variant="empty" title={notes.length ? "No Notes match this view" : "No Notes yet"} description={notes.length ? "Try a different search or filter." : "Choose New Note to capture an idea, meeting, or decision."} />
           )}

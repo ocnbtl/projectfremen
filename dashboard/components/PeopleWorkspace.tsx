@@ -1,4 +1,5 @@
 "use client";
+import { DirectoryLayout, MorphingArticle, MorphingDiv, MorphingSpan } from "./ui/DirectoryLayout";
 import SearchField from "./ui/SearchField";
 import ViewCycleButton from "./ui/ViewCycleButton";
 import PlaceSync from "./planning/PlaceSync";
@@ -4306,7 +4307,7 @@ export default function PeopleWorkspace({
           </section>
         ) : visiblePeople.length > 0 ? (
           <>
-          <div className={`people-directory-list is-${listMode}`}>
+          <DirectoryLayout view={listMode} className={`people-directory-list is-${listMode}`}>
             {visiblePeople.map((record) => {
               const profile = getProfile(record);
               const category = record.className === "person" ? getPrimaryGroup(record) : "";
@@ -4316,12 +4317,12 @@ export default function PeopleWorkspace({
               const classification = organizationLabels(profile);
               const description = profile.context || "";
               return (
-                <article
+                <MorphingArticle
                   className={`people-directory-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
                   data-record-kind={record.className} data-record-id={record.id}
                   key={record.id}
                 >
-                  <div className="people-directory-row-body">
+                  <MorphingDiv className="people-directory-row-body">
                     <button type="button" className="people-card-open" aria-label={`Open ${record.title}`} aria-pressed={selectedPerson?.id === record.id} onClick={() => selectPerson(record)} />
                     <PeopleProfileAvatar organization={record.className === "org"}
                       label={record.title}
@@ -4332,21 +4333,21 @@ export default function PeopleWorkspace({
                     />
                     <span className="people-row-content">
                       <span className="people-row-heading">
-                      <span className="people-row-name"><span className="people-row-title"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>, aka {profile.nickname}</em>}</span>{occupations.length > 0 && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" /><span className="people-occupation-pairs">{occupations.map(({title, employer}, index) => <span className="people-occupation-pair" key={`${title}-${employer?.id || index}`}><span>{title}</span>{employer?.profile?.photoUrl && <span className="people-employer-picture" title={employer.title}><PeopleProfileAvatar organization label={employer.title} initials={getInitials(employer)} photoUrl={employer.profile.photoUrl} photoUpdatedAt={employer.profile.photoUpdatedAt} compact /></span>}</span>)}</span></span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
-                      <span className="people-row-contact"><span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><span className="people-classification-tags">{record.className === "org" ? <>{classification.type && <em title="Organization type"><PeopleIcon name="organization" />{classification.type}</em>}{classification.industry && <em title="Industry">{classification.industry}</em>}{!classification.type && <em>Not classified</em>}</> : <em title={category}>{category}</em>}</span><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
+                      <MorphingSpan className="people-row-name"><span className="people-row-title"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>, aka {profile.nickname}</em>}</span>{occupations.length > 0 && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" /><span className="people-occupation-pairs">{occupations.map(({title, employer}, index) => <span className="people-occupation-pair" key={`${title}-${employer?.id || index}`}><span>{title}</span>{employer?.profile?.photoUrl && <span className="people-employer-picture" title={employer.title}><PeopleProfileAvatar organization label={employer.title} initials={getInitials(employer)} photoUrl={employer.profile.photoUrl} photoUpdatedAt={employer.profile.photoUpdatedAt} compact /></span>}</span>)}</span></span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</MorphingSpan>
+                      <MorphingSpan className="people-row-contact"><span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><span className="people-classification-tags">{record.className === "org" ? <>{classification.type && <em title="Organization type"><PeopleIcon name="organization" />{classification.type}</em>}{classification.industry && <em title="Industry">{classification.industry}</em>}{!classification.type && <em>Not classified</em>}</> : <em title={category}>{category}</em>}</span><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
                       {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
                         {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, latestInteractionDateByParticipant.get(record.id))}</span>}
                         {record.time.nextReview && <span title="Follow-up"><PeopleIcon name="follow-up" />{getDirectoryNextContactLabel(record)}</span>}
                       </span>}
-                      </span></span>
-                      {description && <span className="people-row-description">{description}</span>}
+                      </MorphingSpan></span>
+                      {description && <MorphingSpan className="people-row-description">{description}</MorphingSpan>}
                       {linkedPeople.length > 0 && <span className="people-row-linked" aria-label="Linked people">{linkedPeople.slice(0, 3).map(person => <button type="button" className="people-row-linked-person" key={person.id} aria-label={`Open ${person.title}`} onClick={() => selectPerson(person)}><PeopleProfileAvatar label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /><span>{person.title}</span></button>)}{linkedPeople.length > 3 && <span title={linkedPeople.slice(3).map(person => person.title).join(", ")}>+{linkedPeople.length - 3}</span>}</span>}
                     </span>
-                  </div>
-                </article>
+                  </MorphingDiv>
+                </MorphingArticle>
               );
             })}
-          </div>
+          </DirectoryLayout>
 
           </>
         ) : (

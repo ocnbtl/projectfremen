@@ -1,4 +1,5 @@
 "use client";
+import { MorphingSpan } from "../ui/DirectoryLayout";
 import { useState } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { CSSProperties, ReactNode } from "react";
@@ -31,7 +32,7 @@ export function ResourceMark({ gradient, className = "", label, imageUrl, resour
   const icon = resource?.provenance.subjects.find(t=>t.startsWith("Icon:"))?.slice(5).trim();
   const selectedIcon = role && ICON_REGISTRY_BY_ID.has(role) ? <UnigentamosIcon role={role} size={24}/> : icon && PERSONAL_OPS_ICON_LIBRARY.some(i=>i.name===icon) ? <PersonalOpsIcon name={icon as PersonalOpsIconName}/> : null;
   let safe="";try{const u=new URL(imageUrl || "");if(u.protocol==="https:"&&!u.username&&!u.password)safe=u.href;}catch{}
-  return <span className={[styles.resourceMark,className].filter(Boolean).join(" ")} aria-label={label} aria-hidden={label?undefined:true}>{selectedIcon || (safe&&failedSource!==safe?<img key={safe} src={safe} alt="" referrerPolicy="no-referrer" ref={image=>{if(image?.complete && image.naturalWidth===0)setFailedSource(safe);}} onError={()=>setFailedSource(safe)}/>:<UnigentamosIcon role="resource" size={24}/>)}</span>;
+  return <MorphingSpan resize className={[styles.resourceMark,className].filter(Boolean).join(" ")} aria-label={label} aria-hidden={label?undefined:true}>{selectedIcon || (safe&&failedSource!==safe?<img key={safe} src={safe} alt="" referrerPolicy="no-referrer" ref={image=>{if(image?.complete && image.naturalWidth===0)setFailedSource(safe);}} onError={()=>setFailedSource(safe)}/>:<UnigentamosIcon role="resource" size={24}/>)}</MorphingSpan>;
 }
 
 export function ResourceIconButton({

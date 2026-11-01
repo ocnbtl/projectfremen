@@ -1,4 +1,5 @@
 "use client";
+import { DirectoryLayout } from "../ui/DirectoryLayout";
 import * as Popover from "@radix-ui/react-popover";
 import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
 import SelectField from "../ui/SelectField";
@@ -714,7 +715,7 @@ export default function MediaLibrary({
             </Button>
           </div>
         )}
-      <div className={`resource-directory media-directory ${view === "grid" || view === "gallery" ? "is-grid" : view === "compact" ? "is-compact" : ""}`} role="list" aria-label="Media assets">
+      <DirectoryLayout view={view} className={`resource-directory media-directory ${view === "grid" || view === "gallery" ? "is-grid" : view === "compact" ? "is-compact" : ""}`} role="list" aria-label="Media assets">
         {visible.map(object => {
           const manifest = manifestFor(object), pending = pendingCanonicalCommands(object).length > 0;
           return <DirectoryCard key={object.objectId} id={object.objectId}
@@ -733,7 +734,7 @@ export default function MediaLibrary({
           icon="module-media" gallery={view === "gallery"} status="File reference" statusIcon="information" tag="File reference"
           description={record.body || undefined} metadata="No file attached"
           href={`/admin/media/${encodeURIComponent(record.id)}`} />)}
-      </div>
+      </DirectoryLayout>
       {!catalogueLoaded && !error && <LogoLoader label="Loading Media" />}
       {!visible.length && !legacy.length && catalogueLoaded && (
         <WorkspaceEmpty

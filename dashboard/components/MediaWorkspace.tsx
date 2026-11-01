@@ -1,4 +1,5 @@
 "use client";
+import { DirectoryLayout } from "./ui/DirectoryLayout";
 import ViewCycleButton, { type DirectoryView } from "./ui/ViewCycleButton";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
 import { WorkspaceNavSlot } from "./admin-shell/WorkspaceTopbar";
@@ -2443,7 +2444,7 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className={`resource-directory is-${density}`} data-density={density} role="list">
+                    <DirectoryLayout view={density} className={`resource-directory is-${density}`} data-density={density} role="list">
                       {group.assets.map((asset) => {
                         const evidence = rightsEvidenceById.get(asset.id) || buildMediaRightsEvidence(asset);
                         return (
@@ -2471,7 +2472,7 @@ export default function MediaWorkspace({
                           />
                         );
                       })}
-                    </div>
+                    </DirectoryLayout>
                   </section>
                 ))}
               </div>
@@ -2501,7 +2502,7 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className={`resource-directory is-${density}`} data-density={density} role="list">
+                    <DirectoryLayout view={density} className={`resource-directory is-${density}`} data-density={density} role="list">
                       {group.assets.map((asset) => {
                         const checks = legacyReadinessChecks(asset);
                         const supported = checks.filter((check) => check.supported).length;
@@ -2534,7 +2535,7 @@ export default function MediaWorkspace({
                           />
                         );
                       })}
-                    </div>
+                    </DirectoryLayout>
                   </section>
                 ))}
               </div>
@@ -2558,7 +2559,7 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className={`resource-directory is-${density}`} data-density={density} role="list">
+                    <DirectoryLayout view={density} className={`resource-directory is-${density}`} data-density={density} role="list">
                       {group.assets.map((asset) => {
                         const evidence = metadataEvidenceById.get(asset.id) || buildMediaMetadataEvidence(asset);
                         return (
@@ -2586,7 +2587,7 @@ export default function MediaWorkspace({
                           />
                         );
                       })}
-                    </div>
+                    </DirectoryLayout>
                   </section>
                 ))}
               </div>
@@ -2609,7 +2610,7 @@ export default function MediaWorkspace({
               }
             />
           ) : (
-            <div className={`resource-directory is-${density}`} data-density={density} role="list" aria-label="Media assets">
+            <DirectoryLayout view={density} className={`resource-directory is-${density}`} data-density={density} role="list" aria-label="Media assets">
               {visibleAssets.map((asset) => (
                 <DirectoryCard icon="module-media" status={displayLabel(asset.lifecycleState)} statusIcon={asset.lifecycleState === "archived" ? "archive" : "information"} tag={displayLabel(asset.type)}
                   id={asset.id}
@@ -2636,7 +2637,7 @@ export default function MediaWorkspace({
                   key={asset.id}
                 />
               ))}
-            </div>
+            </DirectoryLayout>
           )}
         </div>
       </DirectoryPane>

@@ -1,4 +1,5 @@
 "use client";
+import { DirectoryLayout, MorphingLi, MorphingSpan } from "../ui/DirectoryLayout";
 import SearchField from "../ui/SearchField";
 import { WorkspaceNavSlot } from "../admin-shell/WorkspaceTopbar";
 
@@ -147,18 +148,18 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
     </WorkspaceNavSlot>
     {error ? <div role="alert" className="notes-empty-state"><h2>Interactions could not be loaded</h2><p>{error}</p><button onClick={() => window.location.reload()}>Reload</button></div> : <>
       <p className="people-visually-hidden" role="status">{filtered.length} matching interactions</p>
-      {filtered.length ? <div className="people-interaction-groups">{[...groups].map(([month, entries]) => <section key={month} aria-label={month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}>
-        <h2>{month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}</h2><ul>{entries.map(item => <li key={item.id}><button className="people-interaction-row" data-interaction-id={item.id} aria-current={selected?.id === item.id ? "true" : undefined} aria-controls="people-interaction-panel" aria-label={`View interaction: ${item.title}`} onClick={() => navigate({ interaction: item.id }, true)}>
-          <span className="people-interaction-row-identity"><span className="people-interaction-row-avatars" aria-hidden="true">{item.participantIds.slice(0, 2).map(id => {
+      {filtered.length ? <DirectoryLayout view={density} className="people-interaction-groups">{[...groups].map(([month, entries]) => <section key={month} aria-label={month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}>
+        <h2>{month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}</h2><ul>{entries.map(item => <MorphingLi key={item.id}><button className="people-interaction-row" data-interaction-id={item.id} aria-current={selected?.id === item.id ? "true" : undefined} aria-controls="people-interaction-panel" aria-label={`View interaction: ${item.title}`} onClick={() => navigate({ interaction: item.id }, true)}>
+          <MorphingSpan className="people-interaction-row-identity"><span className="people-interaction-row-avatars" aria-hidden="true">{item.participantIds.slice(0, 2).map(id => {
             const person = people.find(person => person.id === id);
             return <PeopleProfileAvatar organization={person?.className === "org"} key={id} label={person?.title || "Profile unavailable"} initials={person ? initials(person.title) : "?"} photoUrl={person?.profile?.photoUrl} photoUpdatedAt={person?.profile?.photoUpdatedAt} compact />;
           })}{item.participantIds.length > 2 && <span className="people-interaction-extra-participants">+{item.participantIds.length - 2}</span>}</span>
-            <span className="people-interaction-row-main"><strong>{item.title}</strong><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span></span>
-          </span>
-          {item.summary && <span className="people-interaction-row-notes">{item.summary}</span>}
-          <span className="people-interaction-row-footer"><span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}><UnigentamosIcon role="interaction-date" size={14} />{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time>{interactionTimeLabel(item.startTime, item.endTime) && <small><UnigentamosIcon role="clock" size={14} />{interactionTimeLabel(item.startTime, item.endTime)}</small>}<InteractionTypeBadge kind={item.kind} /></span><UnigentamosIcon role="chevron-right" size={16} /></span>
-        </button></li>)}</ul>
-      </section>)}</div> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
+            <MorphingSpan className="people-interaction-row-main"><strong>{item.title}</strong><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span></MorphingSpan>
+          </MorphingSpan>
+          {item.summary && <MorphingSpan className="people-interaction-row-notes">{item.summary}</MorphingSpan>}
+          <MorphingSpan className="people-interaction-row-footer"><span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}><UnigentamosIcon role="interaction-date" size={14} />{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time>{interactionTimeLabel(item.startTime, item.endTime) && <small><UnigentamosIcon role="clock" size={14} />{interactionTimeLabel(item.startTime, item.endTime)}</small>}<InteractionTypeBadge kind={item.kind} /></span><UnigentamosIcon role="chevron-right" size={16} /></MorphingSpan>
+        </button></MorphingLi>)}</ul>
+      </section>)}</DirectoryLayout> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
       {filtered.length > limit && <button className="people-interactions-more" onClick={() => setLimit(current => current + 50)}>Show more · {filtered.length - limit} remaining</button>}
     </>}
     {detailTarget && createPortal(<InteractionDetail item={selected} people={people} explicitSelection={Boolean(selectedId)} empty={!selectedId && !filtered.length} error={error} onBack={backToList} onOpenPerson={onOpenPerson} />, detailTarget)}

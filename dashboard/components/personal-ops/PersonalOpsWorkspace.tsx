@@ -1,5 +1,7 @@
 "use client";
+import { DirectoryLayout, MorphingArticle, MorphingDiv, MorphingButton, MorphingP, usePersonalDirectoryView } from "../ui/DirectoryLayout";
 import PersonalCardStatusControl, { personalCardStatusChoices } from "./PersonalCardStatusControl";
+import ViewCycleButton from "../ui/ViewCycleButton";
 import PersonalHome from "./PersonalHome";
 import { EventObjectPreview } from "../planning/EventLinksPreview";
 import { EventObjectIdentity } from "../planning/EventObjects";
@@ -1068,6 +1070,7 @@ export default function PersonalOpsWorkspace({
   const repository = useMemo(() => createPersonalOpsRepository(), []);
   const urlState = useMemo(() => parsePersonalOpsUrlState(searchParams), [searchParams]);
   const [state, setState] = useState(initialState);
+  const [directoryView, setDirectoryView] = usePersonalDirectoryView();
   const [legacyGoals, setLegacyGoals] = useState(initialLegacyGoals);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(Boolean(urlState.selected));
@@ -1574,6 +1577,7 @@ export default function PersonalOpsWorkspace({
           </WorkspaceHeader>
           <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<div><PersonalOpsFilterRail items={filterItems.map(({count, ...item}) => item)} ariaLabel="Filter by status" className={styles.statusFilterMenu} /><strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</div>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
+            <ViewCycleButton data-toolbar-view value={directoryView} onChange={setDirectoryView}/>
           </WorkspaceToolbar>
 
 
@@ -1593,19 +1597,19 @@ export default function PersonalOpsWorkspace({
                 : { label: `Create ${FAMILY_LABELS[primaryFamily]}`, onSelect: () => openCreate(primaryFamily) }}
             />
           ) : (
-            <section className={styles.personalCards} aria-label="Personal records">{scopedItems.map(item => <article key={item.id} data-selected={item.id === urlState.selected || undefined}>
-              <div className={styles.personalCardTop}>
+            <DirectoryLayout view={directoryView} className={styles.personalCards} role="list" aria-label="Personal records">{scopedItems.map(item => <MorphingArticle key={item.id} role="listitem" data-selected={item.id === urlState.selected || undefined}>
+              <MorphingDiv className={styles.personalCardTop}>
               <div className={styles.personalCardLinks} aria-label="Linked objects">
                 {item.source === "legacy-goal" ? item.organizationId ? <EventObjectPreview showName record={{module:"people",objectType:"organization",objectId:item.organizationId,label:item.entity,route:`/admin/people?organization=${encodeURIComponent(item.organizationId)}`,preview:{imageUrl:item.imageUrl,imageUpdatedAt:item.imageUpdatedAt}} as NativeObjectRef}/> : <span title={item.projectLabel}><EventObjectIdentity record={{module:"people",objectType:"organization",objectId:item.slug,label:item.entity,route:"",preview:{imageUrl:item.imageUrl,imageUpdatedAt:item.imageUpdatedAt}}}/><span className={styles.personalCardLinkLabel}>{item.entity}</span></span> : cardLinks(item).map(ref => ref.module === "people" && ["person","organization"].includes(ref.objectType) ? <EventObjectPreview key={`${ref.module}:${ref.objectId}`} showName record={{...ref,preview:linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`]} as NativeObjectRef}/> : <Link prefetch={false} href={ref.route} key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || ""}:${ref.objectId}`} title={ref.label}><EventObjectIdentity record={{...ref,preview:linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`]}}/><span className={styles.personalCardLinkLabel}>{ref.label}</span></Link>)}
               </div>
               <div className={styles.personalCardDates}>
                 {item.source === "native" && <><time dateTime={item.createdAt} title={`Created ${formatTimestamp(item.createdAt)}`}><PersonalOpsIcon name="today"/>Created {formatDate(item.createdAt)}</time>{item.dueAt && <time dateTime={item.dueAt} title="Due date"><PersonalOpsIcon name="week"/>Due {formatDate(item.dueAt)}</time>}</>}
               </div>
-              </div>
-              <button type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></button>
-              <p className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</p>
-              <div className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? [{value:"active"}, {value:"complete"}] : personalCardStatusChoices(item)} disabled={busy} onSave={next => saveCardStatus(item, next)} /></div>
-            </article>)}</section>
+              </MorphingDiv>
+              <MorphingButton type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></MorphingButton>
+              <MorphingP className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</MorphingP>
+              <MorphingDiv className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? [{value:"active"}, {value:"complete"}] : personalCardStatusChoices(item)} disabled={busy} onSave={next => saveCardStatus(item, next)} /></MorphingDiv>
+            </MorphingArticle>)}</DirectoryLayout>
           )}
         </div>
 

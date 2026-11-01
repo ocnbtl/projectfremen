@@ -1,4 +1,5 @@
 "use client";
+import { DirectoryLayout } from "../ui/DirectoryLayout";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "../people/PeopleProfilePhoto";
 import SelectField from "../ui/SelectField";
 import ProjectProperties from "./ProjectProperties";
@@ -3134,7 +3135,7 @@ export default function ProjectsWorkspace({
           }}><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="grid">Grid</option></SelectField>
         </WorkspaceToolbar>
         {visibleProjects.length ? (
-          <div className={`resource-directory ${grid ? "is-grid" : compact ? "is-compact" : ""}`} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
+          <DirectoryLayout view={grid ? "grid" : compact ? "compact" : "comfortable"} className={`resource-directory ${grid ? "is-grid" : compact ? "is-compact" : ""}`} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
             {visibleProjects.map((item) => {
               const milestone = nextMilestone(item);
               const attention = item.attentionReasons.find(reason=>!/objectives.*not defined/i.test(reason));
@@ -3159,7 +3160,7 @@ export default function ProjectsWorkspace({
                 actions={<button type="button" onClick={() => void toggleStar(item)} disabled={!item.project.editable || mutationBusy || ["complete", "archived"].includes(item.project.lifecycle)} aria-label={item.project.starred ? "Remove star" : "Star project"} aria-pressed={item.project.starred} data-active={item.project.starred || undefined}><UnigentamosIcon role="star" size={16} /></button>}
               />;
             })}
-          </div>
+          </DirectoryLayout>
         ) : (
           <SystemState
             variant="empty"

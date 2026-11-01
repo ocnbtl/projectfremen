@@ -1,4 +1,5 @@
 "use client";
+import { MorphingSpan } from "../ui/DirectoryLayout";
 import SelectField from "../ui/SelectField";
 
 import { useEffect, useRef, useState } from "react";
@@ -90,7 +91,7 @@ export function PeopleProfileAvatar({
       </button>
     );
   }
-  return <span className={`people-row-avatar people-profile-photo${compact ? " is-compact" : ""}`} data-photo-state={photoState}>{image}</span>;
+  return <MorphingSpan resize className={`people-row-avatar people-profile-photo${compact ? " is-compact" : ""}`} data-photo-state={photoState}>{image}</MorphingSpan>;
 }
 
 async function prepareProfilePhoto(editor: PhotoEditorDraft): Promise<File> {

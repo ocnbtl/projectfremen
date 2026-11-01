@@ -2624,3 +2624,15 @@ button.metric {
 @media(max-width:600px){.inspectorTabs{overflow:visible;}.inspectorTabs :global(.detail-tabs){flex-wrap:wrap;width:100%;overflow:visible;}.inspectorTabs :global(.detail-tabs>button){font-size:11px;padding-inline:6px;flex:1 0 auto;min-width:0;}}
 
 .inspectorScroll .panel dl{display:grid;grid-template-columns:minmax(72px,110px) minmax(0,1fr);gap:10px 16px;margin:12px 0 0;align-items:start;}.inspectorScroll .panel dt{font-size:12px;color:var(--text-muted);}.inspectorScroll .panel dd{margin:0;font-size:13px;overflow-wrap:anywhere;}
+/* Personal shares the directory view vocabulary without changing record order or identity. */
+.personalCards[data-directory-view="comfortable"] {grid-template-columns:repeat(2,minmax(0,1fr));}
+.personalCards[data-directory-view="compact"] {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.personalCards[data-directory-view="compact"] article {padding:14px;row-gap:6px;}
+.personalCards[data-directory-view="compact"] .personalCardSummary {-webkit-line-clamp:1;}
+.personalCards[data-directory-view="grid"] {grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:14px;}
+.personalCards[data-directory-view="grid"] article {padding:16px;}
+.personalCards[data-directory-view="grid"] .personalCardTop {flex-wrap:wrap;gap:8px;}
+@media(min-width:1600px){.personalCards[data-directory-view="compact"]{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:900px){.personalCards[data-directory-view="comfortable"],.personalCards[data-directory-view="compact"]{grid-template-columns:1fr;}}
+@media(max-width:600px){.personalCards[data-directory-view="grid"]{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-inline:12px;}.personalCards[data-directory-view="grid"] article{padding:10px;row-gap:8px;}.personalCards[data-directory-view="grid"] .personalCardTop{display:flex;flex-direction:column;align-items:flex-start;}.personalCards[data-directory-view="grid"] .personalCardDates{align-items:flex-start;flex-direction:column;gap:4px;font-size:10px;}.personalCards[data-directory-view="grid"] .personalCardLinks{max-width:100%;}.personalCards[data-directory-view="grid"] .personalCardOpen strong{font-size:13px;}.personalCards[data-directory-view="grid"] .personalCardMeta{gap:4px;}}
+@media(max-width:359px){.personalCards[data-directory-view="grid"]{grid-template-columns:1fr;}}
