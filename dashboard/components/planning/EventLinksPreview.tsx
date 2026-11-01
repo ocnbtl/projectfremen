@@ -1,6 +1,8 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useContext, useLayoutEffect, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
+import { CalendarLinkedWorkContext } from "./CalendarLinkedWorkContext";
+import { editableCalendarRef } from "../../lib/modules/planning/linked-work-types";
 import Link from "next/link";
 import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
@@ -13,8 +15,9 @@ import { useCalendarDetails } from "./CalendarDisplayPreferences";
 const identity = (ref: NativeObjectRef) => ref.objectType === "person" ? <PersonAvatar person={ref}/> : <EventObjectIdentity record={ref}/>;
 
 /** Preview here; navigate only when the user explicitly opens the profile. */
-export function EventObjectPreview({record, showName = false, iconOnly = false}: {record: NativeObjectRef; showName?: boolean; iconOnly?: boolean}) {
+export function EventObjectPreview({record, showName = false, iconOnly = false, onEditHere}: {onEditHere?:()=>void;record: NativeObjectRef; showName?: boolean; iconOnly?: boolean}) {
   const detail = (record as NativeObjectRef & {preview?: {detail?: string}}).preview?.detail;
+  if (onEditHere) return <button type="button" className={styles.trigger} data-profile-preview aria-label={"Edit linked "+record.label} title={record.label} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onEditHere();}}>{iconOnly ? <UnigentamosIcon role="module-notes" size={14}/> : identity(record)}{showName&&!iconOnly&&<span className={styles.name}>{record.label}</span>}</button>;
   return <Popover.Root><Popover.Trigger asChild><button type="button" className={styles.trigger} data-profile-preview aria-label={"Preview "+record.label} title={record.label} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
     {iconOnly ? <UnigentamosIcon role={record.objectType === "person" ? "person" : "object"} size={14}/> : identity(record)}{showName && !iconOnly && <span className={styles.name}>{record.label}</span>}
   </button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.panel} sideOffset={6} collisionPadding={10} aria-label={record.label} onOpenAutoFocus={e=>e.preventDefault()} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
@@ -28,6 +31,8 @@ export function EventObjectPreview({record, showName = false, iconOnly = false}:
 export default function EventLinksPreview({ event, available, excludePlaces = true, limit, list = false, align = "start" }: { event: EventOccurrence; available: NativeObjectRef[]; excludePlaces?: boolean; limit?: number; list?: boolean; align?: "start" | "end" }) {
   const root = useRef<HTMLSpanElement>(null), [width,setWidth] = useState(0);
   const details = useCalendarDetails();
+  const openWork = useContext(CalendarLinkedWorkContext);
+  const editHere = (ref:NativeObjectRef) => openWork&&editableCalendarRef(ref)?()=>openWork(event,ref):undefined;
   const refs = eventObjectRefs(event,available).filter(ref => !excludePlaces || ref.module !== "map");
   useLayoutEffect(() => {
     const card = root.current?.closest<HTMLElement>("[data-morph-event]");
@@ -42,17 +47,17 @@ export default function EventLinksPreview({ event, available, excludePlaces = tr
   const hiddenObjects = refs.filter(ref => ref.objectType !== "person" && !details.objects);
   const shown = detailed.slice(0,capacity), remaining = Math.max(0,detailed.length-capacity);
   return <span ref={root} className={styles.preview} data-event-links data-object-list={list || undefined} data-align={align}>
-    {shown.map(ref=><EventObjectPreview key={ref.module+":"+ref.objectId} record={ref} showName={list}/>)}
-    {remaining > 0 && <LinkGroup refs={detailed} eventTitle={event.title} count={remaining}/>}
-    {hiddenPeople.length > 0 && <LinkGroup refs={hiddenPeople} eventTitle={event.title} kind="people"/>}
-    {hiddenObjects.length > 0 && <LinkGroup refs={hiddenObjects} eventTitle={event.title}/>}
+    {shown.map(ref=><EventObjectPreview key={ref.module+":"+ref.objectId} record={ref} showName={list} onEditHere={editHere(ref)}/>)}
+    {remaining > 0 && <LinkGroup editHere={editHere} refs={detailed} eventTitle={event.title} count={remaining}/>}
+    {hiddenPeople.length > 0 && <LinkGroup editHere={editHere} refs={hiddenPeople} eventTitle={event.title} kind="people"/>}
+    {hiddenObjects.length > 0 && <LinkGroup editHere={editHere} refs={hiddenObjects} eventTitle={event.title}/>}
   </span>;
 }
 
-function LinkGroup({refs,eventTitle,kind="objects",count}: {refs: NativeObjectRef[]; eventTitle: string; kind?: "people" | "objects"; count?: number}) {
+function LinkGroup({editHere,refs,eventTitle,kind="objects",count}: {editHere:(ref:NativeObjectRef)=>(()=>void)|undefined; refs: NativeObjectRef[]; eventTitle: string; kind?: "people" | "objects"; count?: number}) {
   const icon = kind === "people" ? "person" : "object";
   return <Popover.Root><Popover.Trigger asChild><button type="button" className={styles.trigger} data-counted={count !== undefined || undefined} data-linked-summary={count === undefined ? kind : undefined} aria-label={`All ${refs.length} linked ${kind} for ${eventTitle}`} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}><span className={styles.count}><UnigentamosIcon role={icon} size={14}/>{count !== undefined && `+${count}`}</span></button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.panel} sideOffset={6} collisionPadding={10} aria-label={`${kind === "people" ? "People" : "Objects"} linked to ${eventTitle}`} onOpenAutoFocus={e=>e.preventDefault()} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
     <header><UnigentamosIcon role={icon} size={16}/><strong>Linked {kind} · {refs.length}</strong><Popover.Close aria-label={`Close linked ${kind}`}><UnigentamosIcon role="close" size={16}/></Popover.Close></header>
-    <div className={styles.list}>{refs.map(ref=><EventObjectPreview key={ref.module+":"+ref.objectId} record={ref} showName/>)}</div>
+    <div className={styles.list}>{refs.map(ref=><EventObjectPreview key={ref.module+":"+ref.objectId} record={ref} showName onEditHere={editHere(ref)}/>)}</div>
   </Popover.Content></Popover.Portal></Popover.Root>;
 }

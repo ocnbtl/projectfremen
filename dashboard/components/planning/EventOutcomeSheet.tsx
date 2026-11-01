@@ -1,5 +1,6 @@
 "use client";
 import { useEffect,useState } from "react";
+import type { NativeObjectRef } from "../../lib/native-objects/types";
 import Link from "next/link";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
 import SelectField from "../ui/SelectField";
@@ -10,7 +11,7 @@ import type { OutcomeSource,OutcomeInput,OutcomeReceipt } from "../../lib/module
 import type { EventOccurrence } from "../../lib/modules/planning/types";
 import styles from "./EventOutcomeSheet.module.css";
 
-export default function EventOutcomeSheet({event,source,onClose,onSaved}:{event:EventOccurrence;source:OutcomeSource;onClose:()=>void;onSaved:()=>void}){
+export default function EventOutcomeSheet({event,source,onClose,onSaved,onOpenLinked}:{event:EventOccurrence;source:OutcomeSource;onClose:()=>void;onSaved:()=>void;onOpenLinked?:(ref:NativeObjectRef)=>void}){
  const people=event.linkedRefs.filter(r=>r.module==="people"&&["person","org","organization"].includes(r.objectType));
  const [input,setInput]=useState<OutcomeInput>({interactionKind:event.interactionKind||(people.length?"meeting":"none"),note:"",decision:"",nextSteps:[]});
  const [receipt,setReceipt]=useState<OutcomeReceipt|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[loadFailed,setLoadFailed]=useState(false),[loadAttempt,setLoadAttempt]=useState(0);
@@ -18,7 +19,7 @@ export default function EventOutcomeSheet({event,source,onClose,onSaved}:{event:
  async function save(){if(receipt?.completedAt&&event.completed){onClose();return;}setBusy(true);setError("");try{const response=await fetch("/api/planning/outcomes",{method:"POST",headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({source,input})});const result=await response.json();if(!result.ok)throw new Error(result.error);setReceipt(result.receipt);onSaved();onClose();}catch(e){const message=e instanceof Error?e.message:"Could not save";try{const response=await fetch("/api/planning/outcomes?"+new URLSearchParams(source),{cache:"no-store"});const result=await response.json();if(result.ok&&result.receipt){setReceipt(result.receipt);setInput(result.receipt.input);setError(result.receipt.completedAt?"Saved successfully. You can close this sheet.":"Some changes are saved. Resume saving to finish without duplicates. "+message);}else setError(message);}catch{setError(message+". Retry to resume safely.");}}finally{setBusy(false);}}
  const locked=loading||busy||Boolean(receipt);
  return <ConfirmationSheet open eyebrow={null} iconRole="check" title={receipt?.completedAt?"Saved together":"Complete event"} description={event.title} onOpenChange={open=>{if(!open)onClose();}} onConfirm={save} confirmLabel={receipt?.completedAt?(event.completed?"Done":"Complete again"):receipt?"Resume saving":"Complete & save"} busy={busy} confirmDisabled={loading||loadFailed} className={styles.sheet}>
-  {receipt?.completedAt?<div className={styles.saved}><p>Your event and any next steps are linked.</p>{receipt.refs?.map(ref=><Link prefetch={false} key={ref.module+ref.objectId} href={ref.route}><UnigentamosIcon role={ref.objectType==="interaction"?"people":ref.objectType==="goal"?"goal":"link"} size={16}/>{ref.label}</Link>)}</div>:<div className={styles.form}>
+  {receipt?.completedAt?<div className={styles.saved}><p>Your event and any next steps are linked.</p>{receipt.refs?.map(ref=>onOpenLinked?<button type="button" key={ref.module+ref.objectId} onClick={()=>onOpenLinked(ref)}><UnigentamosIcon role="edit" size={16}/>{ref.label}</button>:<Link prefetch={false} key={ref.module+ref.objectId} href={ref.route}><UnigentamosIcon role={ref.objectType==="interaction"?"people":ref.objectType==="goal"?"goal":"link"} size={16}/>{ref.label}</Link>)}</div>:<div className={styles.form}>
    {source.family==="decisions"&&<label>Decision<textarea aria-label="Decision made" value={input.decision} disabled={locked} onChange={e=>setInput({...input,decision:e.target.value})} rows={2}/></label>}
    <label>Record as<SelectField aria-label="Interaction type" disabled={locked} value={input.interactionKind} onChange={e=>setInput({...input,interactionKind:e.target.value as OutcomeInput["interactionKind"]})}><option value="none">No interaction</option>{INTERACTION_KINDS.map(kind=><option key={kind.value} value={kind.value} disabled={!people.length}>{kind.label}</option>)}</SelectField></label>
    {people.length>0?<p className={styles.people}>{people.map(r=>r.label).join(" · ")}</p>:<small>Link people or organizations to the event to record an interaction.</small>}

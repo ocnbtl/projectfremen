@@ -380,7 +380,7 @@ export type PersonalRecordInput = {
   interaction?: Partial<PersonalInteractionDetails>;
 };
 
-export type PersonalRecordPatch = Partial<
+export type PersonalRecordPatch = { interaction?: Partial<PersonalInteractionDetails> } & Partial<
   Pick<
     PersonalRecord,
     "noteType" | "title" | "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources" | "starred"
@@ -2744,8 +2744,11 @@ export async function updatePersonalRecord(
       ]
     }, current.id, current.createdAt);
   }
+  if (patch.interaction && current.className !== "interaction") throw new Error("Only interactions have interaction details");
+  const interaction = patch.interaction ? normalizeInteractionDetails({ ...current.interaction, ...patch.interaction }, true) : current.interaction;
   next[idx] = {
     ...current,
+    interaction,
     title: typeof patch.title === "string" ? sanitizeTitle(patch.title) : current.title,
     body: typeof patch.body === "string" ? patch.body.trim() : current.body,
     noteType: patch.noteType === undefined ? current.noteType : storedNoteType(patch.noteType),

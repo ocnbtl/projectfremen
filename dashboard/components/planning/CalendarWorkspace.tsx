@@ -1,4 +1,8 @@
 "use client";
+import type { NativeObjectRef } from "../../lib/native-objects/types";
+import dynamic from "next/dynamic";
+import { CalendarLinkedWorkContext } from "./CalendarLinkedWorkContext";
+const CalendarLinkedWorkSheet = dynamic(() => import("./CalendarLinkedWorkSheet"), { ssr: false });
 import EventOutcomeSheet from "./EventOutcomeSheet";
 import type { OutcomeSource } from "../../lib/modules/planning/event-outcome-types";
 import PetScheduleDialog from "../personal-ops/PetScheduleDialog";
@@ -235,6 +239,13 @@ export default function CalendarWorkspace() {
     return job;
   }
   const [petTarget,setPetTarget]=useState<NonNullable<EventOccurrence["petSource"]>>();
+  const [linkedWork,setLinkedWork]=useState<{event:EventOccurrence;source:OutcomeSource;initialId?:string}>();
+  function openLinkedWork(event:EventOccurrence,ref?:NativeObjectRef){
+    const original=confirmed.current?.state.events.find(e=>e.id===event.eventId), work=event.workSource;
+    if(work?.family==="routines"||(!work&&!original))return;
+    setPreview({event,anchor:previewAnchor.current||new DOMRect(innerWidth/2,160,1,1)});setPreviewOpen(false);setOutcome(undefined);
+    setLinkedWork({event,initialId:ref?.objectId,source:{family:work?.family||"events",id:work?.id||event.eventId,occurrenceKey:event.occurrenceKey,expectedUpdatedAt:work?.updatedAt||original!.updatedAt}});
+  }
   const [outcome,setOutcome]=useState<{event:EventOccurrence;source:OutcomeSource}>();
   function openOutcome(event:EventOccurrence){const original=confirmed.current?.state.events.find(e=>e.id===event.eventId);const work=event.workSource;if(work?.family==="routines"||(!work&&!original))return;setPreviewOpen(false);setOutcome({event,source:{family:work?.family||"events",id:work?.id||event.eventId,occurrenceKey:event.occurrenceKey,expectedUpdatedAt:work?.updatedAt||original!.updatedAt}});}
   const [wellnessTarget, setWellnessTarget] = useState<NonNullable<EventOccurrence["wellnessSource"]>>();
@@ -662,7 +673,7 @@ export default function CalendarWorkspace() {
   if (!snapshot && !error) return <LogoLoader label="Loading calendar" viewport />;
 
   return (
-    <CalendarDisplayContext.Provider value={details}><CalendarPlacesContext.Provider value={snapshot?.state.places || []}><div
+    <CalendarLinkedWorkContext.Provider value={openLinkedWork}><CalendarDisplayContext.Provider value={details}><CalendarPlacesContext.Provider value={snapshot?.state.places || []}><div
       className={`work-surface ${styles.shell}`}
       onClickCapture={e=>{const card=(e.target as HTMLElement).closest<HTMLElement>('[data-morph-event]');if(card){const box=card.getBoundingClientRect();previewAnchor.current=new DOMRect(e.clientX || box.x+box.width/2,e.clientY || box.y,1,1);}}}
       style={moduleThemeVariables("calendar") as CSSProperties}
@@ -979,8 +990,9 @@ export default function CalendarWorkspace() {
       </WorkspaceSheet>
       {petTarget && <PetScheduleDialog target={petTarget} onClose={()=>setPetTarget(undefined)} onSaved={()=>{setPetTarget(undefined);void refresh();}}/>}
       {wellnessTarget && <WellnessScheduleDialog target={wellnessTarget} onClose={() => setWellnessTarget(undefined)} onSaved={() => { setWellnessTarget(undefined); void refresh(); }} />}
-      {outcome && <EventOutcomeSheet event={outcome.event} source={outcome.source} onClose={()=>setOutcome(undefined)} onSaved={()=>{void refresh();setNotice("Event completed and linked records saved");}}/>}
-      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onReview={()=>openOutcome(preview.event)} onComplete={() => void completeTask(preview.event)} onSkip={() => { const item=preview.event,source=item.wellnessSource; if(!source?.repeating || busy)return; void action(async()=>{await updateWellnessEntry(source.section,source.id,source.updatedAt,{}, {date:item.occurrenceKey.slice(0,10),skipped:true});setPreviewOpen(false);},"Occurrence skipped. Restore it from Personal."); }} onEdit={()=>{if(preview.event.petSource){setPetTarget(preview.event.petSource);setPreviewOpen(false);return;}if (preview.event.wellnessSource) { setWellnessTarget({ ...preview.event.wellnessSource, occurrenceDate: preview.event.occurrenceKey.slice(0,10) }); setPreviewOpen(false); return; } const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
+      {linkedWork && <CalendarLinkedWorkSheet source={linkedWork.source} title={linkedWork.event.title} initialId={linkedWork.initialId} onSaved={()=>{void refresh();}} onClose={()=>{const current=occurrences.find(e=>e.eventId===linkedWork.event.eventId&&(linkedWork.source.family!=="events"||e.occurrenceKey===linkedWork.event.occurrenceKey))||linkedWork.event;setPreview(p=>({event:current,anchor:p?.anchor||new DOMRect(innerWidth/2,160,1,1)}));setLinkedWork(undefined);setPreviewOpen(true);}}/>}
+      {outcome && <EventOutcomeSheet onOpenLinked={ref=>openLinkedWork(outcome.event,ref)} event={outcome.event} source={outcome.source} onClose={()=>setOutcome(undefined)} onSaved={()=>{void refresh();setNotice("Event completed and linked records saved");}}/>}
+      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onLinkedWork={!preview.event.system&&!preview.event.wellnessSource&&!preview.event.petSource&&preview.event.workSource?.family!=="routines"?ref=>openLinkedWork(preview.event,ref):undefined} onReview={()=>openOutcome(preview.event)} onComplete={() => void completeTask(preview.event)} onSkip={() => { const item=preview.event,source=item.wellnessSource; if(!source?.repeating || busy)return; void action(async()=>{await updateWellnessEntry(source.section,source.id,source.updatedAt,{}, {date:item.occurrenceKey.slice(0,10),skipped:true});setPreviewOpen(false);},"Occurrence skipped. Restore it from Personal."); }} onEdit={()=>{if(preview.event.petSource){setPetTarget(preview.event.petSource);setPreviewOpen(false);return;}if (preview.event.wellnessSource) { setWellnessTarget({ ...preview.event.wellnessSource, occurrenceDate: preview.event.occurrenceKey.slice(0,10) }); setPreviewOpen(false); return; } const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
       <CalendarSharePanel open={sharing} onClose={() => setSharing(false)} calendars={snapshot?.state.calendars || []} />
       <WorkspaceSheet
         open={connections}
@@ -1190,7 +1202,7 @@ export default function CalendarWorkspace() {
           ],
         }}
       />
-    </div></CalendarPlacesContext.Provider></CalendarDisplayContext.Provider>
+    </div></CalendarPlacesContext.Provider></CalendarDisplayContext.Provider></CalendarLinkedWorkContext.Provider>
   );
 }
 

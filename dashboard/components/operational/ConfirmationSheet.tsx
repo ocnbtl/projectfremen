@@ -8,6 +8,7 @@ export type ConfirmationSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void | Promise<void>;
+  onCancel?: () => void;
   title: string;
   description?: ReactNode;
   consequences?: readonly string[];
@@ -37,6 +38,7 @@ export default function ConfirmationSheet({
   open,
   onOpenChange,
   onConfirm,
+  onCancel,
   title,
   description,
   consequences,
@@ -166,7 +168,7 @@ export default function ConfirmationSheet({
         {children && <div className="confirmation-sheet__content">{children}</div>}
 
         <footer className="confirmation-sheet__actions">
-          <button type="button" onClick={() => onOpenChange(false)} disabled={busy}>
+          <button type="button" onClick={() => onCancel ? onCancel() : onOpenChange(false)} disabled={busy}>
             {cancelLabel}
           </button>
           <button
