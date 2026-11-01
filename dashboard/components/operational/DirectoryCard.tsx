@@ -7,10 +7,10 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { DenseObjectRowCheckbox } from "./DenseObjectRow";
 
 /** Shared identity, status/type and action slots for module directories. */
-export default function DirectoryCard({ id, title, picture, icon, status, statusIcon = "active", tag, description, metadata, trailing, actions, selected, onSelect, href, checkbox, gallery = false }: {
+export default function DirectoryCard({ id, title, picture, icon, status, statusIcon = "active", tag, description, metadata, signal, trailing, actions, selected, onSelect, href, checkbox, gallery = false }: {
   id: string; title: string; picture?: ReactNode; icon?: string;
   status: string; statusIcon?: string; tag: string;
-  description?: ReactNode; metadata?: ReactNode; trailing?: ReactNode; actions?: ReactNode;
+  description?: ReactNode; metadata?: ReactNode; signal?: ReactNode; trailing?: ReactNode; actions?: ReactNode;
   selected?: boolean; onSelect?: () => void; href?: string;
   checkbox?: DenseObjectRowCheckbox; gallery?: boolean;
 }) {
@@ -30,6 +30,7 @@ export default function DirectoryCard({ id, title, picture, icon, status, status
           <span className="resource-card-pin">{actions}</span>
         </MorphingDiv>
       </div>
+      {signal && <MorphingDiv className="resource-card-signal">{signal}</MorphingDiv>}
       {metadata && <MorphingDiv className="resource-card-details">{metadata}</MorphingDiv>}
       {description && <MorphingDiv className="resource-card-description">{description}</MorphingDiv>}
       {trailing && <MorphingDiv className="resource-card-evidence">{trailing}</MorphingDiv>}

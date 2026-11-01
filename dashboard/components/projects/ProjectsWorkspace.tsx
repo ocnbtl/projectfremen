@@ -45,6 +45,7 @@ import { createProjectsRepository } from "../../lib/modules/projects/repository"
 import { projectUuid } from "../../lib/modules/projects/identity";
 import type {
   Project,
+  ProjectLifecycleState,
   ProjectBlocker,
   ProjectBlockerSeverity,
   ProjectInteraction,
@@ -301,17 +302,11 @@ function OpenIcon() {
   return <UnigentamosIcon role="open" size={16} />;
 }
 
-function PeopleCountIcon() {
-  return <UnigentamosIcon role="person" size={14} />;
-}
-
-function ObjectCountIcon() {
-  return <UnigentamosIcon role="link" size={14} />;
-}
-
-function ClockIcon() {
-  return <UnigentamosIcon role="clock" size={14} />;
-}
+const PROJECT_STATUS_ICONS: Record<ProjectLifecycleState, string> = {
+  draft: "edit", idea: "calendar-group-brain", planned: "calendar",
+  developing: "build", active: "active", monitoring: "show",
+  dormant: "dormant", complete: "review", archived: "archive"
+};
 
 function RowActionIcons({
   inspectLabel,
@@ -3135,26 +3130,30 @@ export default function ProjectsWorkspace({
           }}><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="grid">Grid</option></SelectField>
         </WorkspaceToolbar>
         {visibleProjects.length ? (
-          <DirectoryLayout view={grid ? "grid" : compact ? "compact" : "comfortable"} className={`resource-directory ${grid ? "is-grid" : compact ? "is-compact" : ""}`} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
+          <DirectoryLayout view={grid ? "grid" : compact ? "compact" : "comfortable"} className={`resource-directory ${styles.projectDirectory} ${grid ? "is-grid" : compact ? "is-compact" : ""}`} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
             {visibleProjects.map((item) => {
               const milestone = nextMilestone(item);
-              const attention = item.attentionReasons.find(reason=>!/objectives.*not defined/i.test(reason));
-              const peopleCount = item.linkedContext.filter((context) => context.ref.module === "people").length;
-              const objectCount = item.linkedContext.filter((context) => context.ref.module !== "people").length;
+              const attention = item.attentionReasons.find(reason => /overdue/i.test(reason)) || item.attentionReasons.find(reason=>!/objectives.*not defined/i.test(reason));
+              const objectCount = new Set(item.linkedContext.map(({ ref }) => `${ref.module}:${ref.objectType}:${ref.objectId}`)).size;
+              const signal = attention || (milestone ? `Next milestone ${formatDate(milestone.dueAt)}` : "");
+              const needsAttention = /overdue|blocker/i.test(attention || "");
+              const cardDate = (value?: string) => value && Number.isFinite(Date.parse(value))
+                ? new Intl.DateTimeFormat("en-US", { timeZone: displayTimeZone, month: "2-digit", day: "2-digit", year: "2-digit" }).format(new Date(value))
+                : "—";
               const projectMeta = <span className={styles.projectMeta}>
-                <span title={`${objectCount} linked object${objectCount === 1 ? "" : "s"}`}><ObjectCountIcon />{objectCount}</span>
-                <span title={`${peopleCount} linked ${peopleCount === 1 ? "person" : "people"}`}><PeopleCountIcon />{peopleCount}</span>
-                <span title={`Updated ${formatTimestamp(item.project.updatedAt)}`}><ClockIcon />{formatDate(item.project.updatedAt)}</span>
+                <span title={`Created ${formatTimestamp(item.project.createdAt)}`}><UnigentamosIcon role="calendar" size={14} /><span>Created <time dateTime={item.project.createdAt}>{cardDate(item.project.createdAt)}</time></span></span>
+                <span title={`Last edited ${formatTimestamp(item.project.updatedAt)}`}><UnigentamosIcon role="edit" size={14} /><span>Edited <time dateTime={item.project.updatedAt}>{cardDate(item.project.updatedAt)}</time></span></span>
+                <span title="All linked objects, including people"><UnigentamosIcon role="object" size={14} />{objectCount} object{objectCount === 1 ? "" : "s"}</span>
               </span>;
               return <DirectoryCard
                 key={item.project.id} id={item.project.id} title={item.project.name}
                 picture={item.project.photoUpdatedAt ? <PeopleProfileAvatar initials={initials(item.project.name)} label={item.project.name} photoUrl={`/api/projects/photos/${encodeURIComponent(item.project.id)}`} photoUpdatedAt={item.project.photoUpdatedAt} /> : <span aria-hidden="true">{initials(item.project.name)}</span>}
                 status={displayLabel(item.project.lifecycle)}
-                statusIcon={item.project.lifecycle === "archived" ? "archive" : "active"}
+                statusIcon={PROJECT_STATUS_ICONS[item.project.lifecycle]}
                 tag={displayLabel(item.project.lifecycle)}
-                description={item.project.objective || item.project.description || undefined}
+                description={item.project.objective || item.project.description || <span aria-hidden="true">&nbsp;</span>}
                 metadata={projectMeta}
-                trailing={attention || (milestone ? `Next ${formatDate(milestone.dueAt)}` : undefined)}
+                signal={<span className={styles.projectSignal} data-attention={needsAttention || undefined} title={item.attentionReasons.filter(reason=>!/objectives.*not defined/i.test(reason)).join(" ") || signal}>{signal && <><UnigentamosIcon role={needsAttention ? "warning" : attention ? "information" : "calendar"} size={14} /><span>{signal.replace(/\.$/, "")}</span></>}</span>}
                 selected={selectedProjectId === item.project.id}
                 onSelect={() => selectProject(item)}
                 actions={<button type="button" onClick={() => void toggleStar(item)} disabled={!item.project.editable || mutationBusy || ["complete", "archived"].includes(item.project.lifecycle)} aria-label={item.project.starred ? "Remove star" : "Star project"} aria-pressed={item.project.starred} data-active={item.project.starred || undefined}><UnigentamosIcon role="star" size={16} /></button>}

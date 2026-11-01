@@ -57,6 +57,7 @@ export type ProjectDisplayRecord = {
   legacyKey?: string;
   legacyRoute?: string;
   legacyEntityName?: string;
+  createdAt?: string;
   updatedAt?: string;
   lastActivityAt?: string;
 };
@@ -135,6 +136,7 @@ function displayFromNative(project: Project): ProjectDisplayRecord {
     legacyKey: project.legacySource?.key,
     legacyRoute: project.legacySource?.legacyRoute,
     legacyEntityName: project.legacySource?.entityName,
+    createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     lastActivityAt: project.lastActivityAt
   };
