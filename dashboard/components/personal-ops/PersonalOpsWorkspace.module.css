@@ -888,6 +888,17 @@ button.metric {
   border: 1px solid currentColor;
 }
 
+/* Distinct workflow states, shared by cards, filters and detail controls. */
+.statusChip[data-tone="draft"] { --status-chip-background:#edf2f7; --status-chip-color:#465d75; }
+.statusChip[data-tone="planned"] { --status-chip-background:#e0f3f6; --status-chip-color:#176778; }
+.statusChip[data-tone="scheduled"] { --status-chip-background:#e9edff; --status-chip-color:#424b9c; }
+.statusChip[data-tone="waiting"] { --status-chip-background:#fff2c9; --status-chip-color:#80600b; }
+.statusChip[data-tone="paused"] { --status-chip-background:#f0e6fa; --status-chip-color:#754298; }
+.statusChip[data-tone="replaced"] { --status-chip-background:#f3e5dc; --status-chip-color:#805333; }
+.statusChip[data-tone="carried"] { --status-chip-background:#f9e4ee; --status-chip-color:#9a4268; }
+.statusChip[data-tone="archived"] { --status-chip-background:#e6e8eb; --status-chip-color:#53575f; }
+.statusChip[data-tone="decided"] { --status-chip-background:#dff3ed; --status-chip-color:#176c60; }
+
 .mono {
   font-family: var(--font-body);
   font-variant-numeric: tabular-nums;

@@ -2,6 +2,7 @@
 import { DirectoryLayout, MorphingArticle, MorphingDiv, MorphingButton, MorphingP, usePersonalDirectoryView } from "../ui/DirectoryLayout";
 import PersonalCardStatusControl, { personalCardStatusChoices } from "./PersonalCardStatusControl";
 import PersonalStatusRequirements, { type StatusDetails } from "./PersonalStatusRequirements";
+import { personalStatusLabel, PERSONAL_STATUS_OPTIONS } from "../../lib/modules/personal-ops/status-display";
 import type { EntityGoalItem } from "../../lib/entity-goals";
 import ViewCycleButton from "../ui/ViewCycleButton";
 import PersonalHome from "./PersonalHome";
@@ -140,6 +141,7 @@ type FormDraft = {
   rationale: string;
   deferReason: string;
   revisitAt: string;
+  supersededBy?: NativeObjectRef;
   reversibility: "reversible" | "reversible_costly" | "irreversible" | "unknown";
   risk: "low" | "medium" | "high" | "critical" | "unknown";
   options: string;
@@ -402,7 +404,7 @@ function decisionReviewState(item: PersonalOpsDecision) {
 }
 
 function cleanLabel(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return personalStatusLabel(value);
 }
 
 function dueTime(item: PersonalOpsListItem) {
@@ -451,6 +453,7 @@ function defaultDraft(family: PersonalOpsFamily, item?: PersonalOpsObject, sourc
     rationale: item?.objectType === "decision" ? item.rationale || "" : "",
     deferReason: item?.objectType === "decision" ? item.deferReason || "" : item?.objectType === "follow_up" ? item.deferReason || "" : "",
     revisitAt: item?.objectType === "decision" ? toLocalDate(item.revisitAt) : "",
+    supersededBy: item?.objectType === "decision" ? item.supersededBy : undefined,
     reversibility: item?.objectType === "decision" ? item.reversibility : "unknown",
     risk: item?.objectType === "decision" ? item.risk : "unknown",
     options: item?.objectType === "decision" ? item.options.map((option) => option.title).join("\n") : "",
@@ -531,6 +534,7 @@ function createInput(form: OpenForm, draft: FormDraft): PersonalOpsCreateInputBy
       rationale: draft.rationale || undefined,
       deferReason: draft.deferReason || undefined,
       revisitAt: toIsoDate(draft.revisitAt),
+      supersededBy: draft.supersededBy,
       reversibility: draft.reversibility,
       risk: draft.risk,
       options: lines(draft.options).map((title) => ({ title, selected: title === draft.finalDecision }))
@@ -572,7 +576,13 @@ function createInput(form: OpenForm, draft: FormDraft): PersonalOpsCreateInputBy
 }
 
 function updateInput(form: OpenForm, draft: FormDraft): PersonalOpsUpdateInputByFamily[PersonalOpsFamily] {
+  const reopen = form.item?.lifecycle === "complete" && (
+    (form.family === "decisions" && !["decided", "superseded"].includes(draft.decisionState)) ||
+    (form.family === "obligations" && draft.obligationState !== "complete") ||
+    (form.family === "followUps" && draft.followUpState !== "complete")
+  );
   const common = {
+    ...(reopen ? {lifecycle:"active" as const} : {}),
     title: draft.title,
     domain: draft.domain,
     description: draft.description,
@@ -606,6 +616,7 @@ function updateInput(form: OpenForm, draft: FormDraft): PersonalOpsUpdateInputBy
       rationale: draft.rationale || undefined,
       deferReason: draft.deferReason || undefined,
       revisitAt: toIsoDate(draft.revisitAt),
+      supersededBy: draft.supersededBy,
       reversibility: draft.reversibility,
       risk: draft.risk,
       options: lines(draft.options).map((title) => byTitle.get(title) || { title, selected: title === draft.finalDecision })
@@ -750,7 +761,8 @@ function ObjectForm({
   busy,
   error,
   notice,
-  sourceDuplicates
+  sourceDuplicates,
+  decisions
 }: {
   form: OpenForm;
   draft: FormDraft;
@@ -761,6 +773,7 @@ function ObjectForm({
   error: string;
   notice: string;
   sourceDuplicates: PersonalOpsFollowUp[];
+  decisions: PersonalOpsDecision[];
 }) {
   const familyLabel = FAMILY_LABELS[form.family];
   const editing = Boolean(form.item);
@@ -874,7 +887,7 @@ function ObjectForm({
                 </Field>
                 {draft.followUpState === "deferred" && (
                   <>
-                    <Field label="Why defer?" full>
+                    <Field label="Why put this on hold?" full>
                       <textarea value={draft.deferReason} onChange={(event) => update("deferReason", event.target.value)} required />
                     </Field>
                     <Field label="New date">
@@ -983,8 +996,15 @@ function ObjectForm({
                     <option value="open">Open</option>
                     <option value="decided">Decided</option>
                     <option value="deferred">Deferred</option>
+                    <option value="superseded">Replaced</option>
                   </PersonalOpsStatusSelect>
                 </Field>
+                {draft.decisionState === "superseded" && <Field label="Replacement decision" full>
+                  <SelectField aria-label="Replacement decision" value={draft.supersededBy?.objectId || ""} onChange={event=>{
+                    const decision=decisions.find(item=>item.id===event.target.value);
+                    update("supersededBy",decision ? createNativeObjectRef({module:"personal_ops",objectType:"decision",objectId:decision.id,label:decision.title}) : undefined);
+                  }} required><option value="">Choose a decision</option>{decisions.filter(item=>item.id!==form.item?.id&&item.lifecycle!=="archived").map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</SelectField>
+                </Field>}
                 <Field label="Reversibility">
                   <SelectField aria-label="Reversibility" value={draft.reversibility} onChange={(event) => update("reversibility", event.target.value as FormDraft["reversibility"])}>
                     <option value="unknown">Unknown</option>
@@ -995,7 +1015,7 @@ function ObjectForm({
                 </Field>
                 {draft.decisionState === "deferred" && (
                   <>
-                    <Field label="Why defer?" full>
+                    <Field label="Why put this on hold?" full>
                       <textarea value={draft.deferReason} onChange={(event) => update("deferReason", event.target.value)} required />
                     </Field>
                     <Field label="Revisit date">
@@ -1154,8 +1174,8 @@ export default function PersonalOpsWorkspace({
     if (initialView === "obligations") return state.obligations.map((item) => ({ ...item, source: "native" as const }));
     if (initialView === "follow-ups") return state.followUps.map((item) => ({ ...item, source: "native" as const }));
     return [
-      ...allNative.filter((item) => item.lifecycle !== "complete" && item.lifecycle !== "archived").map((item) => ({ ...item, source: "native" as const })),
-      ...legacyGoals.filter((item) => !item.done).map((item) => ({ ...item, title: item.text, source: "legacy-goal" as const, objectType: "goal" as const }))
+      ...allNative.map((item) => ({ ...item, source: "native" as const })),
+      ...legacyGoals.map((item) => ({ ...item, title: item.text, source: "legacy-goal" as const, objectType: "goal" as const }))
     ];
   }, [allNative, initialView, legacyGoals, state.decisions, state.followUps, state.goals, state.obligations]);
 
@@ -1165,7 +1185,8 @@ export default function PersonalOpsWorkspace({
     const filtered = baseItems.filter((item) => {
       if (query && !`${item.title} ${summaryForItem(item)} ${item.source === "native" ? item.domain : item.entity}`.toLowerCase().includes(query)) return false;
       const filter = urlState.filter;
-      if (filter === "all") return item.source === "legacy-goal" || item.lifecycle !== "archived";
+      if (filter.startsWith("status-")) return stateLabel(item) === filter.slice(7).replaceAll("-", "_");
+      if (filter === "all") return stateLabel(item) !== "archived" && (initialView !== "command" || !["complete","decided","superseded"].includes(stateLabel(item)));
       if (filter === "archived") return item.source === "native" && item.lifecycle === "archived";
       if (item.source === "legacy-goal") return filter === "active" ? !item.done : filter === "complete" ? item.done : false;
       if (filter === "today") return isDueToday(item.dueAt);
@@ -1435,8 +1456,8 @@ export default function PersonalOpsWorkspace({
   }
 
   const metrics = useMemo<PersonalOpsMetricItem[]>(() => {
-    const nativeScope = baseItems.filter((item): item is NativeListItem => item.source === "native");
-    const active = baseItems.filter((item) => stateLabel(item) !== "complete" && stateLabel(item) !== "decided").length;
+    const nativeScope = baseItems.filter((item): item is NativeListItem => item.source === "native" && item.lifecycle !== "archived");
+    const active = baseItems.filter((item) => !["complete", "decided", "superseded", "archived"].includes(stateLabel(item))).length;
     const dueSoon = nativeScope.filter((item) => isDueWithin(item.dueAt, 7) && item.lifecycle !== "complete").length;
     const overdue = nativeScope.filter((item) => item.dueAt && new Date(item.dueAt).getTime() < Date.now() && item.lifecycle !== "complete").length;
     const review = nativeScope.filter((item) => item.review === "needs_review" || item.review === "not_reviewed").length;
@@ -1504,26 +1525,19 @@ export default function PersonalOpsWorkspace({
     queryTimer.current = setTimeout(() => updateUrl({ query: value, selected: "" }), 180);
   }
 
-  const defaultFilterItems = [
-    { id: "all", label: "All", count: baseItems.filter((item) => item.source === "legacy-goal" || item.lifecycle !== "archived").length },
-    { id: "active", label: "Active", count: baseItems.filter((item) => stateLabel(item) !== "complete" && stateLabel(item) !== "decided").length },
-    { id: "due-soon", label: "Due soon", count: baseItems.filter((item) => item.source === "native" && isDueWithin(item.dueAt, 7)).length },
-    { id: "needs-review", label: "Needs review", count: baseItems.filter((item) => item.source === "native" && (item.review === "needs_review" || item.review === "not_reviewed")).length },
-    { id: "blocked", label: "Blocked", count: baseItems.filter((item) => item.source === "native" && item.health === "blocked").length },
-    { id: "complete", label: "Complete", count: baseItems.filter((item) => stateLabel(item) === "complete" || stateLabel(item) === "decided").length }
-  ];
-  const decisionFilterItems = [
-    { id: "all", label: "All", count: state.decisions.filter((item) => item.lifecycle !== "archived").length },
-    { id: "active", label: "Open", count: state.decisions.filter((item) => item.decisionState === "open").length },
-    { id: "due-soon", label: "Due soon", count: state.decisions.filter((item) => isDueWithin(item.dueAt, 7)).length },
-    { id: "needs-review", label: "Needs review", count: state.decisions.filter((item) => item.review === "needs_review" || item.review === "not_reviewed").length },
-    { id: "in-review", label: "In review", count: state.decisions.filter((item) => item.review === "in_review").length },
-    { id: "reviewed", label: "Reviewed", count: state.decisions.filter((item) => decisionReviewState(item) === "reviewed").length },
-    { id: "complete", label: "Decided", count: state.decisions.filter((item) => item.decisionState === "decided" || item.decisionState === "superseded").length }
-  ];
-  const filterItems = (initialView === "decisions" ? decisionFilterItems : defaultFilterItems)
-    .map((item) => ({ ...item, tone: toneForState(item.label), active: urlState.filter === item.id, onSelect: () => updateUrl({ filter: item.id, selected: "" }) }));
-
+  const statusTypes = initialView === "goals" ? PERSONAL_STATUS_OPTIONS.goal
+    : initialView === "decisions" ? PERSONAL_STATUS_OPTIONS.decision
+    : initialView === "obligations" ? PERSONAL_STATUS_OPTIONS.obligation
+    : initialView === "follow-ups" ? PERSONAL_STATUS_OPTIONS.follow_up
+    : [...new Set(Object.values(PERSONAL_STATUS_OPTIONS).flat())];
+  const filterItems = [
+    {id:"all",label:"All",tone: "neutral" as PersonalOpsTone},
+    ...statusTypes.map(value=>({id:`status-${value.replaceAll("_","-")}`,label:personalStatusLabel(value),tone:toneForState(value)}))
+  ].map(item=>({...item,active:urlState.filter===item.id,onSelect:()=>updateUrl({filter:item.id,selected:""})}));
+  const timingFilters = [
+    {id:"due-soon",label:"Due soon"}, {id:"overdue",label:"Overdue"}, {id:"needs-review",label:"Needs review"},
+    ...(initialView === "decisions" ? [{id:"in-review",label:"In review"},{id:"reviewed",label:"Reviewed"}] : [])
+  ].map(item=>({...item,tone:toneForState(item.id),active:urlState.filter===item.id,onSelect:()=>updateUrl({filter:item.id,selected:""})}));
   const primaryFamily = VIEW_COPY[initialView].family || "followUps";
 
   async function confirmPendingAction() {
@@ -1581,7 +1595,7 @@ export default function PersonalOpsWorkspace({
           <WorkspaceHeader title={initialView === "command" ? "Personal" : VIEW_COPY[initialView].title} count={scopedItems.length}>
             {initialView === "command" ? <SelectField aria-label="Create personal item" optionIcons={{"":"plus",goals:"goal",followUps:"follow-up",decisions:"decision",obligations:"check"}} value="" onChange={event => {if(event.target.value) openCreate(event.target.value as PersonalOpsFamily);}}><option value="" disabled>Add new</option>{(["goals","followUps","decisions","obligations"] as const).map(family => <option value={family} key={family}>{FAMILY_LABELS[family]}</option>)}</SelectField> : <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate(primaryFamily)}>Add {FAMILY_LABELS[primaryFamily].toLowerCase()}</WorkspaceButton>}
           </WorkspaceHeader>
-          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<div><PersonalOpsFilterRail items={filterItems.map(({count, ...item}) => item)} ariaLabel="Filter by status" className={styles.statusFilterMenu} /><strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</div>}>
+          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<div><PersonalOpsFilterRail items={filterItems} ariaLabel="Filter by status" className={styles.statusFilterMenu} /><strong className={styles.filterHeading}>Timing & review</strong><PersonalOpsFilterRail items={timingFilters} ariaLabel="Filter by timing and review" className={styles.statusFilterMenu}/><strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</div>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
             <ViewCycleButton data-toolbar-view value={directoryView} onChange={setDirectoryView}/>
           </WorkspaceToolbar>
@@ -1642,7 +1656,7 @@ export default function PersonalOpsWorkspace({
                 <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector" data-icon-button="standard"><PersonalOpsIcon name="close" /></button>
               </div>
               <div className={styles.chipRow}>
-                <PersonalOpsStatusChip tone={toneForState(stateLabel(selectedItem))}>{cleanLabel(stateLabel(selectedItem))}</PersonalOpsStatusChip>
+                <PersonalCardStatusControl title={selectedItem.title} value={stateLabel(selectedItem)} choices={selectedItem.source === "legacy-goal" ? ["draft","planned","active","complete"].map(value=>({value})) : personalCardStatusChoices(selectedItem)} disabled={busy} onSave={next=>saveCardStatus(selectedItem,next)} onRequirements={next=>{if(selectedItem.source === "native")setStatusRequirements({item:selectedItem,next});}}/>
                 {selectedItem.source === "native" && selectedItem.objectType === "decision" && <PersonalOpsStatusChip tone={toneForState(decisionReviewState(selectedItem))}>{cleanLabel(decisionReviewState(selectedItem))}</PersonalOpsStatusChip>}
                 {selectedItem.source === "native" && selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && ["blocked","attention"].includes(selectedItem.health) && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
                 {selectedItem.source === "legacy-goal" && <PersonalOpsStatusChip tone="attention">Existing Current Goals</PersonalOpsStatusChip>}
@@ -1692,8 +1706,8 @@ export default function PersonalOpsWorkspace({
                           </PersonalOpsPanel>
                           {selectedItem.description && <PersonalOpsPanel title="Context" wide><p>{selectedItem.description}</p></PersonalOpsPanel>}
                           {selectedItem.decisionState === "deferred" && (
-                            <PersonalOpsPanel title="Deferred until review" wide>
-                              <p>{selectedItem.deferReason || "No deferral context recorded."}</p>
+                            <PersonalOpsPanel title="On hold" wide>
+                              <p>{selectedItem.deferReason || "No reason recorded."}</p>
                               <small className={styles.mutedCopy}>Revisit {formatDate(selectedItem.revisitAt)}</small>
                             </PersonalOpsPanel>
                           )}
@@ -1806,6 +1820,7 @@ export default function PersonalOpsWorkspace({
           error={error}
           notice={notice}
           sourceDuplicates={sourceDuplicates}
+          decisions={state.decisions}
         />
       )}
 

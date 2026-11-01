@@ -6,9 +6,10 @@ import { useId, useRef, useState } from "react";
 import type { PersonalOpsObject } from "../../lib/modules/personal-ops/types";
 import { PersonalOpsStatusChip, personalOpsToneForState } from "./PersonalOpsPrimitives";
 import styles from "./PersonalOpsWorkspace.module.css";
+import { personalStatusLabel, PERSONAL_STATUS_OPTIONS } from "../../lib/modules/personal-ops/status-display";
 
 export type StatusChoice = { value: string; reason?: string };
-export const statusLabel = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
+export const statusLabel = personalStatusLabel;
 export function personalCardStatusChoices(item: PersonalOpsObject): StatusChoice[] {
   let choices: StatusChoice[];
   if (item.objectType === "goal") choices = ["draft", "planned", "active", "complete"].map(value => ({value, reason: value === "complete" && item.keyResults.some(result => !result.complete) ? "Confirm the remaining key results." : undefined}));
@@ -19,7 +20,7 @@ export function personalCardStatusChoices(item: PersonalOpsObject): StatusChoice
   ];
   else if (item.objectType === "obligation") choices = ["open","waiting","blocked","complete"].map(value => ({value,reason:value === "complete" && (!item.completionCriteria.length || item.completionCriteria.some(criterion => !criterion.satisfied) || item.requiredEvidence.some(evidence => evidence.required && evidence.state === "missing")) ? "Confirm completion and required evidence." : undefined}));
   else choices = ["open","scheduled","waiting","deferred","complete","carried_forward"].map(value => ({value,reason:value === "deferred" && (!item.deferReason || !item.deferredUntil) ? "Choose a new date and reason." : undefined}));
-  return [...choices, {value:"archived",reason:"Add an archive reason."}];
+  return PERSONAL_STATUS_OPTIONS[item.objectType].map(value => value === "archived" ? {value,reason:"Add an archive reason."} : choices.find(choice=>choice.value===value)!);
 }
 export default function PersonalCardStatusControl({ title, value, choices, disabled, onSave, onRequirements }: {
   title: string;

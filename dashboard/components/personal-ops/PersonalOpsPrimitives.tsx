@@ -4,8 +4,10 @@ import type { ComponentProps, ReactNode } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 import styles from "./PersonalOpsWorkspace.module.css";
+import { PERSONAL_STATUS_LABELS } from "../../lib/modules/personal-ops/status-display";
 
 export type PersonalOpsTone =
+  | "draft" | "planned" | "scheduled" | "waiting" | "paused" | "replaced" | "carried" | "archived" | "decided"
   | "default"
   | "active"
   | "open"
@@ -19,6 +21,8 @@ export type PersonalOpsTone =
 /** One semantic palette for Personal cards, details, routines and templates. */
 export function personalOpsToneForState(value: string): PersonalOpsTone {
   const state = value.trim().toLowerCase().replace(/[ -]+/g, "_");
+  const specific: Record<string, PersonalOpsTone> = {draft:"draft",planned:"planned",scheduled:"scheduled",waiting:"waiting",deferred:"paused",on_hold:"paused",paused:"paused",superseded:"replaced",replaced:"replaced",carried_forward:"carried",carried_over:"carried",archived:"archived",decided:"decided"};
+  if (specific[state]) return specific[state];
   if (["active", "in_progress"].includes(state)) return "active";
   if (["open", "planned", "pending", "scheduled"].includes(state)) return "open";
   if (["complete", "completed", "done", "decided", "resolved", "healthy", "reviewed", "current", "ready", "processed", "verified", "received"].includes(state)) return "positive";
@@ -257,6 +261,6 @@ export function PersonalOpsPanel({
 /** Keep native form values and the shared menu keyboard behavior; decorate only labels. */
 export function PersonalOpsStatusSelect({ optionDescriptions, ...props }: ComponentProps<typeof SelectField> & { optionDescriptions?: Record<string, string> }) {
   return <SelectField {...props} menuClassName={[styles.statusSelectMenu, props.menuClassName].filter(Boolean).join(" ")} renderOptionLabel={(value, label) =>
-    <span className={styles.statusChoiceLabel}><PersonalOpsStatusChip tone={personalOpsToneForState(value)}>{label}</PersonalOpsStatusChip>{optionDescriptions?.[value] && <small>{optionDescriptions[value]}</small>}</span>
+    <span className={styles.statusChoiceLabel}><PersonalOpsStatusChip tone={personalOpsToneForState(value)}>{PERSONAL_STATUS_LABELS[value] || label}</PersonalOpsStatusChip>{optionDescriptions?.[value] && <small>{optionDescriptions[value]}</small>}</span>
   } />;
 }
