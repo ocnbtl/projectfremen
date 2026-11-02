@@ -341,12 +341,12 @@ html[data-active-module] button.workspace-actions-trigger:is(:hover,[data-state=
 .workspace-actions-heading svg {color:var(--module-icon);flex:none;}
 .workspace-actions-menu .workspace-topnav__actions {display:grid;gap:6px;width:100%;margin:0;}
 .workspace-actions-menu :is(.work-actions,.people-header-actions,.finance-page-actions,.finance-native-action-bar,.workspace-space-actions) {display:flex!important;flex-direction:column;align-items:stretch;gap:3px;width:100%;margin:0;padding:0;border:0;}
-html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a) {display:flex!important;align-items:center;justify-content:flex-start!important;gap:10px!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:44px!important;height:auto!important;padding:8px 10px!important;margin:0!important;border:0!important;border-radius:10px!important;background:#fff!important;background-image:none!important;color:#23383f!important;box-shadow:none!important;text-align:left;font:500 14px/1.4 var(--font-body)!important;text-decoration:none;transition:background-color 180ms ease,color 180ms ease;}
-html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a):is(:hover,:focus-visible,[aria-expanded="true"]) {background:var(--module-quiet,#eef2f5)!important;color:#23383f!important;}
-html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a):focus-visible {outline:2px solid var(--module-focus);outline-offset:-2px;}
-html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(button,a):disabled {opacity:.5;}
+html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__actions :is(button,a) {display:flex!important;align-items:center;justify-content:flex-start!important;gap:10px!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:44px!important;height:auto!important;padding:8px 10px!important;margin:0!important;border:0!important;border-radius:10px!important;background:#fff!important;background-image:none!important;color:#23383f!important;box-shadow:none!important;text-align:left;font:500 14px/1.4 var(--font-body)!important;text-decoration:none;transition:background-color 180ms ease,color 180ms ease;}
+html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__actions :is(button,a):is(:hover,:focus-visible,[aria-expanded="true"]) {background:var(--module-quiet,#eef2f5)!important;color:#23383f!important;}
+html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__actions :is(button,a):focus-visible {outline:2px solid var(--module-focus);outline-offset:-2px;}
+html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__actions :is(button,a):disabled {opacity:.5;}
 .workspace-actions-menu .workspace-topnav__actions :is(button,a)>svg {width:20px!important;height:20px!important;flex:0 0 20px;align-self:center;color:var(--module-icon);}
-html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-topnav__actions :is(.work-mobile-only,[class*="mobileMenuButton"],.finance-mobile-menu,.people-mobile-nav-trigger) {display:none!important;}
+html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__actions :is(.work-mobile-only,[class*="mobileMenuButton"],.finance-mobile-menu,.people-mobile-nav-trigger) {display:none!important;}
 .workspace-action-label,.workspace-action-group-label,.workspace-create-actions {display:none;}
 .workspace-actions-menu .workspace-action-label {display:inline;}
 .workspace-actions-menu .workspace-create-select {display:none;}
@@ -366,3 +366,10 @@ html[data-active-module] .workspace-actions-menu[data-state="open"] .workspace-t
 
 /* CSS must not tween transforms already driven frame-by-frame by layout motion. */
 [data-directory-motion-card], [data-directory-motion-part] {transition-property:background-color,border-color,box-shadow,color,opacity!important;}
+
+/* Nested action menus use their own viewport-aware portal, above the parent. */
+.workspace-actions-submenu,.app-choice-menu[data-actions-submenu] {max-width:calc(100vw - 24px);max-height:min(480px,var(--radix-popover-content-available-height,75dvh));overflow:auto;overscroll-behavior:contain;}
+
+html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__actions [hidden] {display:none!important;}
+.workspace-actions-submenu .work-check {display:flex;align-items:center;gap:8px;}
+.workspace-actions-submenu .work-check input {width:18px;height:18px;flex:0 0 18px;margin:0;accent-color:var(--module-icon);}

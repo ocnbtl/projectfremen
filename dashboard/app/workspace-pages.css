@@ -150,7 +150,8 @@ button.workspace-back { display: inline-flex; align-items: center; gap: 7px; wid
 .workspace-topnav .finance-native-action-bar { padding: 0; }
 .workspace-topnav .people-directory-heading { display: none !important; }
 .workspace-nav-menu > section > p { margin: 12px 8px 6px; font-size: 12px; color: var(--text-muted); }
-.workspace-actions-menu[data-state="closed"] { display: none; }
+.workspace-actions-menu[data-state="closed"]:not([data-exiting]) { display: none; }
+.workspace-actions-menu[data-state="closed"][data-exiting] {animation:workspace-menu-fold 150ms ease-in both;pointer-events:none;}
 .workspace-actions-menu .work-count { display: none; }
 .workspace-actions-menu :is(.work-actions,.people-header-actions,.finance-page-actions,.quick-action-bar__actions) { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
 .workspace-actions-menu :is(header,.quick-action-bar,.finance-native-action-bar) { padding: 0; margin: 0; min-height: 0; border: 0; }

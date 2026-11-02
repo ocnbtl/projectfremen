@@ -5,7 +5,7 @@ import { workspaceReturnUrl } from "./useWorkspaceReturn";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import { useContext, useEffect, useState, useId } from "react";
+import { useContext, useEffect, useState, useId, useRef } from "react";
 import { LayoutGroup, motion } from "motion/react";
 import { WorkspaceTopbarContext, WorkspaceHomeContext } from "./WorkspaceTopbar";
 import * as Popover from "@radix-ui/react-popover";
@@ -118,7 +118,29 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
   const saved = workspaceReturnUrl(module,root);
   const home = module !== "personal" && saved.split("?")[0]===root ? saved : root;
   const bar = useContext(WorkspaceTopbarContext);
-  const [actionsOpen, setActionsOpen] = useState(false);
+  const [actionsOpen, setActionsOpenState] = useState(false);
+  const [actionsExiting, setActionsExiting] = useState(false);
+  const actionsTrigger = useRef<HTMLButtonElement>(null);
+  const actionsMenu = useRef<HTMLDivElement>(null);
+  const setActionsOpen = (next: boolean) => {
+    setActionsExiting(!next && actionsOpen && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    setActionsOpenState(next);
+  };
+  // Keep the portal host mounted so closing never discards module drafts or menu state.
+  useEffect(() => {
+    if (actionsOpen) {
+      const frame = requestAnimationFrame(() => {
+        const first = [...(actionsMenu.current?.querySelectorAll<HTMLElement>("button:not(:disabled), a[href]") || [])].find(item => item.getClientRects().length);
+        first?.focus({ preventScroll: true });
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    if (actionsExiting) {
+      // Fallback for a cancelled animation or a motion-preference change during exit.
+      const timer = setTimeout(() => setActionsExiting(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [actionsOpen, actionsExiting]);
   const [compact, setCompact] = useState(false);
   useEffect(() => {
     const query = window.matchMedia("(max-width: 900px)");
@@ -155,6 +177,6 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
     </div>}
     {status && <div className="workspace-nav-status">{status}</div>}
     {footer && !compact && <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label={title + " tools"}><UnigentamosIcon role="sliders" size={18} /><span>Tools</span></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>{footer}</Popover.Content></Popover.Portal></Popover.Root>}
-    {bar && (compact ? <Popover.Root open={actionsOpen} onOpenChange={setActionsOpen}><Popover.Trigger className="workspace-nav-trigger workspace-actions-trigger" aria-label={`${title} actions`} title="Actions"><UnigentamosIcon role="plus" size={18} /><span>Actions</span></Popover.Trigger><Popover.Portal forceMount><Popover.Content forceMount className="workspace-nav-menu workspace-actions-menu" aria-label={`${title} actions`} align="end" sideOffset={8} collisionPadding={12}><div className="workspace-actions-heading"><UnigentamosIcon role={`module-${module}`} size={18}/><span>{title}</span></div><div className="workspace-topnav__actions" ref={bar.setActions} onClick={event => { const action = (event.target as HTMLElement).closest("button, a"); if (action && !action.hasAttribute("aria-haspopup")) setActionsOpen(false); }} /></Popover.Content></Popover.Portal></Popover.Root> : <div className="workspace-topnav__actions" ref={bar.setActions} />)}
+    {bar && (compact ? <Popover.Root open={actionsOpen} onOpenChange={setActionsOpen}><Popover.Trigger ref={actionsTrigger} className="workspace-nav-trigger workspace-actions-trigger" aria-label={`${title} actions`} title="Actions"><UnigentamosIcon role="plus" size={18} /><span>Actions</span></Popover.Trigger><Popover.Portal forceMount><Popover.Content forceMount ref={actionsMenu} data-exiting={actionsExiting || undefined} inert={!actionsOpen} aria-hidden={!actionsOpen} onOpenAutoFocus={event => event.preventDefault()} onInteractOutside={event => { if ((event.target as HTMLElement)?.closest(".workspace-actions-submenu,[data-actions-submenu]")) event.preventDefault(); }} onEscapeKeyDown={event => { event.preventDefault(); setActionsOpen(false); actionsTrigger.current?.focus({preventScroll:true}); }} onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === "workspace-menu-fold") setActionsExiting(false); }} className="workspace-nav-menu workspace-actions-menu" aria-label={`${title} actions`} align="end" sideOffset={8} collisionPadding={12}><div className="workspace-actions-heading"><UnigentamosIcon role={`module-${module}`} size={18}/><span>{title}</span></div><div className="workspace-topnav__actions" ref={bar.setActions} onClick={event => { const action = (event.target as HTMLElement).closest("button, a"); if (action && !action.hasAttribute("aria-haspopup")) setActionsOpen(false); }} /></Popover.Content></Popover.Portal></Popover.Root> : <div className="workspace-topnav__actions" ref={bar.setActions} />)}
   </nav>;
 }

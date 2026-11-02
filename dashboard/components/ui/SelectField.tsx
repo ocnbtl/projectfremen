@@ -26,6 +26,10 @@ export default function SelectField({ value, defaultValue, onChange, children, c
   if (optionIcons) options.forEach(option => { if (optionIcons[option.value]) option.label = <span style={{display:"inline-flex",alignItems:"center",gap:6,minWidth:0}}><UnigentamosIcon role={optionIcons[option.value]} size={15} style={{flex:"none"}}/>{option.label}</span>; });
   if (renderOptionLabel) options.forEach(option => { option.label = renderOptionLabel(option.value, option.label); });
   const filtered = options.filter(option => matchesChoiceSearch(query, option.text, option.value, option.keywords));
+  const enclosingDialog = trigger.current?.closest<HTMLElement>('[role="dialog"]');
+  const inActionsMenu = Boolean(trigger.current?.closest(".workspace-actions-menu"));
+  // A scrolling nonmodal Actions popover is not a modal boundary for its children.
+  const portalContainer = enclosingDialog?.classList.contains("workspace-actions-menu") ? undefined : enclosingDialog || undefined;
   const label = attributes["aria-label"] || fieldLabel || "Select an option";
   const select = (next:string) => {setInternal(next); onChange?.({target:{value:next},currentTarget:{value:next}} as ChangeEvent<HTMLSelectElement>); setOpen(false); setQuery("");};
   return <Popover.Root open={open} onOpenChange={next => {setOpen(next); if (!next) setQuery("");}}>
@@ -41,7 +45,7 @@ export default function SelectField({ value, defaultValue, onChange, children, c
       onKeyDown={event => {if (["ArrowDown","ArrowUp"].includes(event.key)) {event.preventDefault(); setOpen(true);}}}>
       <span>{triggerContent ?? options.find(option => option.value === chosen)?.label ?? options.find(option => !option.value)?.label ?? "Select…"}</span>{!triggerContent && <UnigentamosIcon role="chevron-down" size={16} />}
     </button></Popover.Trigger>
-    <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content ref={menu} className={`app-select-menu app-choice-menu${columns > 1 ? " is-grid" : ""} ${menuClassName}`} sideOffset={6} collisionPadding={12} collisionBoundary={contained ? trigger.current?.closest<HTMLElement>('.work-sheet') : undefined}
+    <Popover.Portal container={portalContainer}><Popover.Content ref={menu} data-actions-submenu={inActionsMenu || undefined} className={`app-select-menu app-choice-menu${columns > 1 ? " is-grid" : ""} ${menuClassName}`} sideOffset={6} collisionPadding={12} collisionBoundary={contained ? trigger.current?.closest<HTMLElement>('.work-sheet') : undefined}
       onEscapeKeyDown={event => event.stopImmediatePropagation()}
       onOpenAutoFocus={event => {event.preventDefault(); if(hold.current?.held)return; if (searchable && autoFocusSearch) search.current?.focus(); else (menu.current?.querySelector<HTMLElement>('[aria-selected="true"]:not([disabled])') || menu.current?.querySelector<HTMLElement>('[role="option"]:not([disabled])'))?.focus({ preventScroll: true });}}
       onKeyDown={event => {

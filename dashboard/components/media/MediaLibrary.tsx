@@ -513,7 +513,7 @@ export default function MediaLibrary({
         count={visible.length + legacy.length}
       >
         {<>
-            <Popover.Root><Popover.Trigger asChild><Button icon="settings" aria-label="Upload options" title="Upload options"><span className="workspace-action-label">Upload options</span></Button></Popover.Trigger><Popover.Portal><Popover.Content className="app-select-menu workspace-filter-menu" align="end" sideOffset={8} collisionPadding={12}><strong>Upload options</strong><label className="work-check"><input type="checkbox" checked={readLocation} onChange={e=>setReadLocation(e.target.checked)}/>Read embedded JPEG locations on upload</label><p>Off by default. Only new uploads are affected.</p></Popover.Content></Popover.Portal></Popover.Root>
+            <Popover.Root><Popover.Trigger asChild><Button icon="settings" aria-label="Upload options" title="Upload options"><span className="workspace-action-label">Upload options</span></Button></Popover.Trigger><Popover.Portal><Popover.Content className="app-select-menu workspace-filter-menu workspace-actions-submenu" align="end" sideOffset={8} collisionPadding={12}><strong>Upload options</strong><label className="work-check"><input type="checkbox" checked={readLocation} onChange={e=>setReadLocation(e.target.checked)}/>Read embedded JPEG locations on upload</label><p>Off by default. Only new uploads are affected.</p></Popover.Content></Popover.Portal></Popover.Root>
             <Button
               intent="primary"
               icon="photo-upload"
