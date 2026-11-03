@@ -1,21 +1,15 @@
 "use client";
-import SelectField from "../ui/SelectField";
-
-import MetricStrip from "../operational/MetricStrip";
+import type {FinanceFilter,FinanceSort} from "../../lib/native-objects/url-state";
+import type {FinanceTransactionsViewModel} from "../../lib/modules/finance/transactions-view-model";
+import {money} from "./FinancePrimitives";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import {WorkspaceButton} from "../admin-shell/WorkspaceKit";
 import SystemState from "../operational/SystemState";
-import type { FinanceFilter, FinanceSort } from "../../lib/native-objects/url-state";
-import type { FinanceTransactionsViewModel } from "../../lib/modules/finance/transactions-view-model";
-import {
-  Chip,
-  HeaderAction,
-  Icon,
-  Panel,
-  WorkspaceHeader,
-  money
-} from "./FinancePrimitives";
-import styles from "./FinanceOperational.module.css";
-
+import {DirectoryLayout,MorphingArticle,MorphingButton,MorphingDiv} from "../ui/DirectoryLayout";
+import FinanceCollectionControls,{useFinanceCollectionView} from "./FinanceCollectionControls";
+import styles from "./FinanceCollections.module.css";
 export type FinanceTransactionsViewProps = {
+  onAddTransaction: () => void;
   model: FinanceTransactionsViewModel;
   filter: FinanceFilter;
   checkedIds: ReadonlySet<string>;
@@ -29,137 +23,25 @@ export type FinanceTransactionsViewProps = {
   onOpenColumnsPreview: () => void;
 };
 
-function statusTone(status: string) {
-  return status === "pending" ? "yellow" as const : "green" as const;
-}
 
-export default function FinanceTransactionsView({
-  model,
-  filter,
-  checkedIds,
-  onQueryChange,
-  onFilterChange,
-  onSortChange,
-  onSelect,
-  onCheckedChange,
-  onClearChecked,
-  onOpenFilterPreview,
-  onOpenColumnsPreview
-}: FinanceTransactionsViewProps) {
-  const displayedSort = model.sort;
-  const effectiveFilter = filter;
-
-  return (
-    <>
-
-      <MetricStrip
-        className={styles.metrics}
-        ariaLabel="Transaction scope metrics"
-        items={[
-          { id: "visible", label: "Transactions", value: model.visibleCount, detail: `${model.sourceCount} transactions recorded` },
-          { id: "income", label: "Income", value: money(model.totals.income), detail: `${model.counts.income} classified`, tone: "positive" },
-          { id: "spending", label: "Spending", value: money(model.totals.spending), detail: `${model.counts.expense} classified` },
-        ]}
-      />
-
-      <div className={styles.scopeBar}>
-        <div className={styles.filterGroup} role="group" aria-label="Transaction filters">
-          <button type="button" className={styles.filterButton} data-active={effectiveFilter === ""} aria-pressed={effectiveFilter === ""} onClick={() => onFilterChange("")}>All</button>
-          <button type="button" className={styles.filterButton} data-active={effectiveFilter === "unreviewed"} aria-pressed={effectiveFilter === "unreviewed"} onClick={() => onFilterChange("unreviewed")}>To review</button>
-          <button type="button" className={styles.filterButton} data-active={filter === "pending"} aria-pressed={filter === "pending"} onClick={() => onFilterChange("pending")}>Pending at bank</button>
-          <button type="button" className={styles.filterButton} data-active={filter === "transfer"} aria-pressed={filter === "transfer"} onClick={() => onFilterChange("transfer")}>Transfers</button>
-        </div>
-        <label className={styles.sortLabel}>
-          Sort
-          <SelectField
-            className={styles.sortSelect}
-            aria-label="Sort transactions"
-            value={displayedSort}
-            onChange={(event) => onSortChange(event.target.value as FinanceSort)}
-          >
-            <option value="date-desc">Newest first</option>
-            <option value="date-asc">Oldest first</option>
-            <option value="amount-desc">Amount high to low</option>
-            <option value="amount-asc">Amount low to high</option>
-            <option value="merchant-asc">Merchant A–Z</option>
-          </SelectField>
-        </label>
-      </div>
-
-      <Panel className={`${styles.ledger} finance-transaction-table`}>
-        <div className={styles.ledgerToolbar}>
-          <div className={styles.ledgerSummary} aria-live="polite">
-            <strong>{model.visibleCount} transactions</strong>
-            <code>{money(model.totals.income, { cents: true })} in</code>
-            <code>{money(model.totals.spending, { cents: true })} out</code>
-            <code>{money(model.totals.savingsMovement, { cents: true })} savings</code>
-          </div>
-          {checkedIds.size > 0 && (
-            <div className={styles.batchState}>
-              <strong>{checkedIds.size} selected</strong>
-              <button type="button" onClick={onClearChecked}>Clear</button>
-            </div>
-          )}
-        </div>
-
-        <div className={styles.columnHeader} aria-hidden="true">
-          <span />
-          <div className={styles.columnHeaderBody}>
-            <span>Date</span><span>Merchant / entity</span><span>TX ID</span><span>Account</span><span>Category</span><span>Status</span><span>Amount</span>
-          </div>
-        </div>
-
-        <div role="list" aria-label="Finance transactions">
-          {model.rows.map((transaction) => {
-            const selected = model.selectedId === transaction.id;
-            const accessibleTransaction = `${transaction.merchant}, ${transaction.date}, ${money(transaction.amount, { sign: true, cents: true })}, transaction ${transaction.id}, account ${transaction.account}`;
-            return (
-              <div
-                role="listitem"
-                className={styles.transactionRow}
-                data-selected={selected || undefined}
-                data-finance-transaction-id={transaction.id}
-                key={transaction.id}
-              >
-                <label className={styles.rowCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={checkedIds.has(transaction.id)}
-                    onChange={(event) => onCheckedChange(transaction.id, event.target.checked)}
-                    aria-label={`Select ${accessibleTransaction} for batch actions`}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className={styles.transactionBody}
-                  aria-pressed={selected}
-                  aria-controls="finance-inspector"
-                  aria-label={`Inspect ${accessibleTransaction}`}
-                  onClick={() => onSelect(transaction.id)}
-                >
-                  <span className={styles.secondaryCell}><strong>{transaction.date}</strong><span>{transaction.weekdayName} · W{transaction.week}</span></span>
-                  <span className={styles.primaryCell}><strong>{transaction.merchant}</strong><span>{transaction.entity}</span></span>
-                  <span className={styles.secondaryCell}><strong>{transaction.id}</strong><span>{transaction.ufInit ? "reviewed" : "needs review"}</span></span>
-                  <span className={styles.secondaryCell}><strong>{transaction.account}</strong><span>{transaction.accountType}</span></span>
-                  <span><Chip hue={transaction.hue}>{transaction.category}</Chip></span>
-                  <span><Chip hue={statusTone(transaction.status)}>{transaction.status}</Chip></span>
-                  <strong className={`${styles.amount} ${transaction.amount > 0 ? styles.positive : ""}`}>{money(transaction.amount, { sign: true, cents: true })}</strong>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        {model.rows.length === 0 && (
-          <SystemState
-            variant="empty"
-            className={styles.empty}
-            title={model.sourceCount ? "No matching transactions" : "Your transaction stream starts here"}
-            description={model.sourceCount ? "Try another search or return to All." : "Record a transaction or import a CSV statement from one of your accounts."}
-            action={{ label: "Clear filters", onSelect: () => { onQueryChange(""); onFilterChange(""); } }}
-          />
-        )}
-      </Panel>
-    </>
-  );
+export default function FinanceTransactionsView({model,filter,checkedIds,onQueryChange,onFilterChange,onSortChange,onSelect,onCheckedChange,onClearChecked,onAddTransaction}:FinanceTransactionsViewProps){
+ const [view,setView]=useFinanceCollectionView("transactions");
+ return <div className={styles.collection}>
+  <FinanceCollectionControls label="transactions" view={view} onView={setView} sort={model.sort} onSort={onSortChange} sortOptions={[{value:"date-desc",label:"Newest first"},{value:"date-asc",label:"Oldest first"},{value:"amount-desc",label:"Amount high to low"},{value:"amount-asc",label:"Amount low to high"},{value:"merchant-asc",label:"Merchant A–Z"}]} filter={filter} onFilter={onFilterChange} filterOptions={[{value:"",label:"All transactions"},{value:"unreviewed",label:"To review"},{value:"pending",label:"Pending at bank"},{value:"transfer",label:"Transfers"}]}/>
+  <div className={styles.metrics}><article><span>Transactions</span><strong>{model.visibleCount}</strong></article><article><span>Income</span><strong>{money(model.totals.income,{cents:true})}</strong></article><article><span>Spending</span><strong>{money(model.totals.spending,{cents:true})}</strong></article></div>
+  {checkedIds.size>0&&<div className={styles.batch} role="status"><strong>{checkedIds.size} selected</strong><WorkspaceButton intent="quiet" onClick={onClearChecked}>Clear selection</WorkspaceButton></div>}
+  <DirectoryLayout view={view} className={styles.list} role="list" aria-label="Finance transactions">{model.rows.map(transaction=>{
+   const description=transaction.merchant+", "+transaction.date+", "+money(transaction.amount,{sign:true,cents:true})+", transaction "+transaction.id+", account "+transaction.account;
+   return <MorphingArticle role="listitem" className={styles.card+" "+styles.transaction} data-selected={model.selectedId===transaction.id||undefined} data-finance-transaction-id={transaction.id} key={transaction.id}>
+    <label className={styles.checkbox}><input type="checkbox" checked={checkedIds.has(transaction.id)} onChange={event=>onCheckedChange(transaction.id,event.target.checked)} aria-label={"Select "+description+" for batch actions"}/></label>
+    <MorphingButton type="button" className={styles.open} aria-pressed={model.selectedId===transaction.id} aria-controls="finance-inspector" aria-label={"Inspect "+description} onClick={()=>onSelect(transaction.id)}>
+     <MorphingDiv className={styles.top}><span className={styles.identity}><strong>{transaction.merchant}</strong><small>{transaction.entity}</small></span><span className={styles.amount}><strong className={transaction.amount>0?styles.positive:undefined}>{money(transaction.amount,{sign:true,cents:true})}</strong></span></MorphingDiv>
+     <MorphingDiv className={styles.meta}><span><UnigentamosIcon role="calendar" size={14}/>{transaction.date}</span><span><UnigentamosIcon role="wallet" size={14}/>{transaction.account}</span></MorphingDiv>
+     <MorphingDiv className={styles.footer}><span className={styles.pill}>{transaction.category}</span><span className={styles.pill} data-tone={transaction.status==="pending"?"attention":undefined}>{transaction.status==="pending"?"Pending":"Posted"}</span></MorphingDiv>
+     {!transaction.ufInit&&<MorphingDiv className={styles.meta}><span><UnigentamosIcon role="review" size={14}/>Needs review</span></MorphingDiv>}
+    </MorphingButton>
+   </MorphingArticle>;
+  })}</DirectoryLayout>
+  {!model.rows.length&&<SystemState variant="empty" icon="banknote" title={model.sourceCount?"No matching transactions":"No transactions yet"} description={model.sourceCount?"Try another search or clear your filters.":"Add a transaction or import a statement."} action={{label:model.sourceCount?"Clear filters":"Add transaction",icon:model.sourceCount?"filter":"plus",onSelect:model.sourceCount?()=>{onQueryChange("");onFilterChange("");}:onAddTransaction}}/>}
+ </div>;
 }

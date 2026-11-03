@@ -1,5 +1,7 @@
 "use client";
 import SearchField from "./ui/SearchField";
+import * as Popover from "@radix-ui/react-popover";
+import financeStyles from "./finance/FinanceCollections.module.css";
 import { WorkspaceSheet, WorkspaceEmpty } from "./admin-shell/WorkspaceKit";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -211,18 +213,22 @@ function ArchivedFinanceRecords({ state, onRestore }: {
   </section>;
 }
 
-function FinanceSidebar({ smartCounts, view, smartFilter, onSmart, onUtility, onImport, mobileOpen, onClose }: {
+function FinanceSidebar({ smartCounts, view, smartFilter, onSmart, onUtility, onImport, onArchive, onPlan, onActivity, mobileOpen, onClose }: {
   smartCounts: Readonly<Record<string, number>>; view: ViewId; smartFilter: string;
   onSmart: (id: string) => void; onUtility: (utility: FinanceUtility) => void; onImport: () => void;
+  onArchive: () => void; onPlan: () => void; onActivity: () => void;
   mobileOpen: boolean; onClose: () => void;
 }) {
   return <ModuleSidebar id="finance-module-sidebar" title="Finance" ariaLabel="Finance sidebar" className="finance-module-sidebar" mobileOpen={mobileOpen} onClose={onClose}
     sections={[
       { id: "finance-views", label: "Finance", items: VIEWS.map(item => ({ id: item.id, label: item.label, icon: <UnigentamosIcon role={item.icon} />, active: view === item.id && !smartFilter, href: getModuleViewRoute("finance", item.id) })) },
-      { id: "finance-smart-views", label: "Smart views", items: SMART_VIEWS.map(item => ({ id: item.id, label: item.label, icon: <UnigentamosIcon role={item.icon} />, count: smartCounts[item.id] || 0, active: smartFilter === item.id, onSelect: () => onSmart(item.id) })) }
+      { id: "finance-smart-views", label: "Quick filters", items: SMART_VIEWS.map(item => ({ id: item.id, label: item.label, icon: <UnigentamosIcon role={item.icon} />, count: smartCounts[item.id] || 0, active: smartFilter === item.id, onSelect: () => onSmart(item.id) })) }
     ]}
-    footer={<div className="finance-sidebar-utilities" aria-label="Finance data tools">
-      {[{ id: "data", label: "Accounts data", icon: "contact-file" }, { id: "categories", label: "Categories", icon: "list" }, { id: "import", label: "Import", icon: "import" }, { id: "settings", label: "Settings", icon: "sliders" }].map(item => <button key={item.id} type="button" aria-label={item.label} title={item.label} data-icon-button="standard" onClick={() => { onClose(); if (item.id === "import") onImport(); else onUtility(item.id as FinanceUtility); }}><UnigentamosIcon role={item.icon} /><span className="finance-utility-tooltip">{item.label}</span></button>)}
+    footer={<div className={financeStyles.tools} aria-label="Finance tools">
+      {["overview","budgets","bills"].includes(view)&&<Popover.Close asChild><button type="button" onClick={()=>{onClose();onPlan();}}><UnigentamosIcon role="sliders"/><span>Plan from history</span></button></Popover.Close>}
+      <Popover.Close asChild><button type="button" onClick={()=>{onClose();onActivity();}}><UnigentamosIcon role="clock"/><span>Recent activity</span></button></Popover.Close>
+      <Popover.Close asChild><button type="button" onClick={()=>{onClose();onArchive();}}><UnigentamosIcon role="archive"/><span>Archived records</span></button></Popover.Close>
+      {[{id:"data",label:"Accounts data",icon:"contact-file"},{id:"categories",label:"Categories",icon:"list"},{id:"import",label:"Import statement",icon:"import"},{id:"settings",label:"Connections & settings",icon:"settings"}].map(item=><Popover.Close asChild key={item.id}><button type="button" onClick={()=>{onClose();if(item.id==="import")onImport();else onUtility(item.id as FinanceUtility);}}><UnigentamosIcon role={item.icon}/><span>{item.label}</span></button></Popover.Close>)}
     </div>}
   />;
 }
@@ -243,15 +249,15 @@ function NativeActionBar({
   const actions: React.ReactNode[] = [];
   if (view === "overview") actions.push(
     <HeaderAction key="account" icon="Plus" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
-    <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} title={!hasAccounts ? "Add an account first" : undefined} onClick={() => onOperation("transaction")}>Record transaction</HeaderAction>
+    <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} title={!hasAccounts ? "Add an account first" : undefined} onClick={() => onOperation("transaction")}>Add transaction</HeaderAction>
   );
   if (view === "accounts") actions.push(
     <HeaderAction key="account" icon="Plus" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
-    <HeaderAction key="import" icon="Link" primary disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
+    <HeaderAction key="import" icon="Import" disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
   );
   if (view === "transactions") actions.push(
-    <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("transaction")}>Record</HeaderAction>,
-    <HeaderAction key="import" icon="Link" disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
+    <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("transaction")}>Add transaction</HeaderAction>,
+    <HeaderAction key="import" icon="Import" disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
   );
   if (view === "bills") actions.push(
     <HeaderAction key="bill" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("bill")}>Add bill</HeaderAction>
@@ -849,11 +855,14 @@ export default function FinanceWorkspace({
       module="finance"
       mode="detail"
       ariaLabel="Finance workspace"
-      className={classNames("finance-workspace", "finance-module-shell", "finance-split-workspace", "has-rail", showContext && "has-context")}
+      className={classNames(financeStyles.workspace, "finance-workspace", "finance-module-shell", "finance-split-workspace", "has-rail", showContext && "has-context")}
       sidebar={<FinanceSidebar
         smartCounts={smartCounts}
         view={view}
         smartFilter={smartFilter}
+        onArchive={()=>setArchiveOpen(true)}
+        onPlan={()=>setPlanning("plan")}
+        onActivity={()=>{setAiOpen(false);setUtility("activity");}}
         onSmart={handleSmart}
         onUtility={(next) => { setAiOpen(false); setUtility(next); }}
         onImport={() => { setOperationTarget(null); setOperation(accounts.length ? "import" : "account"); }}
@@ -940,13 +949,13 @@ export default function FinanceWorkspace({
       <div className="finance-main-workspace">
         <WorkspaceNavSlot kind="actions"><header className="finance-page-header">
           <div className="finance-page-title"><button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar" aria-expanded={mobileSidebarOpen} aria-controls="finance-module-sidebar" data-icon-button="standard"><UnigentamosIcon role="menu" /></button><h1>{activeSmart?.label || activeView.label}</h1></div>
-          <div className="finance-page-actions"><button type="button" className="finance-action" onClick={()=>setArchiveOpen(true)}><UnigentamosIcon role="archive" size={18}/><span>Archive</span></button>{["overview", "budgets", "bills"].includes(view) && <button type="button" aria-label="Plan from history" title="Plan from history" className="finance-action finance-plan-trigger" onClick={() => setPlanning("plan")}><Icon name="Sliders" /><span>Plan from history</span></button>}{view === "transactions" && smartCounts.unreviewed > 0 && <button type="button" aria-label="Approve all transactions" title="Approve all transactions" className="finance-action finance-review-trigger" onClick={() => setPlanning("review")}><Icon name="Check" /><span>Approve all</span></button>}<NativeActionBar
+          <div className="finance-page-actions">{view === "transactions" && smartCounts.unreviewed > 0 && <button type="button" aria-label="Approve all transactions" title="Approve all transactions" className="finance-action finance-review-trigger" onClick={() => setPlanning("review")}><Icon name="Check" /><span>Approve all</span></button>}<NativeActionBar
           view={view}
           hasSelection={hasRouteSelection}
           hasAccounts={financeState.accounts.some((item) => !item.archivedAt)}
           closeStatus={activeClose?.status || "none"}
           onOperation={(nextOperation) => { setOperationTarget(null); setOperation(nextOperation); }}
-        />{view === "accounts" && <button type="button" className="finance-action" onClick={() => { setAiOpen(false); setInspectorOpen(false); setUtility("settings"); }}><Icon name="Link" />Connections</button>}<button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button></div>
+        /></div>
         </header></WorkspaceNavSlot>
         <WorkspaceNavSlot kind="search"><div className="finance-search-row"><SearchField aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); updateFinanceUrl({ query: event.target.value }, { native: true }); }} className="finance-global-search" /></div></WorkspaceNavSlot>
 
@@ -1006,6 +1015,7 @@ export default function FinanceWorkspace({
         )}
         {view === "bills" && (
           <FinanceBillsRouteView
+            onAddBill={()=>setOperation(financeState.accounts.some(item=>!item.archivedAt)?"bill":"account")}
             model={billsModel}
             filter={smartFilter}
             onQueryChange={(nextQuery) => {
@@ -1076,6 +1086,7 @@ export default function FinanceWorkspace({
         )}
         {view === "transactions" && (
           <FinanceTransactionsRouteView
+            onAddTransaction={()=>setOperation(financeState.accounts.some(item=>!item.archivedAt)?"transaction":"account")}
             model={transactionsModel}
             filter={smartFilter}
             checkedIds={checkedTxnIds}
