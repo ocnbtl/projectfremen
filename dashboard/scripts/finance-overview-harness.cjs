@@ -29,4 +29,11 @@ assert.deepEqual(readOverviewUrl(url), { filters, selection }); assert.equal(url
 const malformed = readOverviewUrl(new URLSearchParams('chart-range=invalid&chart-from=2026-02-30&chart-status=no&chart-detail=bad'));
 assert.equal(malformed.filters.range, '90d'); assert.equal(malformed.filters.from, ''); assert.equal(malformed.filters.status, 'cleared'); assert.equal(malformed.selection.kind, 'summary');
 assert.equal(JSON.stringify(state), before, 'Overview is read-only');
+const seven = buildFinanceOverview({ ...state, transactions: [tx('outside', { occurredOn: '2026-09-01', amount: 999 }), tx('start', { occurredOn: '2026-09-02', amount: 2 }), tx('end', { occurredOn: '2026-09-08', amount: 8 })] }, { ...defaults, range: '7d' });
+assert.equal(seven.from, '2026-09-02'); assert.equal(seven.to, '2026-09-08'); assert.equal(seven.spending, 10); assert.equal(seven.periods.length, 7); assert.equal(seven.unit, 'day');
+assert.equal(readOverviewUrl(writeOverviewUrl(new URLSearchParams(), { ...defaults, range: '7d' }, { kind: 'summary', id: '' })).filters.range, '7d');
+const daily = buildFinanceOverview({ ...state, transactions: [tx('start', { occurredOn: '2026-07-01' }), tx('end', { occurredOn: '2026-09-01' })] }, { ...defaults, range: '90d' });
+assert.equal(daily.unit, 'day'); assert.equal(daily.periods.length, 63);
+const weekly = buildFinanceOverview({ ...state, transactions: [tx('start', { occurredOn: '2026-01-01' }), tx('end', { occurredOn: '2026-11-01' })] }, { ...defaults, range: 'all' });
+assert.equal(weekly.unit, 'week'); assert.equal(weekly.periods[0].to, '2026-01-07'); assert.equal(weekly.periods.at(-1).to, '2026-11-01');
 console.log('Finance Overview: totals, pending/transfer/archive isolation, scope, dates, history gaps, URL state and read-only derivation passed.');

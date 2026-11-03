@@ -1,3 +1,6 @@
+import {readFinanceOrganizations} from "../../../lib/modules/finance/merchant-store";
+import {readNativeObjectLinks} from "../../../lib/native-objects/link-store";
+import {financeMerchantLinks} from "../../../lib/modules/finance/merchants";
 import AdminChrome from "../../../components/AdminChrome";
 import FinanceWorkspace from "../../../components/FinanceWorkspace";
 import { createEmptyFinanceState, readFinanceState } from "../../../lib/modules/finance/store";
@@ -27,6 +30,12 @@ export default async function FinanceRoutePage({
       }))
   ]);
 
+  const merchantResult = await Promise.all([readFinanceOrganizations(), readNativeObjectLinks()])
+    .then(([organizations, links]) => ({
+      data: { organizations, links: financeMerchantLinks(links) },
+      error: ""
+    }))
+    .catch(() => ({ data: { organizations: [], links: [] }, error: "Organization links could not be loaded. Reload Finance before changing a merchant organization." }));
   return (
     <div className="shell admin-chrome-main module-ref-shell finance-workspace-shell native-module-shell">
       <AdminChrome
@@ -37,9 +46,10 @@ export default async function FinanceRoutePage({
         showLocalAi={false}
       />
       <FinanceWorkspace
+        initialMerchants={merchantResult.data}
         initialView={initialView}
         initialFinanceState={financeResult.state}
-        initialFinanceError={financeResult.ok ? "" : financeResult.error}
+        initialFinanceError={financeResult.ok ? merchantResult.error : financeResult.error}
         initialPersonalOpsDecisions={personalOpsResult.ok ? personalOpsResult.state.decisions : []}
         initialDecisionsError={personalOpsResult.ok ? "" : personalOpsResult.error}
       />

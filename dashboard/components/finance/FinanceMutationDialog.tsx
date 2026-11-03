@@ -1,7 +1,13 @@
 "use client";
 import SelectField from "../ui/SelectField";
+import DateField from "../people/DateField";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import styles from "./FinanceDetails.module.css";
+import {FinanceOrganizationField,useFinanceMerchants} from "./FinanceMerchants";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import type { FinanceClosePeriodRecord, FinanceImportPreview, FinanceRecordKind, FinanceState } from "../../lib/modules/finance/native-types";
 import { createFinanceRepository } from "../../lib/modules/finance/repository";
 import { Icon } from "./FinancePrimitives";
@@ -14,7 +20,7 @@ export type FinanceOperation =
 type Selection = { kind: FinanceRecordKind; id: string } | null;
 
 const TITLES: Record<FinanceOperation, string> = {
-  account: "Add account", edit: "Edit Finance record", balance: "Record balance snapshot", transaction: "Record transaction",
+  account: "Add account", edit: "Edit Finance record", balance: "Record balance snapshot", transaction: "Add transaction",
   transaction_review: "Reconcile transaction", import: "Import bank CSV", transfer: "Record paired transfer",
   savings: "Record savings movement", bill: "Add bill or subscription", payment: "Record bill payment",
   budget: "Create monthly budget", close: "Start monthly close", close_check: "Resolve close check",
@@ -44,7 +50,9 @@ function value(form: FormData, name: string): string {
 
 function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string; name: string }) {
   const { label, ...input } = props;
-  return <label><span>{label}</span><input {...input} /></label>;
+  const [date,setDate]=useState(String(input.defaultValue || ""));
+  if(input.type==="date")return <div className={styles.dateField}><input type="hidden" name={input.name} value={date}/><DateField theme="finance" compact label={label} value={date} onChange={setDate} required={input.required}/></div>;
+  return <label data-wide={["name","merchant","memo"].includes(input.name)||undefined}><span>{label}</span><input {...input} /></label>;
 }
 
 function Select({ label, name, defaultValue, children }: { label: string; name: string; defaultValue?: string; children: React.ReactNode }) {
@@ -103,15 +111,15 @@ function EditFields({ state, selection, record }: { state: FinanceState; selecti
     <Select label="Entity" name="entityScope" defaultValue={String(record.entityScope || "personal")}><option value="personal">Personal</option><option value="business">Business</option></Select>
   </>;
   if (selection?.kind === "transaction") return <>
-    <Field label="Date" name="occurredOn" type="date" defaultValue={String(record.occurredOn || today())} required />
     <Field label="Merchant or source" name="merchant" defaultValue={String(record.merchant || "")} required maxLength={240} />
+    <Field label="Date" name="occurredOn" type="date" defaultValue={String(record.occurredOn || today())} required />
+    <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" defaultValue={String(record.amount || "")} required />
     <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}>{accountOptions(state)}</Select>
     <Select label="Direction" name="direction" defaultValue={String(record.direction || "expense")}><option value="expense">Expense</option><option value="income">Income</option></Select>
-    <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" defaultValue={String(record.amount || "")} required />
     <Field label="Category" name="category" defaultValue={String(record.category || "Uncategorized")} maxLength={160} />
-    <Field label="Memo" name="memo" defaultValue={String(record.memo || "")} maxLength={1000} />
-    <Select label="Status" name="status" defaultValue={String(record.status || "pending")}><option value="pending">Needs review</option><option value="cleared">Cleared</option></Select>
     <Select label="Entity" name="entityScope" defaultValue={String(record.entityScope || "personal")}><option value="personal">Personal</option><option value="business">Business</option></Select>
+    <Field label="Memo" name="memo" defaultValue={String(record.memo || "")} maxLength={1000} />
+    <Select label="Status" name="status" defaultValue={String(record.status || "pending")}><option value="pending">Pending</option><option value="cleared">Posted</option></Select>
     <label><span>Reviewed</span><input name="reviewed" type="checkbox" defaultChecked={Boolean(record.reviewed)} /></label>
   </>;
   if (selection?.kind === "bill") return <>
@@ -159,14 +167,14 @@ function Fields({ operation, state, record, selection, importHeaders, onImportFi
     <Select label="Source" name="balanceSource" defaultValue="manual"><option value="manual">Manual snapshot</option><option value="imported">Imported statement fact</option></Select>
   </>;
   if (operation === "transaction") return <>
-    <Field label="Date" name="occurredOn" type="date" defaultValue={today()} required />
     <Field label="Merchant or source" name="merchant" required maxLength={240} />
+    <Field label="Date" name="occurredOn" type="date" defaultValue={today()} required />
+    <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" required />
     <Select label="Account" name="accountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}>{accountOptions(state)}</Select>
     <Select label="Direction" name="direction" defaultValue="expense"><option value="expense">Expense</option><option value="income">Income</option></Select>
-    <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" required />
     <Field label="Category" name="category" defaultValue="Uncategorized" maxLength={160} />
-    <Field label="Memo (optional)" name="memo" maxLength={1000} />
     <Select label="Entity scope" name="entityScope" defaultValue="personal"><option value="personal">Personal</option><option value="business">Business</option></Select>
+    <Field label="Memo (optional)" name="memo" maxLength={1000} />
   </>;
   if (operation === "transaction_review") return <p>This records review and clears pending status. It does not alter the explicit account balance snapshot.</p>;
   if (operation === "import") return <>
@@ -264,6 +272,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
   const dialogRef = useRef<HTMLElement>(null);
   const idempotencyKeyRef = useRef("");
   const repository = useRef(createFinanceRepository()).current;
+  const merchants=useFinanceMerchants();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<FinanceImportPreview | null>(null);
@@ -284,9 +293,10 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
   useEffect(() => {
     if (!operation || !dialogRef.current) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const controls = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled])") || []);
+    const controls = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled])") || []).filter(control => control.getClientRects().length > 0);
     controls()[0]?.focus();
     const onKey = (event: KeyboardEvent) => {
+      if(event.defaultPrevented || !(event.target instanceof Node) || !dialogRef.current?.contains(event.target))return;
       if (event.key === "Escape" && !busy) { event.preventDefault(); onClose(); return; }
       if (event.key !== "Tab") return;
       const items = controls(); if (!items.length) return;
@@ -300,7 +310,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
   if (!operation) return null;
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); if (busy) return; setBusy(true); setError("");
     const form = new FormData(event.currentTarget);
     let result;
     if (operation === "import") {
@@ -322,7 +332,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
     }
     if (operation === "edit" && selection && record) {
       const fields: Record<string, unknown> = {};
-      for (const [name, item] of form.entries()) if (!(item instanceof File)) fields[name] = item;
+      for (const [name, item] of form.entries()) if (!(item instanceof File) && name!=="merchantOrganizationId") fields[name] = item;
       if (selection.kind === "transaction") fields.reviewed = form.has("reviewed");
       if (selection.kind === "bill") fields.autopay = form.has("autopay");
       result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields });
@@ -358,7 +368,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
       result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields: { currentBalance: value(form, "currentBalance"), balanceAsOf: value(form, "balanceAsOf"), balanceSource: value(form, "balanceSource") } });
     } else {
       const input: Record<string, unknown> = { kind: operation === "savings" ? "savings_movement" : operation === "close" ? "close_period" : operation };
-      for (const [name, item] of form.entries()) if (!(item instanceof File)) input[name] = item;
+      for (const [name, item] of form.entries()) if (!(item instanceof File) && name!=="merchantOrganizationId") input[name] = item;
       if (operation === "bill") input.autopay = form.has("autopay");
       if (operation === "rule") {
         const actionId = `finance-rule-action-${crypto.randomUUID()}`;
@@ -378,9 +388,19 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
       }
       result = await repository.create(input, idempotencyKeyRef.current);
     }
-    setBusy(false); if (!result.ok) { setError(result.error.message); return; }
+    if (!result.ok) { setBusy(false); setError(result.error.message); return; }
+    let message=`${TITLES[operation]} saved.`;
+    const organizationId=value(form,"merchantOrganizationId"), kind=operation==="edit"?selection?.kind:operation;
+    if ((kind === "bill" || kind === "transaction") && form.has("merchantOrganizationId")) {
+      const savedId = String(result.data.item.id);
+      try {
+        if (organizationId) await merchants.link(kind, savedId, String(result.data.item.merchant || result.data.item.name || "Merchant"), organizationId);
+        else for (const link of merchants.links.filter(item => item.source.objectType === kind && item.source.objectId === savedId)) await merchants.unlink(link.id);
+      } catch { message += " The organization link could not be updated. Open the record to try linking it again."; }
+    }
     idempotencyKeyRef.current = "";
-    onState(result.data.state, `${TITLES[operation]} saved.`); onClose();
+    setBusy(false);
+    onState(result.data.state,message); onClose();
   };
 
   const confirm = async () => {
@@ -395,11 +415,14 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
     onState(result.data.state, `${importableRows.length} transaction${importableRows.length === 1 ? "" : "s"} imported. ${preview.counts.ambiguous} still need categorization; ${preview.counts.rejected} invalid or duplicate row${preview.counts.rejected === 1 ? " was" : "s were"} skipped.`); onClose();
   };
 
+  const compactForm=["account","bill","transaction","balance"].includes(operation)||(operation==="edit"&&["account","bill","transaction"].includes(selection?.kind || ""));
+  const recordKind=operation==="edit"?selection?.kind:operation;
+  const heading=operation==="edit"?`Edit ${selection?.kind || "record"}`:TITLES[operation];
   const needsAccount = ["transaction", "import", "transfer", "savings", "bill"].includes(operation);
-  return <div className="finance-modal-backdrop" role="presentation">
-    <section ref={dialogRef} className="finance-modal" role="dialog" aria-modal="true" aria-labelledby="finance-mutation-title">
+  return createPortal(<div className="finance-module-shell" data-module="finance" style={{...moduleThemeVariables("finance"), display:"contents"} as React.CSSProperties}><div className="finance-modal-backdrop" role="presentation">
+    <section ref={dialogRef} className={`finance-modal ${compactForm?styles.dialog:""}`} role="dialog" aria-modal="true" aria-labelledby="finance-mutation-title">
       <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance operation" disabled={busy} data-icon-button="standard"><Icon name="X" /></button>
-      <h2 id="finance-mutation-title">{TITLES[operation]}</h2>
+      <h2 id="finance-mutation-title"><UnigentamosIcon role={recordKind==="account"?"wallet":recordKind==="bill"?"calendar":"banknote"} size={23}/>{heading}</h2>
       {error && <p className="finance-form-error" role="alert">{error}</p>}
       {preview ? <div className="finance-import-preview">
         <p><strong>{preview.sourceFilename}</strong> is ready.</p>
@@ -407,17 +430,17 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
         <div className="finance-import-preview__rows" aria-label="CSV preview rows">{preview.rows.slice(0, 8).map((row) => <div key={`${row.rowNumber}:${row.fingerprint}`} data-status={row.status}><span>{row.occurredOn || `Row ${row.rowNumber}`}</span><strong>{row.merchant || row.reason || "Unreadable row"}</strong><span>{row.amount === undefined ? "Skipped" : `$${row.amount.toFixed(2)}`}</span><small>{row.status === "ambiguous" ? "Needs category" : row.status === "rejected" ? "Skipped" : "Ready"}</small></div>)}</div>
         <p>Ready rows become transactions immediately. Uncategorized rows stay visible as “Needs review,” so you can categorize and reconcile them later.</p>
         <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={() => setPreview(null)} disabled={busy}>Back</button><button type="button" className="finance-action is-primary" onClick={() => void confirm()} disabled={busy}>{busy ? "Importing…" : preview.counts.accepted + preview.counts.ambiguous ? `Import ${preview.counts.accepted + preview.counts.ambiguous} transactions` : "Save skipped-row record"}</button></div>
-      </div> : <form onSubmit={(event) => void submit(event)}>
-        <div><Fields operation={operation} state={state} record={record} selection={selection} importHeaders={importHeaders} onImportFile={(file) => {
+      </div> : <form key={`${operation}:${record?.id || "new"}`} onSubmit={(event) => void submit(event)}>
+        <div className={compactForm?styles.fields:undefined}><Fields operation={operation} state={state} record={record} selection={selection} importHeaders={importHeaders} onImportFile={(file) => {
           setError("");
           if (!file) { setImportHeaders([]); return; }
           if (file.size > 5_000_000) { setImportHeaders([]); setError("Choose a CSV smaller than 5 MB."); return; }
           void file.text().then((text) => setImportHeaders(csvHeaders(text))).catch(() => setError("This CSV could not be read."));
-        }} /></div>
+        }} />{["transaction","bill"].includes(recordKind || "")&&<FinanceOrganizationField kind={recordKind as "transaction"|"bill"} recordId={record?.id as string|undefined}/>}</div>
         <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" className="finance-action is-primary" disabled={busy || (needsAccount && state.accounts.filter((item) => !item.archivedAt).length === 0)}>{busy ? "Saving…" : operation === "import" ? "Preview CSV" : "Save"}</button></div>
       </form>}
     </section>
-  </div>;
+  </div></div>, document.body);
 }
 
 export function activeCloseForState(state: FinanceState): FinanceClosePeriodRecord | null {

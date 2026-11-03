@@ -13,14 +13,14 @@ import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
 /** An independent draft layered over the person editor; parent state never unmounts. */
-export default function InlineOrganizationDialog({existingIds,onSaved,onClose,school=false}:{existingIds:string[];onSaved:(record:PersonalRecord,records:PersonalRecord[])=>void;onClose:()=>void;school?:boolean}) {
+export default function InlineOrganizationDialog({existingIds,onSaved,onClose,school=false,returnLabel="person draft",existingNames=[]}:{returnLabel?:string;existingNames?:string[];existingIds:string[];onSaved:(record:PersonalRecord,records:PersonalRecord[])=>void;onClose:()=>void;school?:boolean}) {
   const [values,setValues]=useState<OrganizationAutofillValues>(school ? { organizationType: "University / School" } : {});
   const [photo,setPhoto]=useState(""),[photoOpen,setPhotoOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[discard,setDiscard]=useState(false);
   const locked=useRef(false);
   const change=(field:keyof OrganizationAutofillValues,value:string)=>setValues(current=>({...current,[field]:value}));
   const close=()=>{if(locked.current)return; if(Object.entries(values).some(([key,value])=>Boolean(value) && !(school && key === "organizationType" && value === "University / School"))||photo)setDiscard(true);else onClose();};
   async function save(event:React.FormEvent) {
-    event.preventDefault(); if(locked.current || !values.name?.trim())return; locked.current=true;setBusy(true);setError("");
+    event.preventDefault(); event.stopPropagation(); if(existingNames.some(name=>name.trim().toLowerCase()===values.name?.trim().toLowerCase())){setError("An organization with this name already exists. Choose it from the organization list.");return;} if(locked.current || !values.name?.trim())return; locked.current=true;setBusy(true);setError("");
     try {
       const {name,headquarters,streetAddress,...fields}=values;
       const profile={...fields,fullName:name!.trim(),industry:normalizeOrganizationIndustry(values.organizationType || "",values.industry || ""),headquarters:headquarters || "",address:streetAddress || "",notes:"",locations:headquarters || streetAddress?[{id:crypto.randomUUID(),label:"Headquarters",location:headquarters || "",address:streetAddress || ""}]:[]};
@@ -34,7 +34,7 @@ export default function InlineOrganizationDialog({existingIds,onSaved,onClose,sc
     } catch(reason){setError(reason instanceof Error?reason.message:"Could not save. Your draft is still here.");} finally{locked.current=false;setBusy(false);}
   }
   return <Dialog.Root open onOpenChange={open=>{if(!open)close();}}><Dialog.Portal><Dialog.Overlay className="people-inline-org-overlay"/><Dialog.Content className="people-inline-org-dialog" onEscapeKeyDown={event=>{event.preventDefault();event.stopImmediatePropagation();if(photoOpen){setPhotoOpen(false);return;}close();}} onInteractOutside={event=>event.preventDefault()}>
-    <form onSubmit={save}><header><div><Dialog.Title>New organization</Dialog.Title><Dialog.Description>Save this organization to return to your person draft.</Dialog.Description></div><button type="button" aria-label="Close new organization" onClick={close} disabled={busy} data-icon-button="standard"><UnigentamosIcon role="close" size={18}/></button></header>
+    <form onSubmit={save}><header><div><Dialog.Title>New organization</Dialog.Title><Dialog.Description>Save this organization to return to your {returnLabel}.</Dialog.Description></div><button type="button" aria-label="Close new organization" onClick={close} disabled={busy} data-icon-button="standard"><UnigentamosIcon role="close" size={18}/></button></header>
       <fieldset disabled={busy} className="people-inline-org-fields">
         <button type="button" className="people-inline-org-photo" aria-label="Add organization picture" onClick={()=>setPhotoOpen(true)}><PeopleProfileAvatar organization={true} label={values.name || "Organization"} initials={(values.name || "O").slice(0,1)} photoUrl={photo} compact/><span>{photo?"Edit picture":"Add picture"}</span></button>
         <div className="people-inline-org-group"><label className="is-wide">Organization name<input required value={values.name || ""} onChange={event=>change("name",event.target.value)}/></label>

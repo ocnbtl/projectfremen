@@ -1,5 +1,7 @@
 "use client";
 
+import FinanceMerchantAvatar,{FinanceMerchantPanel} from "./FinanceMerchants";
+import detailStyles from "./FinanceDetails.module.css";
 import FinanceAccountDetails from "./FinanceAccountDetails";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import InspectorRail from "../admin-shell/InspectorRail";
@@ -124,7 +126,9 @@ function WorkbenchActions({ children }: { children: React.ReactNode }) {
 }
 
 function WorkbenchAction({ children, primary = false, onClick }: { children: React.ReactNode; primary?: boolean; onClick: () => void }) {
-  return <button type="button" className={`finance-action ${primary ? "is-primary" : ""}`} onClick={onClick}>{children}</button>;
+  const label = typeof children === "string" ? children : "";
+  const icon = label.startsWith("Edit") || label.startsWith("Update") ? "edit" : label === "Archive" ? "archive" : label.includes("payment") ? "banknote" : "check";
+  return <button type="button" className={`finance-action ${primary ? "is-primary" : ""}`} onClick={onClick}><UnigentamosIcon role={icon} size={16}/>{children}</button>;
 }
 
 function TransactionProperties({ transaction }: { transaction: FinanceTransaction }) {
@@ -275,7 +279,7 @@ export default function FinanceInspector({
           objectType={accountRow ? "" : objectType}
           title={objectTitle}
           subtitle={subtitle}
-          identity={<Icon name={accountRow ? "Wallet" : transaction ? "Banknote" : billRow ? "Calendar" : budgetRow ? "PiggyBank" : "Check"} />}
+          identity={transaction?<FinanceMerchantAvatar kind="transaction" id={transaction.id} label={transaction.merchant}/>:billRow?<FinanceMerchantAvatar kind="bill" id={billRow.bill.id} label={billRow.bill.name}/>:<Icon name={accountRow ? "Wallet" : transaction ? "Banknote" : billRow ? "Calendar" : budgetRow ? "PiggyBank" : "Check"} />}
           states={accountRow ? undefined : stateChip}
           metadata={accountRow
             ? stateChip
@@ -304,7 +308,7 @@ export default function FinanceInspector({
         {budgetSelection && <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", budgetSelection)}>Edit budget</WorkbenchAction><WorkbenchAction onClick={() => onOperation("archive", budgetSelection)}>Archive</WorkbenchAction></WorkbenchActions>}
         {closeSelection && <WorkbenchActions><WorkbenchAction onClick={() => onOperation("close_check", closeSelection)}>Update check</WorkbenchAction><WorkbenchAction primary onClick={() => onOperation(closePeriod?.status === "closed" ? "reopen_close" : "complete_close", closeSelection)}>{closePeriod?.status === "closed" ? "Reopen month" : "Complete month"}</WorkbenchAction></WorkbenchActions>}
       </div>}
-      className={`finance-right-rail ${accountRow ? "finance-account-inspector" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
+      className={`${detailStyles.detail} finance-right-rail ${accountRow ? "finance-account-inspector" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
       ariaLabel={`${objectTitle} Finance inspector`}
       overlay={overlay}
       overlayOpen={overlayOpen}
@@ -322,9 +326,9 @@ export default function FinanceInspector({
       {transaction && (
         <div className={styles.inspectorPanel}>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="overview" active={safeTab === "overview"} className={styles.inspectorPanel}>
-            <div className={styles.factGrid}>
+            <FinanceMerchantPanel kind="transaction" id={transaction.id} label={transaction.merchant}/><div className={styles.factGrid}>
               <div><span>Amount</span><strong>{money(transaction.amount, { sign: true, cents: true })}</strong></div>
-              <div><span>Status</span><strong>{transaction.status}</strong></div>
+              <div><span>Status</span><strong>{transaction.status === "cleared" ? "Posted" : transaction.status === "pending" ? "Pending" : transaction.status}</strong></div>
               <div><span>Type</span><strong>{transaction.io === "income" ? "Money in" : transaction.io === "transfer" ? "Transfer" : "Money out"}</strong></div>
               <div><span>Account</span><strong>{transaction.account}</strong></div>
               <div><span>Category</span><strong>{transaction.category}</strong></div>
@@ -343,8 +347,8 @@ export default function FinanceInspector({
 
           <DetailTabPanel tabsId="finance-object-tabs" tabId="links" active={safeTab === "links"} className={styles.inspectorPanel}>
             <section className={styles.inspectorSection}>
-              <h3>Owner-module search handoffs</h3>
-              <p>Exact NativeObjectRef evidence opens its canonical owner. Search handoffs remain visibly distinct from persisted links.</p>
+              <h3>Related records</h3>
+
               <div className={styles.compactList}>
                 <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "accounts")}?query=${encodeURIComponent(transaction.account)}`}><span><strong>{transaction.account}</strong><small>Finance account search · display-name match</small></span><span>Open</span></a>
                 <a className={styles.compactRow} href={getModuleViewRoute("finance", "review")}><span><strong>Finance Monthly Review</strong><small>Finance owns close state</small></span><span>Open</span></a>
@@ -371,7 +375,7 @@ export default function FinanceInspector({
       {billRow && (
         <div className={styles.inspectorPanel}>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="overview" active={safeTab === "overview"} className={styles.inspectorPanel}>
-            <div className={styles.factGrid}>
+            <FinanceMerchantPanel kind="bill" id={billRow.bill.id} label={billRow.bill.name}/><div className={styles.factGrid}>
               <div><span>Amount</span><strong>{money(billRow.bill.amount, { cents: true })}</strong></div>
               <div><span>Payment status</span><strong>{billRow.bill.status}</strong></div>
               <div><span>Cadence</span><strong>{billRow.bill.recurring || "Not recorded"}</strong></div>
@@ -380,11 +384,11 @@ export default function FinanceInspector({
               <div><span>Category</span><strong>{billRow.bill.category}</strong></div>
             </div>
             <section className={styles.inspectorSection}>
-              <h3>{billRow.bill.evidence ? "Detected from your transactions" : "Payment and value stay separate"}</h3>
+              <h3>{billRow.bill.evidence ? "Detected from your transactions" : "Payment"}</h3>
               {billRow.bill.evidence && <p>{billRow.bill.evidence.basis}</p>}
-              <p>{billRow.bill.name} is {billRow.bill.status}. Payment outcome, recurrence, autopay, canonical evidence, or an explicit exception remain separate facts.</p>
+              <p>Record a payment once it has been paid. Autopay and estimates do not confirm payment.</p>
             </section>
-            <div className={styles.boundary}><strong>No payment execution</strong><span>Finance records an observed payment only with evidence or an explicit audited exception; it never sends money.</span></div>
+            <p className={styles.paymentNote}>Recording a payment does not send money.</p>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="payments" active={safeTab === "payments"}>
             {billRow.bill.evidence && <section className={styles.inspectorSection}><h3>Observed payments</h3><p>These transactions support the recurring estimate. They do not confirm payment of the next bill.</p><div className={styles.compactList}>{financeState.transactions.filter(t => billRow.bill.evidence?.transactionIds.includes(t.id)).map(t => <a key={t.id} className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?selected=${encodeURIComponent(t.id)}`}><span><strong>{t.merchant}</strong><small>{t.occurredOn} · {t.status}{t.archivedAt ? " · archived" : ""}</small></span><strong>{money(t.amount, { cents: true })}</strong></a>)}</div></section>}

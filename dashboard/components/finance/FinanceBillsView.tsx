@@ -7,6 +7,7 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SystemState from "../operational/SystemState";
 import {DirectoryLayout,MorphingArticle,MorphingButton,MorphingDiv} from "../ui/DirectoryLayout";
 import FinanceCollectionControls,{useFinanceCollectionView} from "./FinanceCollectionControls";
+import FinanceMerchantAvatar from "./FinanceMerchants";
 import styles from "./FinanceCollections.module.css";
 export type FinanceBillsViewProps = {
   onAddBill: () => void;
@@ -48,7 +49,7 @@ export default function FinanceBillsView({model,filter,onQueryChange,onFilterCha
    <div className={styles.heading}><h2>{BILL_STATUS_LABELS[status]}<span>{rows.length}</span></h2></div>
    <DirectoryLayout view={view} className={styles.list} role="list">{rows.map(({bill,monthlyEquivalent})=><MorphingArticle role="listitem" key={bill.id} className={styles.card} data-selected={model.selectedId===bill.id||undefined}>
     <MorphingButton type="button" className={styles.open} data-finance-bill-id={bill.id} aria-pressed={model.selectedId===bill.id} aria-controls="finance-inspector" onClick={()=>onSelect(bill.id)}>
-     <MorphingDiv className={styles.top}><span className={styles.symbol}><Icon name={bill.icon}/></span><span className={styles.identity}><strong>{bill.name}</strong><small>{bill.account}</small></span><span className={styles.amount}><strong>{money(bill.amount,{cents:true})}</strong>{bill.recurring&&<small>{money(monthlyEquivalent,{cents:true})}/mo equivalent</small>}</span></MorphingDiv>
+     <MorphingDiv className={styles.top}><FinanceMerchantAvatar kind="bill" id={bill.id} label={bill.name}/><span className={styles.identity}><strong>{bill.name}</strong><small>{bill.account}</small></span><span className={styles.amount}><strong>{money(bill.amount,{cents:true})}</strong>{bill.recurring&&<small>{money(monthlyEquivalent,{cents:true})}/mo equivalent</small>}</span></MorphingDiv>
      <MorphingDiv className={styles.meta}><span><UnigentamosIcon role="calendar" size={14}/>{bill.due}{bill.evidence?" · estimated":" · "+dueDetail(bill.status,bill.dueIn)}</span></MorphingDiv>
      <MorphingDiv className={styles.footer}><span className={styles.pill} data-tone={status==="overdue"?"danger":status==="due"?"attention":undefined}>{bill.evidence?"Estimated":BILL_STATUS_LABELS[status]}</span><span>{bill.category}</span></MorphingDiv>
      <MorphingDiv className={styles.meta}><span><UnigentamosIcon role="routine" size={14}/>{bill.recurring||"One-time"}</span><span>{bill.evidence&&!bill.autopayConfirmed?"Autopay unconfirmed":bill.autopay?"Autopay on":"Manual payment"}</span></MorphingDiv>

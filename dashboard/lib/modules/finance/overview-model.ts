@@ -2,7 +2,7 @@ import type { FinanceState, FinanceTransactionRecord } from "./native-types";
 import { financeSpendingGroup } from "./planning";
 
 export type OverviewFilters = {
-  range: "30d" | "90d" | "year" | "all" | "custom";
+  range: "7d" | "30d" | "90d" | "year" | "all" | "custom";
   from: string; to: string; account: string; category: string; budget: string;
   status: "cleared" | "pending" | "all";
   direction: "all" | "income" | "expense";
@@ -19,7 +19,7 @@ export function readOverviewUrl(params: URLSearchParams) {
     const value = params.get(`chart-${key}`);
     if (value !== null) Object.assign(filters, { [key]: value });
   }
-  if (!["30d", "90d", "year", "all", "custom"].includes(filters.range)) filters.range = "90d";
+  if (!["7d", "30d", "90d", "year", "all", "custom"].includes(filters.range)) filters.range = "90d";
   if (!["cleared", "pending", "all"].includes(filters.status)) filters.status = "cleared";
   if (!["all", "income", "expense"].includes(filters.direction)) filters.direction = "all";
   if (!["amount-desc", "amount-asc", "name", "count"].includes(filters.spendingSort)) filters.spendingSort = "amount-desc";
@@ -54,7 +54,7 @@ export function buildFinanceOverview(state: FinanceState, filters: OverviewFilte
   const latest = dates.at(-1) || iso(new Date());
   const first = dates[0] || latest;
   const endDate = new Date(`${latest}T00:00:00Z`);
-  const defaultStart = iso(new Date(endDate.getTime() - (filters.range === "30d" ? 29 : 89) * DAY));
+  const defaultStart = iso(new Date(endDate.getTime() - (filters.range === "7d" ? 6 : filters.range === "30d" ? 29 : 89) * DAY));
   let from = filters.range === "all" ? first : filters.range === "year" ? `${latest.slice(0, 4)}-01-01` : filters.range === "custom" ? filters.from || first : defaultStart;
   let to = filters.range === "custom" ? filters.to || latest : latest;
   const invalidRange = from > to;
@@ -82,7 +82,7 @@ export function buildFinanceOverview(state: FinanceState, filters: OverviewFilte
   // Plot only the observed span: an unobserved month is never presented as zero spending.
   const plotFrom = from > first ? from : first, plotTo = to < latest ? to : latest;
   const span = (Date.parse(plotTo) - Date.parse(plotFrom)) / DAY;
-  const unit = span <= 21 ? "day" : span <= 120 ? "week" : span <= 1095 ? "month" : "year";
+  const unit = span <= 90 ? "day" : span <= 366 ? "week" : span <= 1095 ? "month" : "year";
   const periods: { id: string; to: string; label: string; income: number; spending: number; count: number }[] = [];
   if (!invalidRange && recorded.length && plotFrom <= plotTo) {
     let cursor = plotFrom;

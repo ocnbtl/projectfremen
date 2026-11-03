@@ -74,17 +74,12 @@ const output=path.join(app,'output/actions-motion');fs.mkdirSync(output,{recursi
   await page.keyboard.press('Escape');await expect(parent).toBeHidden();
  }
  await page.goto(base+'/admin/personal');await page.setViewportSize({width:375,height:667});
- // Exercise the real shared selector inside the action host without changing shipped UI.
- await page.addStyleTag({content:'.workspace-actions-menu .workspace-create-select {display:block!important}'});
+ // Current Personal actions are individual buttons, rather than the retired create selector.
  await page.locator('.workspace-actions-trigger').click();await page.waitForTimeout(280);
- await page.getByRole('combobox',{name:'Create personal item'}).click();
- const choices=page.locator('.app-choice-menu[data-actions-submenu]');await expect(choices).toBeVisible();
- assert.equal(await choices.evaluate(el=>Boolean(el.parentElement.closest('.workspace-actions-menu'))),false);
- const choiceBounds=await choices.boundingBox();assert(choiceBounds.x>=0&&choiceBounds.x+choiceBounds.width<=375&&choiceBounds.y>=0&&choiceBounds.y+choiceBounds.height<=667);
- await page.keyboard.press('Escape');await expect(choices).toBeHidden();await expect(page.locator('.workspace-actions-menu')).toHaveAttribute('data-state','open');
- await page.getByRole('combobox',{name:'Create personal item'}).click();await choices.getByRole('option',{name:'Goal',exact:true}).click();
+ await page.locator('.workspace-actions-menu').getByRole('button',{name:'Add Goal',exact:true}).click();
+ await expect(page.locator('.workspace-actions-menu')).toBeHidden();
  const form=page.locator('[role="dialog"]:visible').filter({hasNot:page.locator('.workspace-topnav__actions')}).first();await expect(form).toBeVisible();await page.waitForTimeout(250);await expect(form).toBeVisible();
  const field=form.locator('input:not([type]),input[type="text"]').first();await field.fill('Local unsaved draft');await page.waitForTimeout(250);await expect(field).toHaveValue('Local unsaved draft');
- console.log('PASS real nested selector portal, keyboard dismissal and form/draft preservation');
+ console.log('PASS portaled action dismissal and form/draft preservation');
  console.log('PASS nested menu bounds, visible hit targets, selection and keyboard dismissal at four mobile sizes');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

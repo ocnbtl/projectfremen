@@ -1,4 +1,6 @@
 "use client";
+import {FinanceMerchantsProvider} from "./finance/FinanceMerchants";
+import type {FinanceMerchantsData} from "../lib/modules/finance/merchants";
 import SearchField from "./ui/SearchField";
 import * as Popover from "@radix-ui/react-popover";
 import financeStyles from "./finance/FinanceCollections.module.css";
@@ -352,12 +354,14 @@ export default function FinanceWorkspace({
   initialView,
   initialFinanceState,
   initialFinanceError = "",
+  initialMerchants={organizations:[],links:[]},
   initialPersonalOpsDecisions = [],
   initialDecisionsError = ""
 }: {
   initialView?: FinanceView;
   initialFinanceState: FinanceState;
   initialFinanceError?: string;
+  initialMerchants?:FinanceMerchantsData;
   initialPersonalOpsDecisions?: PersonalOpsDecision[];
   initialDecisionsError?: string;
 }) {
@@ -849,7 +853,7 @@ export default function FinanceWorkspace({
   }
 
   return (
-    <ModuleShell
+    <FinanceMerchantsProvider initial={initialMerchants}><ModuleShell
       detailOpen={inspectorOpen || showContext}
       onBack={closeInspector}
       module="finance"
@@ -1135,6 +1139,6 @@ export default function FinanceWorkspace({
           setOperationTarget(null);
         }}
       />
-    </ModuleShell>
+    </ModuleShell></FinanceMerchantsProvider>
   );
 }

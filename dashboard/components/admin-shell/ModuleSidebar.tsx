@@ -143,6 +143,18 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
   }, [actionsOpen, actionsExiting]);
   const [compact, setCompact] = useState(false);
   useEffect(() => {
+    const host = bar?.actions;
+    if (!host || !actionsOpen) return;
+    // Slotted actions are React portals: their synthetic clicks follow the source
+    // tree, so listen on the actual menu host to dismiss after a leaf action.
+    const closeAction = (event: MouseEvent) => {
+      const action = event.target instanceof Element ? event.target.closest("button, a") : null;
+      if (action && !action.hasAttribute("aria-haspopup") && !action.hasAttribute("disabled")) setActionsOpen(false);
+    };
+    host.addEventListener("click", closeAction);
+    return () => host.removeEventListener("click", closeAction);
+  }, [bar?.actions, actionsOpen]);
+  useEffect(() => {
     const query = window.matchMedia("(max-width: 900px)");
     const sync = () => setCompact(query.matches);
     sync(); query.addEventListener("change", sync);

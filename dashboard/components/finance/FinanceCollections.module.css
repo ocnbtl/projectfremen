@@ -91,3 +91,54 @@
 .checkbox.checkbox{margin:0;padding:0;min-height:0;}
 .checkbox input{height:17px;min-height:17px;padding:0;}
 @media(max-width:600px){.metrics strong{font-size:clamp(13px,3.7vw,18px);}.list[data-directory-view=grid] .transaction .open{padding-top:48px;}}
+/* Overview: cash flow and categories share the main column; recent activity stays beside them. */
+.overview.overview{grid-template-columns:minmax(0,1.8fr) minmax(310px,1fr);grid-template-rows:auto auto;}
+.overview :global(.finance-overview-cashflow){grid-column:1;grid-row:1;}
+.overview :global(.finance-spending-breakdown){grid-column:1;grid-row:2;}
+.overview :global(.finance-recent-transactions){grid-column:2;grid-row:1 / span 2;}
+.overview :global(.finance-welcome){grid-row:1;}
+.overview:has(:global(.finance-welcome)) :global(.finance-overview-cashflow){grid-row:2;}
+.overview:has(:global(.finance-welcome)) :global(.finance-spending-breakdown){grid-row:3;}
+.overview:has(:global(.finance-welcome)) :global(.finance-recent-transactions){grid-row:2/span 2;}
+.chartActions{display:flex;align-items:center;gap:6px;flex:none;}
+.chartActions button{width:36px!important;height:36px!important;min-height:36px!important;display:grid;place-items:center;padding:0!important;}
+.overview .chartActions svg{transform:none!important;}
+.rangeLabel.rangeLabel{display:flex!important;align-items:center;gap:7px;margin:7px 0 0!important;width:fit-content;background:var(--module-primary-50);padding:5px 8px;border-radius:7px;font-variant-numeric:tabular-nums;}
+.overview :global(.finance-flow-totals){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:8px 18px 18px;}
+.overview :global(.finance-flow-totals)>div{padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--module-primary-50);min-width:0;}
+.overview :global(.finance-flow-totals) span{display:flex;align-items:center;gap:6px;font-size:12px;}
+.overview :global(.finance-flow-totals) strong{font-size:clamp(17px,1.7vw,26px);overflow-wrap:anywhere;}
+.overview :global(.finance-chart-dates){display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;}
+.overview :global(.finance-chart-dates) :global(.people-date-field){display:grid;gap:5px;font-size:12px;}
+.overview :global(.finance-chart-dates) :global(.people-date-trigger){display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:white;font-size:13px;}
+.overview :global(.finance-chart-dates)>span{align-self:center;margin-top:14px;}
+.overview :global(.finance-range-presets){flex-wrap:wrap;}
+.overview :global(.finance-range-presets) button{flex:1;min-width:56px;}
+.overview :global(.finance-spending-sort){padding:0;margin:0;}
+.overview .categoryTotal{font-size:24px!important;font-weight:600!important;}
+.overview :global(.finance-spending-breakdown) ol{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+.overview :global(.finance-spending-breakdown) li button>span:last-of-type strong{font-size:20px;}
+.overview :global(.finance-focus-queue){grid-template-columns:minmax(0,1fr);}
+.overview :global(.finance-focus-queue)>button{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;}
+.overview :global(.finance-focus-queue)>button>span{min-width:0;}
+.overview :global(.finance-focus-queue) strong{overflow-wrap:anywhere;}
+.overview :global(.finance-chart-readout){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 16px;background:var(--module-primary-50);border-radius:12px;padding:14px;min-height:105px;margin:6px 0 16px;}
+.overview :global(.finance-chart-readout)>strong{grid-column:1/-1;font-size:14px;}
+.overview :global(.finance-chart-readout)>span{display:grid;gap:5px;}
+.overview :global(.finance-chart-readout)>span:only-child{grid-column:1/-1;align-self:center;font-size:13px;}
+.overview :global(.finance-chart-readout) small{font-size:12px;}
+.overview :global(.finance-chart-readout) b{font-size:17px;font-weight:550;color:var(--text-strong);}
+.overview :global(.finance-chart-table)>h3{font-size:14px;font-weight:550;text-transform:capitalize;}
+.overview :global(.finance-chart-table)>div{max-height:250px;overflow:auto;border:1px solid var(--border);border-radius:12px;}
+.overview :global(.finance-chart-table) table{font-size:12px;}
+.overview :global(.finance-chart-table) thead{position:sticky;top:0;background:var(--module-primary-50);z-index:1;}
+.overview :global(.finance-chart-table) button{text-decoration:none;text-align:left;color:var(--text);padding:0;}
+.overview :global(.finance-chart-table) tr[data-selected=true]{background:var(--module-primary-50);}
+.section[data-account-group]{padding:16px;border:1px solid var(--border);border-radius:16px;background:color-mix(in srgb,var(--module-primary-50) 45%,transparent);}
+.section[data-account-group] .heading{padding:0 2px 4px;}
+.section[data-account-group] .heading h2{font-size:15px;}
+.section[data-account-group] .list{grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));}
+.section[data-account-group] .list[data-directory-view=compact]{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));}
+.section[data-account-group] .list[data-directory-view=grid]{grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));}
+@media(max-width:1100px){.overview.overview{grid-template-columns:minmax(0,1fr);}.overview :global(.finance-overview-cashflow),.overview :global(.finance-spending-breakdown),.overview :global(.finance-recent-transactions){grid-column:1!important;grid-row:auto!important;}}
+@media(max-width:600px){.overview :global(.finance-panel-heading){flex-wrap:wrap;}.overview :global(.finance-panel-heading)>div:has(h2){flex-basis:55%;}.overview :global(.finance-flow-totals){padding:8px 12px 12px;gap:6px;}.overview :global(.finance-flow-totals)>div{padding:9px 7px;}.overview :global(.finance-flow-totals) span svg{display:none;}.overview :global(.finance-flow-totals) strong{font-size:15px;}.overview .categoryTotal{font-size:20px!important;}.section[data-account-group]{padding:10px;}.section[data-account-group] .list[data-directory-view=grid]{grid-template-columns:repeat(2,minmax(0,1fr));}.overview :global(.finance-chart-readout) b{font-size:14px;}}
