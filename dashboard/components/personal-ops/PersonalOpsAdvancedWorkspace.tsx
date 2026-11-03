@@ -1,4 +1,5 @@
 "use client";
+import PersonalRecordOverview from "./PersonalRecordOverview";
 import SearchField from "../ui/SearchField";
 import SelectField from "../ui/SelectField";
 
@@ -887,7 +888,7 @@ export default function PersonalOpsAdvancedWorkspace({
       .join(" ").toLowerCase().includes(query));
   }, [baseItems, urlState.query]);
 
-  const effectiveSort: PersonalOpsSort = initialView === "routines" && urlState.sort === "priority"
+  const effectiveSort: PersonalOpsSort = initialView === "routines" && !searchParams.has("sort")
     ? "due"
     : urlState.sort;
 
@@ -1062,6 +1063,13 @@ export default function PersonalOpsAdvancedWorkspace({
     updateUrl({ selected: item.id, tab: "overview" }, true);
     setMobileInspectorOpen(true);
   }
+
+  useEffect(()=>{
+    if (initialView !== "routines" || searchParams.get("create") !== "routine") return;
+    const form = {family:"routines" as const}, nextDraft=defaultDraft("routines");
+    setOpenForm(form);setDraft(nextDraft);setFormInitial(JSON.stringify(nextDraft));
+    const params=new URLSearchParams(searchParams.toString());params.delete("create");router.replace(pathname+(params.size ? "?"+params.toString() : ""),{scroll:false});
+  },[initialView,searchParams,router,pathname]);
 
   function openCreate() {
     const form = { family: config.family };
@@ -1666,7 +1674,8 @@ export default function PersonalOpsAdvancedWorkspace({
 
                 <div className={styles.inspectorScroll}>
                   <DetailTabPanel tabsId={`personal-ops-${selectedItem.id}`} tabId={activeTab} active>
-                    {activeTab === "overview" && (
+                    {activeTab === "overview" && selectedItem.objectType === "routine" && <PersonalRecordOverview item={selectedItem} busy={busy} onEdit={()=>openEdit(selectedItem)}/>}
+                    {activeTab === "overview" && Boolean(selectedItem.objectType !== "routine") && (
                       <>
                         <PersonalOpsStateGrid items={selectedItem.objectType === "routine" ? [
                           { id: "lifecycle", label: "Status", value: cleanLabel(selectedItem.lifecycle), tone: toneFor(selectedItem.lifecycle) },

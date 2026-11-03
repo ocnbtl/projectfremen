@@ -12,14 +12,14 @@
 .shortcuts a:focus {outline:none;box-shadow:none;}
 .shortcuts a:focus-visible > span {outline:2px solid var(--module-focus);outline-offset:4px;}
 .operations { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-.operations a { display:flex; align-items:center; gap:12px; padding:14px; border:1px solid var(--border); border-radius:14px; text-decoration:none; color:var(--text-strong); background:var(--surface); transition:background .2s; }
-.operations a:is(:hover,:focus-visible) { background:var(--module-primary-100); }
+.operations button { display:flex; align-items:center; gap:12px; padding:14px; border:1px solid var(--border); border-radius:14px; text-decoration:none; color:var(--text-strong); background:var(--surface); transition:background .2s; }
+.operations button:is(:hover,:focus-visible) { background:var(--module-primary-100); }
 .operations strong {font-size:14px;font-weight:500;}
-.operations a > svg { flex:none; color:var(--module-accent); }
+.operations button > svg { flex:none; color:var(--module-accent); }
 .operations span { display:grid; gap:4px; flex:1; }
 .operations small { color:var(--text-muted); font-size:12px; }
 .operations b { font-size:16px; font-weight:500; font-variant-numeric:tabular-nums; }
-.operations a { display:grid; grid-template-columns:24px minmax(0,1fr) auto; }
+.operations button { display:grid; grid-template-columns:24px minmax(0,1fr) auto; }
 .customizeSheet:global(.work-sheet) { width:min(650px,calc(100vw - 24px)); overflow:visible; }
 .customizeSheet :global(.work-sheet-header) { border:0; padding:18px 20px 10px; }
 .customizeSheet :global(.work-sheet-header h2) { display:flex; align-items:center; gap:10px; font-size:19px; line-height:1.4; }
@@ -34,7 +34,7 @@
 .choices button[aria-pressed=true],.sectionEdit button[aria-pressed=true] { background:var(--module-primary-100); border-color:var(--module-accent); }
 .sectionEdit { display:grid; grid-template-columns:110px minmax(0,1fr) auto; gap:8px; margin-bottom:8px; }
 .sectionEdit input { min-width:0; border:1px solid var(--border); border-radius:10px; padding:10px; background:var(--surface); color:var(--text-strong); }
-@media(max-width:600px) { .home {padding:12px;gap:16px;} .shortcuts {gap:14px 8px;} .shortcuts a {width:calc((100% - 24px)/4);} .shortcuts a > span {width:52px;height:52px;} .operations {grid-template-columns:repeat(2,minmax(0,1fr));} .operations a {padding:12px;gap:7px;flex-wrap:wrap;} .operations small {font-size:11px;} .sectionEdit {grid-template-columns:85px minmax(0,1fr);} .sectionEdit button {grid-column:2;justify-self:start;} }
+@media(max-width:600px) { .home {padding:12px;gap:16px;} .shortcuts {gap:14px 8px;} .shortcuts a {width:calc((100% - 24px)/4);} .shortcuts a > span {width:52px;height:52px;} .operations {grid-template-columns:repeat(2,minmax(0,1fr));} .operations button {padding:12px;gap:7px;flex-wrap:wrap;} .operations small {font-size:11px;} .sectionEdit {grid-template-columns:85px minmax(0,1fr);} .sectionEdit button {grid-column:2;justify-self:start;} }
 @media(prefers-reduced-motion:reduce) { .shortcuts a > span {transition:none;transform:none!important;} }
 .sectionEdit:has(button[title]) { grid-template-columns:100px minmax(0,1fr) auto 38px; }
 .sectionEdit button[title] { padding:8px; justify-content:center; }
@@ -49,9 +49,9 @@
   .sectionEdit > button[aria-pressed] {grid-column:2;grid-row:2;justify-self:stretch;}
 }
 @media(max-width:600px) {
-  .operations a { grid-template-columns:18px minmax(0,1fr) auto; align-items:center; padding:10px 8px; gap:6px; }
-  .operations a > svg {width:18px;height:18px;}
-  .operations a > b {font-size:13px;}
+  .operations button { grid-template-columns:18px minmax(0,1fr) auto; align-items:center; padding:10px 8px; gap:6px; }
+  .operations button > svg {width:18px;height:18px;}
+  .operations button > b {font-size:13px;}
   .operations strong {font-size:12px;}
 }
 .newSection { display:grid; grid-template-columns:180px minmax(0,1fr); gap:12px; }
@@ -73,3 +73,7 @@
 }
 
 .customizeSheet :global(.work-button--primary) {background:var(--module-action);border-color:var(--module-action);color:var(--module-action-contrast);}
+
+.operations button {font:inherit;text-align:left;cursor:pointer;}
+.operations button[aria-pressed="true"] {background:var(--module-primary-100);border-color:var(--module-primary-200);}
+.operations button[aria-pressed="false"] {background:var(--surface-panel);}

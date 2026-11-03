@@ -6,6 +6,10 @@ import { personalStatusLabel, PERSONAL_STATUS_OPTIONS } from "../../lib/modules/
 import type { EntityGoalItem } from "../../lib/entity-goals";
 import ViewCycleButton from "../ui/ViewCycleButton";
 import PersonalHome from "./PersonalHome";
+import PersonalRecordOverview from "./PersonalRecordOverview";
+import PersonalWeekAgenda from "./PersonalWeekAgenda";
+import { PERSONAL_HOME_TYPES, parseHomeTypes, toggleHomeType, personalAgendaDate, type PersonalHomeType, type PersonalAgendaEntry } from "../../lib/modules/personal-ops/agenda";
+import { motion, useReducedMotion } from "motion/react";
 import { EventObjectPreview } from "../planning/EventLinksPreview";
 import { EventObjectIdentity } from "../planning/EventObjects";
 import SelectField from "../ui/SelectField";
@@ -62,7 +66,6 @@ import {
   PersonalOpsFilterRail,
   PersonalOpsMetricRail,
   PersonalOpsPanel,
-  PersonalOpsStateGrid,
   PersonalOpsStatusChip,
   PersonalOpsStatusSelect,
   personalOpsToneForState as toneForState,
@@ -206,7 +209,6 @@ const PERSONAL_SYSTEM_LINKS: ReadonlyArray<{ label: string; href: string; icon: 
 ];
 
 const PERSONAL_OPS_SORT_OPTIONS: ReadonlyArray<{ id: PersonalOpsSort; label: string }> = [
-  { id: "priority", label: "Priority" },
   { id: "due", label: "Due date" },
   { id: "updated", label: "Recently updated" },
   { id: "title", label: "Title" }
@@ -224,13 +226,6 @@ const FAMILY_ROUTES: Record<PersonalOpsFamily, string> = {
   decisions: "/admin/personal/decisions",
   obligations: "/admin/personal/obligations",
   followUps: "/admin/personal/follow-ups"
-};
-
-const PRIORITY_WEIGHT: Record<string, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3
 };
 
 const SOURCE_MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
@@ -878,14 +873,7 @@ function ObjectForm({
                 <Field label="Due date">
                   <input type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
                 </Field>
-                <Field label="Priority">
-                  <SelectField value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </SelectField>
-                </Field>
+                <Field label="Life area"><SelectField aria-label="Life area" value={draft.domain} onChange={event=>update("domain",event.target.value)}>{!PERSONAL_OPS_DOMAIN_LABELS.some(domain=>domain===draft.domain) && <option value={draft.domain}>{draft.domain}</option>}{PERSONAL_OPS_DOMAIN_LABELS.map(domain=><option value={domain} key={domain}>{domain}</option>)}</SelectField></Field>
                 <Field label="Outcome (optional)" full hint="Add the result now or after the follow-up. You can complete it without one.">
                   <textarea value={draft.followUpOutcome} onChange={(event) => update("followUpOutcome", event.target.value)} />
                 </Field>
@@ -902,8 +890,8 @@ function ObjectForm({
               </>
             ) : (
               <>
-                <Field label="Domain">
-                  <SelectField aria-label="Domain" value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
+                <Field label="Life area">
+                  <SelectField aria-label="Life area" value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
                     {!PERSONAL_OPS_DOMAIN_LABELS.some((domain) => domain === draft.domain) && <option value={draft.domain}>{draft.domain}</option>}
                     {PERSONAL_OPS_DOMAIN_LABELS.map((domain) => <option key={domain}>{domain}</option>)}
                   </SelectField>
@@ -911,14 +899,7 @@ function ObjectForm({
                 <Field label="Due date">
                   <input aria-label="Due date" type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
                 </Field>
-                <Field label="Priority">
-                  <SelectField aria-label="Priority" value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </SelectField>
-                </Field>
+
                 {form.family !== "decisions" && (
                   <Field label="Health">
                     <PersonalOpsStatusSelect value={draft.health} onChange={(event) => update("health", event.target.value as FormDraft["health"])}>
@@ -1090,12 +1071,27 @@ export default function PersonalOpsWorkspace({
   initialLoadError = "",
   linkedPreviews = {}
 }: PersonalOpsWorkspaceProps) {
+  const reducedMotion = useReducedMotion();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const repository = useMemo(() => createPersonalOpsRepository(), []);
   const urlState = useMemo(() => parsePersonalOpsUrlState(searchParams), [searchParams]);
   const [state, setState] = useState(initialState);
+  const selectedTypes = parseHomeTypes(searchParams.get("types"));
+  const period = searchParams.get("period") === "week" || urlState.filter === "week" ? "week" : "today";
+  const area = searchParams.get("area") || "";
+  const linkedModule = searchParams.get("linked") || "";
+  const timing = searchParams.get("timing") || "";
+  function setViewParam(name: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(name,value); else params.delete(name);
+    params.delete("selected");
+    if (params.get("filter") === "week") params.delete("filter");
+    setMobileInspectorOpen(false);
+    router.replace(params.size ? pathname+"?"+params.toString() : pathname,{scroll:false});
+  }
+  function toggleType(type: PersonalHomeType) {const next=toggleHomeType(selectedTypes,type);setViewParam("types",next.length === PERSONAL_HOME_TYPES.length ? "" : next.join(","));}
   const [directoryView, setDirectoryView] = usePersonalDirectoryView();
   const [legacyGoals, setLegacyGoals] = useState(initialLegacyGoals);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -1186,8 +1182,12 @@ export default function PersonalOpsWorkspace({
     const now = Date.now();
     const filtered = baseItems.filter((item) => {
       if (query && !`${item.title} ${summaryForItem(item)} ${item.source === "native" ? item.domain : item.entity}`.toLowerCase().includes(query)) return false;
-      const filter = urlState.filter;
-      if (filter.startsWith("status-")) return stateLabel(item) === filter.slice(7).replaceAll("-", "_");
+      if (initialView === "command" && !selectedTypes.includes(item.objectType)) return false;
+      if (area && (item.source !== "native" || item.domain !== area)) return false;
+      if (linkedModule && (item.source !== "native" || ![...item.linkedRefs,...item.sourceRefs].some(ref=>ref.module === linkedModule))) return false;
+      if (timing && (item.source !== "native" || (timing === "overdue" ? !(item.dueAt && item.dueAt.slice(0,10) < new Date().toLocaleDateString("en-CA") && item.lifecycle !== "complete") : timing === "due-soon" ? !isDueWithin(item.dueAt,7) : !["needs_review","not_reviewed"].includes(item.review)))) return false;
+      const filter = urlState.filter === "week" ? "all" : urlState.filter;
+      if (filter.startsWith("status-")) return personalStatusLabel(stateLabel(item)) === personalStatusLabel(filter.slice(7).replaceAll("-", "_"));
       if (filter === "all") return stateLabel(item) !== "archived" && (initialView !== "command" || !["complete","decided","superseded","cancelled"].includes(stateLabel(item)));
       if (filter === "archived") return item.source === "native" && item.lifecycle === "archived";
       if (item.source === "legacy-goal") return filter === "active" ? !item.done : filter === "complete" ? item.done : false;
@@ -1214,18 +1214,16 @@ export default function PersonalOpsWorkspace({
         const rightValue = right.source === "native" ? right.updatedAt : "";
         return rightValue.localeCompare(leftValue);
       }
-      const leftPriority = left.source === "native" ? PRIORITY_WEIGHT[left.priority] : PRIORITY_WEIGHT.medium;
-      const rightPriority = right.source === "native" ? PRIORITY_WEIGHT[right.priority] : PRIORITY_WEIGHT.medium;
-      return leftPriority - rightPriority || dueTime(left) - dueTime(right);
+      return dueTime(left) - dueTime(right);
     });
-  }, [baseItems, urlState.filter, urlState.query, urlState.sort]);
+  }, [baseItems, urlState.filter, urlState.query, urlState.sort, initialView, searchParams]);
 
   useEffect(() => {
     if (!urlState.selected) return;
-    if (scopedItems.some((item) => item.id === urlState.selected)) return;
+    if (baseItems.some((item) => item.id === urlState.selected)) return;
     updateUrl({ selected: "" });
     setMobileInspectorOpen(false);
-  }, [scopedItems, updateUrl, urlState.selected]);
+  }, [baseItems, updateUrl, urlState.selected]);
 
   useEffect(() => {
     const create = searchParams.get("create");
@@ -1510,6 +1508,22 @@ export default function PersonalOpsWorkspace({
     archived: allNative.filter((item) => item.lifecycle === "archived").length
   };
 
+  const routineItems = initialView === "command" && selectedTypes.includes("routine") ? state.routines.filter(item=> {
+    if (item.lifecycle === "archived" && urlState.filter !== "status-archived") return false;
+    if (urlState.query && !(item.title+" "+item.summary).toLowerCase().includes(urlState.query.toLowerCase())) return false;
+    if (area && item.domain !== area) return false;
+    if (linkedModule && !item.linkedRefs.some(ref=>ref.module === linkedModule)) return false;
+    if (urlState.filter.startsWith("status-") && personalStatusLabel(item.lifecycle) !== personalStatusLabel(urlState.filter.slice(7))) return false;
+    const due = personalAgendaDate(item);
+    if (timing === "due-soon" && !isDueWithin(due,7)) return false;
+    if (timing === "overdue" && (!due || due >= new Date().toLocaleDateString("en-CA"))) return false;
+    if (timing === "needs-review" && !["needs_review","not_reviewed"].includes(item.review)) return false;
+    return true;
+  }).sort((a,b)=>urlState.sort === "title" ? a.title.localeCompare(b.title) : urlState.sort === "updated" ? b.updatedAt.localeCompare(a.updatedAt) : (personalAgendaDate(a)||"9999").localeCompare(personalAgendaDate(b)||"9999")) : [];
+  const agendaEntries: PersonalAgendaEntry[] = [
+    ...scopedItems.map(item=>({id:item.id,title:item.title,date:item.source === "native" ? personalAgendaDate(item) : "",href:"",source:typeLabel(item),type:item.objectType,completed:["complete","decided"].includes(stateLabel(item))})),
+    ...routineItems.map(item=>({id:item.id,title:item.title,date:personalAgendaDate(item),time:item.nextRunTime,href:"/admin/personal/routines?selected="+encodeURIComponent(item.id),source:"Routine",type:"routine" as const}))
+  ];
   const selectedItem: PersonalOpsListItem | null = selectedNative
     ? { ...selectedNative, source: "native" }
     : selectedLegacyGoal
@@ -1517,7 +1531,7 @@ export default function PersonalOpsWorkspace({
       : null;
 
   function selectItem(item: PersonalOpsListItem) {
-    updateUrl({ selected: item.id }, { push: true });
+    updateUrl({ selected: item.id, tab: "overview" }, { push: true });
     setMobileInspectorOpen(true);
   }
 
@@ -1534,12 +1548,8 @@ export default function PersonalOpsWorkspace({
     : [...new Set(Object.values(PERSONAL_STATUS_OPTIONS).flat())];
   const filterItems = [
     {id:"all",label:"All",tone: "neutral" as PersonalOpsTone},
-    ...statusTypes.map(value=>({id:`status-${value.replaceAll("_","-")}`,label:personalStatusLabel(value),tone:toneForState(value)}))
+    ...statusTypes.filter((value,index,values)=>values.findIndex(other=>personalStatusLabel(other)===personalStatusLabel(value))===index).map(value=>({id:`status-${value.replaceAll("_","-")}`,label:personalStatusLabel(value),tone:toneForState(value)}))
   ].map(item=>({...item,active:urlState.filter===item.id,onSelect:()=>updateUrl({filter:item.id,selected:""})}));
-  const timingFilters = [
-    {id:"due-soon",label:"Due soon"}, {id:"overdue",label:"Overdue"}, {id:"needs-review",label:"Needs review"},
-    ...(initialView === "decisions" ? [{id:"in-review",label:"In review"},{id:"reviewed",label:"Reviewed"}] : [])
-  ].map(item=>({...item,tone:toneForState(item.id),active:urlState.filter===item.id,onSelect:()=>updateUrl({filter:item.id,selected:""})}));
   const primaryFamily = VIEW_COPY[initialView].family || "followUps";
 
   async function confirmPendingAction() {
@@ -1583,7 +1593,7 @@ export default function PersonalOpsWorkspace({
   return (
     <WorkspaceTopbarProvider><div className={`${styles.shell} work-surface`} data-has-inspector={Boolean(selectedItem)} data-personal-pages data-detail-open={Boolean(selectedItem && mobileInspectorOpen) || undefined}>
       <PersonalOpsSidebar
-        onHome={selectedItem && mobileInspectorOpen ? () => setMobileInspectorOpen(false) : undefined}
+        onHome={selectedItem && mobileInspectorOpen ? () => {updateUrl({selected:""});setMobileInspectorOpen(false);} : undefined}
         activeView={initialView}
         filter={urlState.filter}
         pathname={pathname}
@@ -1595,9 +1605,14 @@ export default function PersonalOpsWorkspace({
       <main className={styles.directory} aria-label={`${VIEW_COPY[initialView].title} ledger`}>
         <div className={styles.mainScroll}>
           <WorkspaceHeader title={initialView === "command" ? "Personal" : VIEW_COPY[initialView].title} count={scopedItems.length}>
-            {initialView === "command" ? <><div className="workspace-create-select"><SelectField aria-label="Create personal item" optionIcons={{"":"plus",goals:"goal",followUps:"follow-up",decisions:"decision",obligations:"check"}} value="" onChange={event => {if(event.target.value) openCreate(event.target.value as PersonalOpsFamily);}}><option value="" disabled>Add new</option>{(["goals","followUps","decisions","obligations"] as const).map(family => <option value={family} key={family}>{FAMILY_LABELS[family]}</option>)}</SelectField></div><div className="workspace-create-actions"><span className="workspace-action-group-label">Create</span>{(["goals","followUps","decisions","obligations"] as const).map(family=><WorkspaceButton key={family} icon={{goals:"goal",followUps:"follow-up",decisions:"decision",obligations:"check"}[family]} onClick={()=>openCreate(family)}>{FAMILY_LABELS[family]}</WorkspaceButton>)}</div></> : <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate(primaryFamily)}>Add {FAMILY_LABELS[primaryFamily].toLowerCase()}</WorkspaceButton>}
+            {initialView === "command" ? <div className={styles.createActions}><span className="workspace-action-group-label">Create</span>{(["goals","followUps","decisions","obligations"] as const).map(family=><WorkspaceButton key={family} intent="primary" icon={{goals:"goal",followUps:"follow-up",decisions:"decision",obligations:"check"}[family]} onClick={()=>openCreate(family)}>Add {FAMILY_LABELS[family]}</WorkspaceButton>)}<WorkspaceButton intent="primary" icon="routine" onClick={()=>router.push("/admin/personal/routines?create=routine")}>Add Routine</WorkspaceButton></div> : <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate(primaryFamily)}>Add {FAMILY_LABELS[primaryFamily].toLowerCase()}</WorkspaceButton>}
           </WorkspaceHeader>
-          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<div><PersonalOpsFilterRail items={filterItems} ariaLabel="Filter by status" className={styles.statusFilterMenu} /><strong className={styles.filterHeading}>Timing & review</strong><PersonalOpsFilterRail items={timingFilters} ariaLabel="Filter by timing and review" className={styles.statusFilterMenu}/><strong className={styles.filterHeading}>Domain</strong>{PERSONAL_OPS_DOMAIN_LABELS.map(domain => {const id="domain-"+domain.toLowerCase().replace(/\s+/g,"-");return <WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{domain}</WorkspaceButton>;})}<strong className={styles.filterHeading}>Connected work</strong>{[["linked-people","People"],["linked-finance","Finance"],["linked-reviews","Reviews"],["recurring","Recurring"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={urlState.filter===id} onClick={()=>updateUrl({filter:urlState.filter===id?"all":id})}>{label}</WorkspaceButton>)}</div>}>
+          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search" activeFilters={(urlState.filter!=="all"&&urlState.filter!=="week"?1:0)+Number(Boolean(area))+Number(Boolean(linkedModule))+Number(Boolean(timing))} filters={<div className={styles.organizedFilters}>
+            <section><h3>Status</h3><PersonalOpsFilterRail items={filterItems.filter(item=>!["status-complete","status-decided","status-cancelled","status-superseded","status-archived"].includes(item.id))} ariaLabel="Current status" className={styles.statusFilterMenu}/><details><summary>Finished & history</summary><PersonalOpsFilterRail items={filterItems.filter(item=>["status-complete","status-decided","status-cancelled","status-superseded","status-archived"].includes(item.id))} ariaLabel="Finished status" className={styles.statusFilterMenu}/></details></section>
+            <section><h3>Timing</h3><div>{[["due-soon","Next 7 days"],["overdue","Overdue"],["needs-review","Needs review"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={timing===id} onClick={()=>setViewParam("timing",timing===id?"":id)}>{label}</WorkspaceButton>)}</div></section>
+            <section><h3>Life area</h3><p>What part of life does this support?</p><div>{PERSONAL_OPS_DOMAIN_LABELS.map(domain=><WorkspaceButton key={domain} aria-pressed={area===domain} onClick={()=>setViewParam("area",area===domain?"":domain)}>{domain}</WorkspaceButton>)}</div></section>
+            <section><h3>Linked to</h3><p>Only records connected to this module.</p><div>{[["people","People"],["projects","Projects"],["calendar","Calendar"],["finance","Finance"],["reviews","Reviews"],["notes","Notes"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={linkedModule===id} onClick={()=>setViewParam("linked",linkedModule===id?"":id)}>{label}</WorkspaceButton>)}</div></section>
+          </div>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
             <ViewCycleButton data-toolbar-view value={directoryView} onChange={setDirectoryView}/>
           </WorkspaceToolbar>
@@ -1606,10 +1621,10 @@ export default function PersonalOpsWorkspace({
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}
 
-          {initialView === "command" && <PersonalHome state={state} projectGoalCount={legacyGoals.filter(goal=>!goal.done).length} />}
+          {initialView === "command" && <><div className={styles.periodToggle} role="group" aria-label="Personal time view">{(["today","week"] as const).map(value=><button type="button" key={value} aria-pressed={period===value} onClick={()=>setViewParam("period",value === "today" ? "" : value)}>{period===value && <motion.span layoutId="personal-period" className={styles.periodActive} transition={reducedMotion ? {duration:0} : {type:"spring",stiffness:420,damping:38}}/>}<span>{value === "today" ? "Today" : "This week"}</span></button>)}</div><PersonalHome state={state} projectGoalCount={legacyGoals.filter(goal=>!goal.done && goal.status!=="cancelled").length} selectedTypes={selectedTypes} onToggleType={toggleType}/></>}
           {initialLoadError ? (
             <SystemState variant="error" title="Personal could not load" description={initialLoadError} />
-          ) : scopedItems.length === 0 ? (
+          ) : initialView === "command" && period === "week" ? <PersonalWeekAgenda entries={agendaEntries} includeConnected={selectedTypes.length === PERSONAL_HOME_TYPES.length && !area && !linkedModule && !timing && ["all","week"].includes(urlState.filter)} query={urlState.query} onOpen={id=>{const item=baseItems.find(item=>item.id===id);if(item)selectItem(item);}}/> : scopedItems.length === 0 && routineItems.length === 0 ? (
             <SystemState
               variant="empty"
               title={urlState.query || urlState.filter !== "all" ? "No objects match this scope" : `No ${VIEW_COPY[initialView].title.toLowerCase()} yet`}
@@ -1631,6 +1646,9 @@ export default function PersonalOpsWorkspace({
               <MorphingButton type="button" className={styles.personalCardOpen} onClick={() => selectItem(item)} aria-label={"Open " + item.title}><span><strong>{item.title}</strong></span></MorphingButton>
               <MorphingP className={styles.personalCardSummary}>{item.source === "native" && summaryForItem(item) !== "No description recorded" && summaryForItem(item) !== item.title ? summaryForItem(item) : null}</MorphingP>
               <MorphingDiv className={styles.personalCardMeta}><span className={styles.personalCardType} role="img" aria-label={typeLabel(item)} title={typeLabel(item)}><PersonalOpsIcon name={cardIcon(item)}/></span><PersonalCardStatusControl title={item.title} value={stateLabel(item)} choices={item.source === "legacy-goal" ? ["draft","planned","active","waiting","blocked","paused","cancelled","complete"].map(value=>({value})) : personalCardStatusChoices(item)} onRequirements={next => {if(item.source === "native")setStatusRequirements({item,next});}} disabled={busy} onSave={next => saveCardStatus(item, next)} /></MorphingDiv>
+            </MorphingArticle>)}{routineItems.map(item=><MorphingArticle role="listitem" key={item.id}>
+              <MorphingDiv className={styles.personalCardTop}><span className={styles.routineLabel}><PersonalOpsIcon name="routine"/>{item.cadenceRule.label || cleanLabel(item.cadenceRule.frequency)}</span><div className={styles.personalCardDates}>{personalAgendaDate(item) && <time><PersonalOpsIcon name="week"/>Next {formatDate(personalAgendaDate(item))}</time>}</div></MorphingDiv>
+              <Link prefetch={false} className={styles.personalCardOpen} href={"/admin/personal/routines?selected="+encodeURIComponent(item.id)}><strong>{item.title}</strong></Link><MorphingP className={styles.personalCardSummary}>{item.summary}</MorphingP><MorphingDiv className={styles.personalCardMeta}><PersonalOpsIcon name="routine"/><PersonalOpsStatusChip tone={toneForState(item.lifecycle)}>{personalStatusLabel(item.lifecycle)}</PersonalOpsStatusChip></MorphingDiv>
             </MorphingArticle>)}</DirectoryLayout>
           )}
         </div>
@@ -1641,6 +1659,7 @@ export default function PersonalOpsWorkspace({
         <>
           <button className={[styles.scrim, styles.inspectorScrim].join(" ")} data-open={mobileInspectorOpen || undefined} onClick={() => setMobileInspectorOpen(false)} aria-label="Close inspector" />
           <InspectorRail
+            ariaLabel={typeLabel(selectedItem)+" details"}
             className={styles.inspector}
             overlay={false}
             hidden={!mobileInspectorOpen}
@@ -1663,69 +1682,23 @@ export default function PersonalOpsWorkspace({
                 {selectedItem.source === "native" && selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && ["blocked","attention"].includes(selectedItem.health) && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
                 {selectedItem.source === "legacy-goal" && <PersonalOpsStatusChip tone="attention">Existing Current Goals</PersonalOpsStatusChip>}
               </div>
+              {error && <p className={styles.error} role="alert">{error}</p>}
               <div className={styles.inspectorTabs}>
-                <DetailTabs id="personal-ops-inspector" tabs={INSPECTOR_TABS} activeTab={urlState.tab} onTabChange={(tab) => updateUrl({ tab: tab as PersonalOpsTab })} />
+                <DetailTabs id="personal-ops-inspector" tabs={selectedItem.source === "legacy-goal" ? INSPECTOR_TABS.filter(tab=>tab.id === "overview") : INSPECTOR_TABS.filter(tab=>tab.id !== "details")} activeTab={urlState.tab} onTabChange={(tab) => updateUrl({ tab: tab as PersonalOpsTab })} />
               </div>
             </header>
 
             <div className={styles.inspectorScroll}>
               {selectedItem.source === "legacy-goal" ? (
                 <div className={styles.panelGrid}>
-                  <PersonalOpsStateGrid items={[
-                    { id: "state", label: "Completion", value: selectedItem.done ? "Complete" : "Active", tone: selectedItem.done ? "positive" : "attention" },
-                    { id: "owner", label: "Owner", value: selectedItem.entity },
-                    { id: "source", label: "Persistence", value: "Current Goals" },
-                    { id: "scope", label: "Project", value: selectedItem.projectLabel }
-                  ]} />
-                  <PersonalOpsPanel title="Current Goal" wide>
-                    <p>This goal is shared with its entity page. Completing or reopening it updates both views. Key results, review dates, and health are not tracked for this kind of goal.</p>
-                  </PersonalOpsPanel>
+                  <PersonalOpsPanel title="Desired outcome" wide><p>{selectedItem.title}</p></PersonalOpsPanel>
+                  <PersonalOpsPanel title="Linked project"><Link prefetch={false} href={"/admin/entities/"+encodeURIComponent(selectedItem.slug)} className={styles.linkedOwner}><PersonalOpsIcon name="object"/>{selectedItem.projectLabel}</Link><p>Progress is shared with this project's Current Goals.</p></PersonalOpsPanel>
+                  <PersonalOpsPanel title="Progress"><PersonalOpsStatusChip tone={toneForState(stateLabel(selectedItem))}>{personalStatusLabel(stateLabel(selectedItem))}</PersonalOpsStatusChip><p>Edit the goal in its project, or update its status here.</p><Link prefetch={false} href={"/admin/entities/"+encodeURIComponent(selectedItem.slug)}>Edit in project</Link></PersonalOpsPanel>
                 </div>
               ) : (
                 <>
-                  <PersonalOpsStateGrid items={selectedItem.objectType === "follow_up" ? [
-                    { id: "status", label: "Status", value: cleanLabel(selectedItem.followUpState), tone: toneForState(selectedItem.followUpState) },
-                    { id: "due", label: "Due", value: formatDate(selectedItem.dueAt) },
-                    { id: "priority", label: "Priority", value: cleanLabel(selectedItem.priority), tone: toneForState(selectedItem.priority) },
-                    { id: "timing", label: "Timing", value: cleanLabel(selectedItem.cadence), tone: toneForState(selectedItem.cadence) }
-                  ] : selectedItem.objectType === "decision" ? [
-                    { id: "decision", label: "Decision state", value: cleanLabel(selectedItem.decisionState), tone: toneForState(selectedItem.decisionState) },
-                    { id: "review", label: "Review state", value: cleanLabel(decisionReviewState(selectedItem)), tone: toneForState(decisionReviewState(selectedItem)) },
-                    { id: "due", label: "Due", value: formatDate(selectedItem.dueAt) },
-                    { id: "reversibility", label: "Reversibility", value: cleanLabel(selectedItem.reversibility) }
-                  ] : [
-                    { id: "lifecycle", label: "Status", value: cleanLabel(selectedItem.lifecycle), tone: toneForState(selectedItem.lifecycle) },
-                    { id: "health", label: "Health", value: cleanLabel(selectedItem.health), tone: toneForState(selectedItem.health) },
-                    { id: "review", label: "Review", value: cleanLabel(selectedItem.review), tone: toneForState(selectedItem.review) },
-                    { id: "cadence", label: "Cadence", value: cleanLabel(selectedItem.cadence), tone: toneForState(selectedItem.cadence) }
-                  ]} />
                   <div className={styles.panelGrid}>
-                    {urlState.tab === "overview" && (
-                      selectedItem.objectType === "decision" ? (
-                        <>
-                          <PersonalOpsPanel title="Question and decision" wide>
-                            <DecisionPrompts question={selectedItem.question} decision={selectedItem.finalDecision} />
-                          </PersonalOpsPanel>
-                          {selectedItem.description && <PersonalOpsPanel title="Context" wide><p>{selectedItem.description}</p></PersonalOpsPanel>}
-                          {selectedItem.decisionState === "deferred" && (
-                            <PersonalOpsPanel title="On hold" wide>
-                              <p>{selectedItem.deferReason || "No reason recorded."}</p>
-                              <small className={styles.mutedCopy}>Revisit {formatDate(selectedItem.revisitAt)}</small>
-                            </PersonalOpsPanel>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <PersonalOpsPanel title={selectedItem.objectType === "goal" ? "Outcome" : selectedItem.objectType === "obligation" ? "Consequence" : "Description"} wide>
-                            <p>{summaryForItem(selectedItem)}</p>
-                          </PersonalOpsPanel>
-                          {selectedItem.description && selectedItem.objectType !== "follow_up" && <PersonalOpsPanel title="Description" wide><p>{selectedItem.description}</p></PersonalOpsPanel>}
-                          <PersonalOpsPanel title="Next step" wide>
-                            <p>{completionDisabledReason || (selectedItem.lifecycle === "complete" ? "Complete. You can archive this item when you no longer need it in the active list." : "Ready to complete.")}</p>
-                          </PersonalOpsPanel>
-                        </>
-                      )
-                    )}
+                    {urlState.tab === "overview" && <PersonalRecordOverview item={selectedItem} busy={busy} onEdit={()=>openEdit(selectedItem)} onKeyResult={id=>{if(selectedItem.objectType === "goal")void toggleKeyResult(selectedItem,id);}} onCriterion={id=>{if(selectedItem.objectType === "obligation")void toggleCriterion(selectedItem,id);}} onEvidence={id=>{if(selectedItem.objectType === "obligation")void toggleEvidence(selectedItem,id);}}/>}
 
                     {urlState.tab === "details" && selectedItem.objectType === "goal" && (
                       <PersonalOpsPanel title="Key results" meta={`${selectedItem.keyResults.filter((item) => item.complete).length}/${selectedItem.keyResults.length} complete`} wide>
@@ -1779,7 +1752,7 @@ export default function PersonalOpsWorkspace({
 
                     {urlState.tab === "properties" && (
                       <PersonalOpsPanel title="Properties" wide>
-                        <dl><dt>ID</dt><dd className={styles.mono}>{selectedItem.id}</dd><dt>Owner</dt><dd>{selectedItem.owner}</dd><dt>Domain</dt><dd>{selectedItem.domain}</dd><dt>Priority</dt><dd>{cleanLabel(selectedItem.priority)}</dd><dt>Created</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.createdAt)}</dd><dt>Updated</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.updatedAt)}</dd>{selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && selectedItem.cadenceRule && <><dt>Cadence rule</dt><dd>{selectedItem.cadenceRule} (manual)</dd></>}</dl>
+                        <dl><dt>ID</dt><dd className={styles.mono}>{selectedItem.id}</dd><dt>Owner</dt><dd>{selectedItem.owner}</dd><dt>Life area</dt><dd>{selectedItem.domain}</dd><dt>Created</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.createdAt)}</dd><dt>Updated</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.updatedAt)}</dd>{selectedItem.objectType !== "follow_up" && selectedItem.objectType !== "decision" && selectedItem.cadenceRule && <><dt>Cadence rule</dt><dd>{selectedItem.cadenceRule} (manual)</dd></>}</dl>
                       </PersonalOpsPanel>
                     )}
                   </div>
@@ -1790,7 +1763,7 @@ export default function PersonalOpsWorkspace({
             <footer className={styles.actionFooter}>
               {selectedItem.source === "legacy-goal" ? (
                 <>
-                  <span><small>Existing persistence</small></span>
+                  <span/>
                   <button type="button" className={styles.primaryButton} onClick={() => void toggleLegacyGoal(selectedItem)} disabled={busy}>{selectedItem.done ? "Reopen goal" : "Mark complete"}</button>
                 </>
               ) : (

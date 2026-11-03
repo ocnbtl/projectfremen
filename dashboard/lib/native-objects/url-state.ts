@@ -387,7 +387,7 @@ const PERSONAL_OPS_TABS = [
   "notes",
   "properties"
 ] as const;
-const PERSONAL_OPS_SORTS = ["priority", "due", "updated", "title"] as const;
+const PERSONAL_OPS_SORTS = ["due", "updated", "title"] as const;
 
 export type PersonalOpsTab = (typeof PERSONAL_OPS_TABS)[number];
 export type PersonalOpsSort = (typeof PERSONAL_OPS_SORTS)[number];
@@ -436,7 +436,7 @@ export const PERSONAL_OPS_URL_STATE_SCHEMA: UrlStateSchema<PersonalOpsUrlState> 
     omit: (value) => value.trim() === ""
   },
   filter: safeTokenCodec("filter", "all"),
-  sort: enumCodec("sort", PERSONAL_OPS_SORTS, "priority"),
+  sort: enumCodec("sort", PERSONAL_OPS_SORTS, "due"),
   compact: {
     param: "compact",
     defaultValue: false,
