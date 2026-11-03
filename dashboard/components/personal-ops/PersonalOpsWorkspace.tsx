@@ -1551,6 +1551,25 @@ export default function PersonalOpsWorkspace({
     ...statusTypes.filter((value,index,values)=>values.findIndex(other=>personalStatusLabel(other)===personalStatusLabel(value))===index).map(value=>({id:`status-${value.replaceAll("_","-")}`,label:personalStatusLabel(value),tone:toneForState(value)}))
   ].map(item=>({...item,active:urlState.filter===item.id,onSelect:()=>updateUrl({filter:item.id,selected:""})}));
   const primaryFamily = VIEW_COPY[initialView].family || "followUps";
+  const emptyTypes = {
+    goal: { plural: "goals", singular: "Goal", icon: "goal", family: "goals" },
+    routine: { plural: "routines", singular: "Routine", icon: "routine", family: null },
+    follow_up: { plural: "follow-ups", singular: "Follow-up", icon: "follow-up", family: "followUps" },
+    decision: { plural: "decisions", singular: "Decision", icon: "decision", family: "decisions" },
+    obligation: { plural: "obligations", singular: "Obligation", icon: "check", family: "obligations" }
+  } as const;
+  const emptyType = initialView === "command"
+    ? selectedTypes.length === 1 ? emptyTypes[selectedTypes[0]] : undefined
+    : Object.values(emptyTypes).find(type=>type.family === primaryFamily);
+  const emptyFiltered = Boolean(urlState.query || urlState.filter !== "all" || area || linkedModule || timing);
+  const emptyNarrowed = initialView === "command" && selectedTypes.length < PERSONAL_HOME_TYPES.length;
+  function clearEmptyFilters() {
+    if (queryTimer.current) clearTimeout(queryTimer.current);
+    setQueryDraft("");
+    const params = new URLSearchParams(searchParams.toString());
+    ["query","filter","area","linked","timing","types","selected"].forEach(key=>params.delete(key));
+    router.replace(params.size ? `${pathname}?${params}` : pathname,{scroll:false});
+  }
 
   async function confirmPendingAction() {
     if (!pendingAction) return;
@@ -1627,11 +1646,13 @@ export default function PersonalOpsWorkspace({
           ) : initialView === "command" && period === "week" ? <PersonalWeekAgenda entries={agendaEntries} includeConnected={selectedTypes.length === PERSONAL_HOME_TYPES.length && !area && !linkedModule && !timing && ["all","week"].includes(urlState.filter)} query={urlState.query} onOpen={id=>{const item=baseItems.find(item=>item.id===id);if(item)selectItem(item);}}/> : scopedItems.length === 0 && routineItems.length === 0 ? (
             <SystemState
               variant="empty"
-              title={urlState.query || urlState.filter !== "all" ? "No objects match this scope" : `No ${VIEW_COPY[initialView].title.toLowerCase()} yet`}
-              description={urlState.query || urlState.filter !== "all" ? "Clear search or change the active filter." : "Add a follow-up, decision, obligation, or goal to get started."}
-              action={urlState.query || urlState.filter !== "all"
-                ? { label: "Clear scope", onSelect: () => updateUrl({ query: "", filter: "all", selected: "" }) }
-                : { label: `Create ${FAMILY_LABELS[primaryFamily]}`, onSelect: () => openCreate(primaryFamily) }}
+              icon={emptyFiltered ? "search" : emptyType?.icon || "goal"}
+              title={emptyFiltered ? `No matching ${emptyType?.plural || "items"}` : emptyType ? `No ${emptyType.plural} yet` : "Nothing here yet"}
+              description={emptyFiltered ? "Try a different search or clear your filters to see more." : emptyType ? `Add your first ${emptyType.singular.toLowerCase()} to see it here.` : "Start with a goal, routine, follow-up, decision, or obligation."}
+              action={emptyFiltered
+                ? { label: "Clear filters", icon: "filter", onSelect: clearEmptyFilters }
+                : { label: `Add ${emptyType?.singular || "Goal"}`, icon: "plus", onSelect: () => emptyType?.singular === "Routine" ? router.push("/admin/personal/routines?create=routine") : openCreate(emptyType?.family || "goals") }}
+              secondaryAction={!emptyFiltered && emptyNarrowed ? {label:"Show all",onSelect:clearEmptyFilters} : undefined}
             />
           ) : (
             <DirectoryLayout view={directoryView} className={styles.personalCards} role="list" aria-label="Personal records">{scopedItems.map(item => <MorphingArticle key={item.id} role="listitem" data-selected={item.id === urlState.selected || undefined}>
