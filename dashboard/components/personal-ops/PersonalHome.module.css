@@ -76,4 +76,4 @@
 
 .operations button {font:inherit;text-align:left;cursor:pointer;}
 .operations button[aria-pressed="true"] {background:var(--module-primary-100);border-color:var(--module-primary-200);}
-.operations button[aria-pressed="false"] {background:var(--surface-panel);}
+.operations button[aria-pressed="false"] {background:var(--surface-panel,#fff);}

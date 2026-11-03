@@ -8,7 +8,7 @@ import PersonalOpsIcon from "./PersonalOpsIcon";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { HOME_SHORTCUTS, SECTION_ICONS, emptyHomeSettings, type PersonalHomeSettings, type PersonalSection } from "../../lib/modules/personal-ops/home-settings";
 import type { PersonalOpsState } from "../../lib/modules/personal-ops/types";
-import { type PersonalHomeType } from "../../lib/modules/personal-ops/agenda";
+import { PERSONAL_HOME_TYPES, type PersonalHomeType } from "../../lib/modules/personal-ops/agenda";
 import styles from "./PersonalHome.module.css";
 
 export default function PersonalHome({ state, projectGoalCount = 0, selectedTypes, onToggleType }: { state: PersonalOpsState; projectGoalCount?: number; selectedTypes: PersonalHomeType[]; onToggleType: (type: PersonalHomeType)=>void }) {
@@ -66,7 +66,7 @@ export default function PersonalHome({ state, projectGoalCount = 0, selectedType
     <WorkspaceNavSlot kind="actions"><div className={`${styles.sectionHeader} workspace-space-actions`}><span className="workspace-action-group-label">Spaces</span><WorkspaceButton icon="plus" disabled={!loaded || busy} onClick={() => {setDraft(settings); setOpen(true); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-label="New section name"]')?.focus());}}>Add section</WorkspaceButton></div></WorkspaceNavSlot>
     {error && !open && <p role="alert">{error}</p>}
     <nav className={styles.shortcuts} aria-label="Personal spaces">{shortcuts.filter(item => !settings.hidden.includes(item.id)).map(item => <Link prefetch={false} href={item.href} key={item.id}><span><PersonalOpsIcon name={item.icon}/></span><strong>{item.label}</strong></Link>)}{loaded && shortcuts.every(item => settings.hidden.includes(item.id)) && <p>Use Add section to choose your spaces.</p>}</nav>
-    <div className={styles.operations}>{operations.map(item => <button type="button" aria-pressed={selectedTypes.includes(item.type)} onClick={()=>onToggleType(item.type)} key={item.href}><PersonalOpsIcon name={item.icon}/><span><strong>{item.label}</strong></span><b>{item.count}</b></button>)}</div>
+    <div className={styles.operations}>{operations.map(item => <button type="button" aria-pressed={selectedTypes.length < PERSONAL_HOME_TYPES.length && selectedTypes.includes(item.type)} onClick={()=>onToggleType(item.type)} key={item.href}><PersonalOpsIcon name={item.icon}/><span><strong>{item.label}</strong></span><b>{item.count}</b></button>)}</div>
     <WorkspaceSheet open={open} onClose={() => {if (!busy) setOpen(false);}} title="Personal sections" titleIcon="module-personal" presentation="center" className={styles.customizeSheet} focusInput={false}>
       <div className={styles.customize}>
         <p>Choose the spaces shown here. Hiding a space keeps all its information.</p>
