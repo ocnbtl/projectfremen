@@ -123,6 +123,7 @@ export function legacyPersonalRecordToResource(record: LegacyResourceRecord): Re
       label: record.title
     }),
     title: record.title,
+    duplicateReviews: profile?.duplicateReviews || [],
     body: record.body,
     type: profile?.resourceType || "unknown",
     lifecycleState: currentLifecycle,
@@ -266,6 +267,7 @@ export function resourceUpdateInputToLegacy(input: ResourceUpdateInput): Persona
     archiveReason: input.archiveReason,
     starred: input.starred,
     resourceProfile: {
+      ...(input.duplicateReviews !== undefined ? { duplicateReviews: input.duplicateReviews } : {}),
       ...(input.type !== undefined ? { resourceType: input.type } : {}),
       ...(input.lifecycle !== undefined ? { lifecycle: input.lifecycle } : {}),
       ...(input.sourceDomain !== undefined ? { sourceDomain: input.sourceDomain } : {}),

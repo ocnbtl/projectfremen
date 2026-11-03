@@ -20,6 +20,7 @@ export type ResourceDuplicateEvidenceItem = {
 
 export type ResourceDuplicateEvidenceIndex = {
   groups: readonly ResourceExactUrlCollisionGroup[];
+  reviewedGroups: readonly ResourceExactUrlCollisionGroup[];
   byResourceId: ReadonlyMap<string, ResourceDuplicateEvidenceItem>;
   summary: {
     totalResources: number;
@@ -35,6 +36,11 @@ type CollisionMember = {
   target: NativeObjectRef;
   displayDomain: string;
 };
+export const duplicateMemberSignature = (resource: Pick<ResourceRecord,"id"|"title">) => `${resource.id}\n${resource.title}`;
+export function duplicateReviewMatches(review: NonNullable<ResourceRecord["duplicateReviews"]>[number], group: ResourceExactUrlCollisionGroup, resources: readonly ResourceRecord[]) {
+  const members = group.members.map(member=>resources.find(resource=>resource.id===member.resourceId)).filter((item):item is ResourceRecord=>Boolean(item)).map(duplicateMemberSignature).sort();
+  return review.matchKey === group.matchKey && review.members.length === members.length && [...review.members].sort().every((value,index)=>value===members[index]);
+}
 
 /**
  * Builds a read-only exact-match index from the already classified Resource
@@ -49,6 +55,7 @@ export function buildResourceDuplicateEvidenceIndex(
   let withheldEvidenceExcluded = 0;
 
   for (const resource of resources) {
+    if (resource.deletedAt || ["archived","merged","replaced"].includes(resource.lifecycleState)) continue;
     acceptedCandidatesIndexed += resource.source.candidates.length;
     withheldEvidenceExcluded += resource.source.evidence.filter(
       (item) => item.state !== "syntax_accepted"
@@ -65,7 +72,7 @@ export function buildResourceDuplicateEvidenceIndex(
     }
   }
 
-  const groups = Array.from(membersByMatchKey.entries())
+  const allGroups = Array.from(membersByMatchKey.entries())
     .filter(([, members]) => members.size > 1)
     .map(([matchKey, members]) => {
       const sortedMembers = Array.from(members.values()).sort((left, right) =>
@@ -86,6 +93,8 @@ export function buildResourceDuplicateEvidenceIndex(
       left.matchKey.localeCompare(right.matchKey)
     );
 
+  const reviewedGroups = allGroups.filter(group=>resources.some(resource=>group.members.some(member=>member.resourceId===resource.id) && resource.duplicateReviews?.some(review=>duplicateReviewMatches(review,group,resources))));
+  const groups = allGroups.filter(group=>!reviewedGroups.includes(group));
   const mutableByResourceId = new Map<
     string,
     {
@@ -123,6 +132,7 @@ export function buildResourceDuplicateEvidenceIndex(
 
   return {
     groups,
+    reviewedGroups,
     byResourceId,
     summary: {
       totalResources: resources.length,

@@ -13,6 +13,8 @@ import { readNativeObjectLinks } from "../../../lib/native-objects/link-store";
 import { createNativeObjectRef } from "../../../lib/native-objects/routes";
 import { requireAdminSession } from "../../../lib/require-admin";
 import { readPlanningState } from "../../../lib/modules/planning/store";
+import { buildProfileRecordEdges } from "../../../lib/modules/people/profile-connections";
+import { readNoteLinksState } from "../../../lib/modules/notes/links-store";
 
 export type PeopleRouteMode = "directory" | "profile" | "new" | "edit";
 
@@ -24,7 +26,7 @@ export default async function PeopleRoutePage({
   personId?: string;
 }) {
   await requireAdminSession();
-  const [recordsResult, followUpsResult, projectsResult, objectLinksResult, personalLifeResult, financeResult, places] = await Promise.all([
+  const [recordsResult, followUpsResult, projectsResult, objectLinksResult, personalLifeResult, financeResult, places, noteLinksResult] = await Promise.all([
     readPersonalRecords()
       .then((records) => ({ ok: true as const, records }))
       .catch((error: unknown) => ({
@@ -53,7 +55,8 @@ export default async function PeopleRoutePage({
     readFinanceState()
       .then((state) => ({ ok: true as const, state }))
       .catch(() => ({ ok: false as const, state: { accounts: [] } })),
-    readPlanningState().then(state => state.places.filter(place => !place.archivedAt)).catch(() => [])
+    readPlanningState().then(state => state.places.filter(place => !place.archivedAt)).catch(() => []),
+    readNoteLinksState().then(state=>({ok:true,links:state.links})).catch(()=>({ok:false,links:[]}))
   ]);
   const records: PersonalRecord[] = recordsResult.ok ? recordsResult.records : [];
   const loadError = recordsResult.ok ? "" : recordsResult.error;
@@ -66,7 +69,7 @@ export default async function PeopleRoutePage({
   const objectTargets = [
     ...places.map(place => createNativeObjectRef({ module: "map", objectType: "place", objectId: place.id, label: place.name, versionId: place.updatedAt })),
     ...records
-      .filter((record) => !record.archivedAt && record.className === "file")
+      .filter((record) => !record.archivedAt && !record.mediaProfile?.archivedAt && record.className === "file")
       .map((record) => createNativeObjectRef({
         module: "media", objectType: "media_asset", objectId: record.id,
         label: record.title, versionId: record.updatedAt
@@ -90,7 +93,7 @@ export default async function PeopleRoutePage({
         versionId: record.updatedAt
       })),
     ...records
-      .filter((record) => !record.archivedAt && record.className === "resource")
+      .filter((record) => !record.archivedAt && !record.resourceProfile?.deletedAt && record.className === "resource")
       .map((record) => createNativeObjectRef({
         module: "resources",
         objectType: "resource",
@@ -152,6 +155,8 @@ export default async function PeopleRoutePage({
         initialProjectsError={projectsResult.ok ? "" : projectsResult.error}
         initialObjectLinks={objectLinksResult.items}
         initialObjectTargets={objectTargets}
+        initialRecordEdges={[...buildProfileRecordEdges(records.filter(record=>!["person","org"].includes(record.className)),objectTargets).filter(edge=>edge.target.module === "people"),...noteLinksResult.links.filter(link=>link.state!=="removed" && link.targetRef.module === "people").map(link=>({source:link.noteRef,target:link.targetRef,detail:link.contextNote || link.relationship}))]}
+        initialObjectLinksError={[objectLinksResult.ok ? "" : "Direct object links could not load. Refresh to retry; your relationships are preserved.",noteLinksResult.ok ? "" : "Note connections could not load."].filter(Boolean).join(" ")}
       />
     </div>
   );

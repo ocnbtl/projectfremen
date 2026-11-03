@@ -9,7 +9,8 @@ import type { Place } from "../lib/modules/planning/types";
 import LogoLoader from "./operational/LogoLoader";
 import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/people/relationships";
 
-import RelatedRecords from "./planning/RelatedRecords";
+import PeopleLinksPanel from "./people/PeopleLinksPanel";
+import type { ProfileRecordEdge } from "../lib/modules/people/profile-connections";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -124,6 +125,8 @@ type PeopleWorkspaceProps = {
   initialProjectsError?: string;
   initialObjectLinks: ObjectLink[];
   initialObjectTargets: NativeObjectRef[];
+  initialRecordEdges?: ProfileRecordEdge[];
+  initialObjectLinksError?: string;
   initialPlaces?: Place[];
 };
 
@@ -1949,6 +1952,8 @@ export default function PeopleWorkspace({
   initialProjectsError = "",
   initialObjectLinks,
   initialObjectTargets,
+  initialRecordEdges = [],
+  initialObjectLinksError = "",
   initialPlaces = []
 }: PeopleWorkspaceProps) {
   const router = useRouter();
@@ -2607,9 +2612,6 @@ export default function PeopleWorkspace({
     ...selectedOrganizationPeople.filter(target => detailMode !== "edit" || selectedOrganizationDerivedPersonIds.includes(target.id))
       .map((target) => [target.title.toLowerCase(), { label: target.title, target }] as const)
   ]).values());
-  const peopleConnections = relationshipConnections.filter((connection) => connection.target?.className === "person");
-  const organizationConnections = relationshipConnections.filter((connection) => connection.target?.className === "org");
-  const unresolvedConnections = relationshipConnections.filter((connection) => !connection.target);
   const selectedPersonRef = selectedPerson ? createNativeObjectRef({
     module: "people",
     objectType: selectedPerson.className === "org" ? "organization" : "person",
@@ -4777,121 +4779,7 @@ export default function PeopleWorkspace({
                 </div>
               </section>
             ) : detailMode === "workspace" ? (
-              <section className="people-links-hub" aria-label={`${selectedPerson.title} links`}>
-                <div className="people-section-toolbar">
-                  <div>
-                    <h3>Links</h3>
-                  </div>
-                  <div className="people-links-toolbar-actions">
-                    <strong className="people-section-count" aria-label={`${peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length} linked items`}>
-                      {peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length}
-                    </strong>
-                  </div>
-                </div>
-                {actionNotice && <p className="people-notice">{actionNotice}</p>}
-                <div className="people-links-grid">
-                  <article className="people-links-section is-people">
-                    <header className="people-linked-card-header">
-                      <div><h4>People</h4></div>
-                      <strong className="people-section-count" aria-label={`${peopleConnections.length} linked people`}>{peopleConnections.length}</strong>
-                    </header>
-                    <div className="people-links-directory">
-                      {peopleConnections.length > 0 ? peopleConnections.map((connection) => (
-                          <button type="button" onClick={() => selectPerson(connection.target!)} key={connection.label}>
-                            <PeopleProfileAvatar organization={connection.target!.className === "org"}
-                              label={connection.target!.title}
-                              initials={getInitials(connection.target!)}
-                              photoUrl={connection.target!.profile?.photoUrl}
-                              photoUpdatedAt={connection.target!.profile?.photoUpdatedAt}
-                              compact
-                            />
-                            <span><strong>{connection.target!.title}</strong><small>{getPrimaryGroup(connection.target!)}</small></span>
-                            <PeopleIcon name="chevron" />
-                          </button>
-                      )) : <p>No people yet.</p>}
-                    </div>
-                  </article>
-                  <article className="people-links-section is-organizations">
-                    <header className="people-linked-card-header">
-                      <div><h4>Organizations</h4></div>
-                      <strong className="people-section-count" aria-label={`${organizationConnections.length} linked organizations`}>{organizationConnections.length}</strong>
-                    </header>
-                    <div className="people-links-directory is-organizations">
-                      {organizationConnections.length > 0 ? organizationConnections.map((connection) => (
-                        <button type="button" onClick={() => selectPerson(connection.target!)} key={connection.label}>
-                          <PeopleProfileAvatar organization={connection.target!.className === "org"}
-                            label={connection.target!.title}
-                            initials={getInitials(connection.target!)}
-                            photoUrl={connection.target!.profile?.photoUrl}
-                            photoUpdatedAt={connection.target!.profile?.photoUpdatedAt}
-                            compact
-                          />
-                          <span><strong>{connection.target!.title}</strong><small>{connection.target!.profile?.organizationType || "Organization"}</small></span>
-                          <PeopleIcon name="chevron" />
-                        </button>
-                      )) : <p>No organizations yet.</p>}
-                    </div>
-                    {unresolvedConnections.length > 0 && <div className="people-link-context-list">
-                      {unresolvedConnections.map((connection) => <div className="people-link-context" key={connection.label}><strong>{connection.label}</strong><span>Context</span></div>)}
-                    </div>}
-                  </article>
-                  <article className="people-links-section is-projects">
-                    <header className="people-linked-card-header">
-                      <div><h4>Projects</h4></div>
-                      <strong className="people-section-count" aria-label={`${selectedProjectConnections.length} linked projects`}>{selectedProjectConnections.length}</strong>
-                    </header>
-                    {projectsError && <p className="people-notice" role="alert">{projectsError}</p>}
-                    {projectsLoading ? <LogoLoader label="Loading projects" /> : selectedProjectConnections.length > 0 ? (
-                      <LinkedProjectsPanel
-                        personId={selectedPerson.id}
-                        personLabel={selectedPerson.title}
-                        objectType={selectedPerson.className === "org" ? "organization" : "person"}
-                        state={projectsState}
-                        loading={projectsLoading}
-                        error={projectsError}
-                        onRefresh={() => void refreshProjects()}
-                        legacyProjectLabels={selectedPerson.projects}
-                        limit={4}
-                        compact
-                        showHeader={false}
-                        showSummary={false}
-                        showBoundary={false}
-                      />
-                    ) : <p>No projects yet.</p>}
-                  </article>
-                  <article className="people-links-section is-objects">
-                    <header className="people-linked-card-header">
-                      <div><h4>Objects</h4></div>
-                      <strong className="people-section-count" aria-label={`${selectedNativeObjectLinks.length} linked objects`}>{selectedNativeObjectLinks.length}</strong>
-                    </header>
-                    <div className="people-object-links">
-                      {selectedNativeObjectLinks.length > 0 ? selectedNativeObjectLinks.map(({ link, object }) => {
-                        const person = object.module === "people" && ["person", "organization"].includes(object.objectType) ? people.find(record => record.id === object.objectId) : undefined;
-                        return (
-                        <div key={link.id}>
-                          <a href={object.route}>
-                            {person ? <span className="people-linked-person-avatar"><PeopleProfileAvatar organization={person?.className === "org"} label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /></span> : <span className="people-object-glyph"><UnigentamosIcon role={objectTargetIcon(object)} size={20} /></span>}
-                            <span><strong>{object.label}</strong><small>{labelize(object.objectType)} · {labelize(link.relationship)}</small></span>
-                          </a>
-                          <button type="button" onClick={() => void removeObjectLink(link)} disabled={objectLinkSaving} aria-label={`Remove link to ${object.label}`} data-icon-button="standard"><PeopleIcon name="close" /></button>
-                        </div>
-                      ); }) : <p>No objects yet.</p>}
-                    </div>
-                  </article>
-                  <RelatedRecords module="people" type={selectedPerson.className === "org" ? "organization" : "person"} id={selectedPerson.id} />
-                  <article className="people-links-section is-resources">
-                    <header className="people-linked-card-header">
-                      <div><h4>Resources</h4></div>
-                      <strong className="people-section-count" aria-label={`${selectedPerson.externalSources.length} saved resources`}>{selectedPerson.externalSources.length}</strong>
-                    </header>
-                    <div className="people-resource-links">
-                      {selectedPerson.externalSources.length > 0 ? selectedPerson.externalSources.map((item) => (
-                        <a href={/^https?:\/\//i.test(item) ? item : `${getModuleRoute("resources")}?query=${encodeURIComponent(item)}`} target={/^https?:\/\//i.test(item) ? "_blank" : undefined} rel={/^https?:\/\//i.test(item) ? "noreferrer" : undefined} key={item}>{item}</a>
-                      )) : <p>No resources yet.</p>}
-                    </div>
-                  </article>
-                </div>
-              </section>
+              <PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving}/>
             ) : (
               <section className="people-overview-grid">
                 <section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">

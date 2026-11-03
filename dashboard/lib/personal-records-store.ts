@@ -142,6 +142,7 @@ export type PersonalResourceTimelineEvent = {
 
 export type PersonalResourceProfile = {
   version: 1;
+  duplicateReviews?: { matchKey: string; members: string[]; reviewedAt: string }[];
   resourceType:
     | "article"
     | "website"
@@ -1756,6 +1757,12 @@ function normalizeResourceProfile(
       lastCheckedAt: cleanIso(duplicate.lastCheckedAt),
       matchIds: sanitizeRecordIds(Array.isArray(duplicate.matchIds) ? duplicate.matchIds.filter((item): item is string => typeof item === "string") : [])
     },
+    duplicateReviews: Array.isArray(value.duplicateReviews) ? value.duplicateReviews.slice(-200).flatMap(item => {
+      if (!item || typeof item.matchKey !== "string" || !Array.isArray(item.members) || !cleanIso(item.reviewedAt)) return [];
+      const key = item.matchKey.slice(0,4096);
+      try { const url = new URL(key); if (!/^https?:$/.test(url.protocol) || url.username || url.password) return []; } catch { return []; }
+      return [{matchKey:key,members:item.members.filter((member): member is string=>typeof member === "string").slice(0,1000).map(member=>member.slice(0,600)),reviewedAt:cleanIso(item.reviewedAt)!}];
+    }) : [],
     automations: {
       urlHealth: normalizeResourceAutomationRun(automations.urlHealth),
       duplicateScan: normalizeResourceAutomationRun(automations.duplicateScan),

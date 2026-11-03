@@ -233,6 +233,7 @@ export type ResourceRecord = {
   id: string;
   nativeRef: NativeObjectRef;
   title: string;
+  duplicateReviews?: ResourceProfile["duplicateReviews"];
   body: string;
   type: ResourceType;
   lifecycleState: ResourceLifecycleState;
@@ -305,6 +306,7 @@ export type ResourceCreateInput = {
 };
 
 export type ResourceUpdateInput = {
+  duplicateReviews?: ResourceProfile["duplicateReviews"];
   title?: string;
   url?: string;
   body?: string;

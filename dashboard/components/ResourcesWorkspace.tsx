@@ -15,6 +15,7 @@ import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import ResourceDirectoryCard from "./resources/ResourceDirectoryCard";
+import ResourceDuplicateReview from "./resources/ResourceDuplicateReview";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedNotesPanel from "./operational/LinkedNotesPanel";
@@ -562,7 +563,7 @@ export default function ResourcesWorkspace({
   const sidebar = (
     <ModuleSidebar
       id="resources-module-sidebar"
-      status={<WorkspaceButton className={styles.resourceDuplicateButton} icon={duplicateEvidence.summary.affectedResources ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={duplicateEvidence.summary.affectedResources ? `${duplicateEvidence.summary.affectedResources} resources with matching URLs` : "No matching resource URLs"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} />}
+      status={<WorkspaceButton className={`${styles.resourceDuplicateButton} people-duplicates-indicator`} data-warning={duplicateEvidence.groups.length>0 || undefined} disabled={Boolean(initialLoadError)} icon={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={initialLoadError ? "Duplicate check unavailable" : duplicateEvidence.groups.length ? `${duplicateEvidence.groups.length} possible duplicate groups` : "No duplicates to review"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} />}
       title="Resources"
       description="Saved references and useful source material."
       sections={sidebarSections.map(section=>({...section,items:section.items.filter(item=>!item.disabled)})).filter(section=>section.items.length)}
@@ -1003,11 +1004,7 @@ export default function ResourcesWorkspace({
             </section>
           )}
 
-          {view === "duplicate-urls" && !unavailableViewReason && <section className={styles.resourceDuplicates} aria-label="Resource duplicate review">
-            <div><UnigentamosIcon role={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} size={22}/><h2>{duplicateEvidence.groups.length ? "Matching resource URLs" : "No matching URLs found"}</h2><WorkspaceButton onClick={()=>selectLibraryView("all")}>Done</WorkspaceButton></div>
-            <p>Review resources that share the same URL. Nothing is merged or deleted automatically.</p>
-            {duplicateEvidence.groups.map(group=><article key={group.matchKey}><strong>{group.displayDomain}</strong><div>{group.members.map(member=>{const resource=resources.find(item=>item.id===member.resourceId);return resource ? <button type="button" key={resource.id} onClick={()=>selectResource(resource)}><UnigentamosIcon role="resource" size={16}/>{resource.title}<UnigentamosIcon role="chevron-right" size={14}/></button> : null;})}</div></article>)}
-          </section>}
+          {view === "duplicate-urls" && !unavailableViewReason && !initialLoadError && <ResourceDuplicateReview query={query} resources={resources} evidence={duplicateEvidence} onOpen={selectResource} onSaved={saved=>setResources(current=>current.map(item=>item.id===saved.id?saved:item))} onDone={()=>selectLibraryView("all")}/>}
 
           {linkedContextModule && linkedContextSummary && linkedContextCoverage && (
             <section
@@ -1093,19 +1090,19 @@ export default function ResourcesWorkspace({
             <ViewCycleButton data-toolbar-view value={density} onChange={next => { setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }} />
           </WorkspaceToolbar>
 
-          <div className={styles.resourceTypeFilters} role="group" aria-label="Resource types">
+          {view !== "duplicate-urls" && <div className={styles.resourceTypeFilters} role="group" aria-label="Resource types">
             <button type="button" aria-pressed={selectedTypes.size===resourceKinds.length} onClick={()=>toggleResourceType()}>All types</button>
             {resourceKinds.map(type=><button type="button" key={type} aria-pressed={selectedTypes.has(type)} onClick={()=>toggleResourceType(type)}>{type==="components" ? "Components" : TYPE_LABELS[type as ResourceType]}</button>)}
-          </div>
+          </div>}
           {initialLoadError ? (
             <SystemState variant="error" title="Resources could not be loaded" description={initialLoadError} />
           ) : unavailableViewReason ? (
             <SystemState variant="read_only" title="This Resources view is staged" description={unavailableViewReason} />
-          ) : visibleResources.length ? (
+          ) : view === "duplicate-urls" ? null : visibleResources.length ? (
             <DirectoryLayout view={density} className={`${styles.list} resource-directory is-${density}`} data-density={density} data-library role="list" aria-label="Resources">
               {visibleResources.map((resource) => {
                 const queueItem = reviewQueue.byResourceId.get(resource.id);
-                const duplicateItem = duplicateEvidence.byResourceId.get(resource.id);
+
                 const linkedContextPlacements = linkedContextModule
                   ? linkedContextByResourceId
                       .get(resource.id)
@@ -1129,17 +1126,6 @@ export default function ResourcesWorkspace({
                         <>
                           <strong>{queueItem.evidenceGapCount} of 9 unavailable</strong>
                           <span>{queueItem.primaryReason}</span>
-                        </>
-                      ) : view === "duplicate-urls" && duplicateItem ? (
-                        <>
-                          <strong>
-                            {duplicateItem.matchingResourceCount} matching{" "}
-                            {duplicateItem.matchingResourceCount === 1 ? "Resource" : "Resources"}
-                          </strong>
-                          <span>
-                            {duplicateItem.collisionGroupCount} exact URL{" "}
-                            {duplicateItem.collisionGroupCount === 1 ? "group" : "groups"}
-                          </span>
                         </>
                       ) : linkedContextModule ? (
                         <>
@@ -1183,8 +1169,6 @@ export default function ResourcesWorkspace({
               title={
                 view === "needs-review" && !query
                   ? "No Resource evidence needs review"
-                  : view === "duplicate-urls" && !query
-                    ? "No exact URL collision evidence"
                   : linkedContextModule && !query
                     ? `No exact ${displayLabel(linkedContextModule)} owner-route evidence`
                   : resources.length
@@ -1194,8 +1178,6 @@ export default function ResourcesWorkspace({
               description={
                 view === "needs-review" && !query
                   ? "The current read model exposes no unavailable review evidence or source signals. This is not a completed ReviewRun."
-                  : view === "duplicate-urls" && !query
-                    ? "No two Resources share an identical accepted, fragment-free URL key in the current read model. This is not proof that no duplicates exist."
                   : linkedContextModule && !query
                     ? linkedContextCoverage?.state === "indexed"
                       ? `The connected ${displayLabel(linkedContextModule)} read model contains no exact Resource references. This is not proof that no relationship exists.`
