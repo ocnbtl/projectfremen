@@ -116,7 +116,9 @@
 .overview :global(.finance-range-presets) button{flex:1;min-width:56px;}
 .overview :global(.finance-spending-sort){padding:0;margin:0;}
 .overview .categoryTotal{font-size:24px!important;font-weight:600!important;}
-.overview :global(.finance-spending-breakdown) ol{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+.overview :global(.finance-spending-breakdown) ol{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));}
+.overview :global(.finance-spending-breakdown) li button{height:100%;align-content:start;}
+.overview :global(.finance-spending-breakdown) li button>span:first-of-type strong{white-space:normal;overflow-wrap:anywhere;line-height:1.5;}
 .overview :global(.finance-spending-breakdown) li button>span:last-of-type strong{font-size:20px;}
 .overview :global(.finance-focus-queue){grid-template-columns:minmax(0,1fr);}
 .overview :global(.finance-focus-queue)>button{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;}
