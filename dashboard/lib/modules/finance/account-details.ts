@@ -7,10 +7,10 @@ export function accountBalanceSource(account?: FinanceAccountRecord) {
   return ({ plaid: "Plaid", coinbase: "Coinbase", imported: "Imported statement", manual: "Manual entry" })[account?.balanceSource || "manual"];
 }
 export function accountBalanceExplanation(account?: FinanceAccountRecord) {
-  if (account?.bankLink) return "Updated when this account syncs with Plaid, including bank update notifications. This is the latest retrieved balance, not a live balance.";
-  if (account?.coinbaseLink) return "Updated when Coinbase syncs. This is the latest retrieved estimate, not a live valuation.";
-  if (account?.balanceSource === "plaid" || account?.balanceSource === "coinbase") return "Last retrieved from the provider. This account is no longer connected; reconnect to receive new balances.";
-  return "A balance you recorded from an account or statement. Update it when you have a newer balance; adding transactions or importing a CSV does not change it.";
+  if (account?.bankLink) return "This is the balance Plaid last received. It refreshes when the account syncs, including after bank update notifications.";
+  if (account?.coinbaseLink) return "This estimate comes from the last Coinbase sync. Prices can change between syncs.";
+  if (account?.balanceSource === "plaid" || account?.balanceSource === "coinbase") return "This balance came from the last sync. The account is no longer connected. Reconnect it to receive new balances.";
+  return "You can update this balance from your latest statement. Adding or importing transactions does not change the recorded balance.";
 }
 export function accountDate(value?: string, time = false) {
   if (!value) return "Not recorded";

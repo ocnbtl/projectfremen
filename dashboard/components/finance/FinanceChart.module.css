@@ -1,0 +1,281 @@
+.footer {
+  min-width: 0;
+  padding: 5px 0 12px;
+}
+
+.periodBar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.periodToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-panel, white);
+  color: var(--text-strong);
+  font: 550 12px/1.4 var(--font-body);
+  cursor: pointer;
+  transition: border-color 180ms, background-color 180ms;
+}
+
+.periodToggle svg:last-child {
+  transition: transform 220ms ease;
+}
+
+.periodToggle[aria-expanded=true] svg:last-child {
+  transform: rotate(90deg);
+}
+
+.periodToggle:hover,
+.periodToggle[aria-expanded=true] {
+  border-color: var(--module-primary-200);
+  background: var(--module-primary-50);
+}
+
+.footer .periodBar .readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-content: center;
+  gap: 3px 12px;
+  min-width: 0;
+  min-height: 36px;
+  margin: 0;
+  padding: 3px 0;
+  background: transparent;
+  font: 400 12px/1.45 var(--font-body);
+  color: var(--text-muted);
+}
+
+.periodBar .readout > span,
+.periodBar .readout > span:only-child {
+  display: inline;
+  font-size: inherit;
+}
+
+.periodBar .readout > strong,
+.periodBar .readout b {
+  font: 600 12px/1.45 var(--font-body);
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableReveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  min-width: 0;
+  visibility: hidden;
+  clip-path: inset(0 100% 0 0);
+  transition: grid-template-rows 240ms ease, clip-path 240ms ease, visibility 0s 240ms;
+}
+
+.tableReveal[data-open=true] {
+  visibility: visible;
+  grid-template-rows: 1fr;
+  clip-path: inset(0);
+  transition: grid-template-rows 280ms ease, clip-path 340ms cubic-bezier(.22,.8,.2,1), visibility 0s;
+}
+
+.tableClip {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tableClip section {
+  padding: 8px 0 0;
+}
+
+.tableClip [role=region] {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.tableClip table {
+  min-width: 340px;
+}
+
+.tableClip table :is(th, td) {
+  white-space: nowrap;
+}
+
+.totalButton {
+  display: grid;
+  justify-content: stretch;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--module-primary-50);
+  color: var(--text-strong);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 180ms, border-color 180ms;
+}
+
+.totalButton:hover {
+  border-color: var(--module-primary-200);
+  background: var(--module-primary-100);
+}
+
+.totalButton:nth-child(2) strong {
+  color: var(--module-secondary-700);
+}
+
+.totalButton svg:last-child {
+  margin-left: auto;
+  flex: none;
+}
+
+.filterPanel {
+  box-sizing: border-box;
+  width: min(410px, calc(100vw - 24px));
+  max-height: min(85dvh, var(--radix-popover-content-available-height));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 150;
+  padding: 16px;
+  border: 1px solid var(--border-soft, #d6dfe4);
+  border-radius: 16px;
+  background: var(--surface-panel, white);
+  color: var(--text-strong);
+  box-shadow: 0 14px 40px #16344920;
+  font-family: var(--font-body);
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+
+.filterHeader, .filterFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filterHeader h3, .coverage h3 {
+  font: 600 15px/1.4 var(--font-heading);
+  margin: 0;
+}
+
+.filterGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+  margin: 14px 0 18px;
+}
+
+.filterGrid label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: var(--text-muted);
+  font: 500 12px/1.4 var(--font-body);
+}
+
+.budgetField {
+  grid-column: 1 / -1;
+}
+
+.filterOptions.filterOptions {
+  box-sizing: border-box;
+  width: min(max(210px, var(--radix-popover-trigger-width)), calc(100vw - 24px));
+  min-width: 0;
+  max-height: min(360px, var(--radix-popover-content-available-height));
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+
+.filterOptions :global(.app-select-item) {
+  overflow-wrap: anywhere;
+}
+
+.filterPanel[data-state=open], .filterOptions.filterOptions[data-state=open] {
+  animation: menuOpen 210ms cubic-bezier(.22,.8,.2,1) both;
+}
+
+.filterPanel[data-state=closed], .filterOptions.filterOptions[data-state=closed] {
+  pointer-events: none;
+  animation: menuClose 130ms ease-in both;
+}
+
+@keyframes menuOpen {
+  from { opacity: 0; transform: scale(.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes menuClose {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(.98); }
+}
+
+.filterFooter {
+  border-top: 1px solid var(--border-soft, #d6dfe4);
+  padding-top: 12px;
+}
+
+.filterFooter > button:first-child {
+  min-height: 40px;
+  border: 0;
+  padding: 5px 3px;
+  background: transparent;
+  color: var(--module-primary-700);
+  font: 550 13px/1.4 var(--font-body);
+  cursor: pointer;
+}
+
+.filterFooter > button:first-child:hover {
+  text-decoration: underline;
+}
+
+.filterPanel .filterHeader button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.filterPanel .filterFooter button { width: auto; box-shadow: none; }
+.filterPanel .filterFooter button:last-child {
+  background: var(--nav-module-accent, #0a5a36);
+  color: white;
+  padding-inline: 18px;
+}
+
+.coverage {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.coverage p {
+  margin: 0;
+  color: var(--text-muted);
+  font: 400 13px/1.55 var(--font-body);
+}
+
+@media (max-width: 600px) {
+  .totalButton { padding: 9px 7px; }
+  .periodBar { gap: 7px; }
+  .periodToggle { min-height: 40px; }
+}
+
+@media (max-width: 410px) {
+  .filterGrid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filterPanel[data-state], .filterOptions.filterOptions[data-state] { animation: none; }
+  .periodToggle, .periodToggle svg:last-child, .tableReveal, .tableReveal[data-open=true], .totalButton { transition: none; }
+}

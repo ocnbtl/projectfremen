@@ -1,0 +1,11 @@
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-inline-start: 6px;
+  vertical-align: .1em;
+  border-radius: 50%;
+  background: #657583;
+}
+.dot[data-direction="income"] { background: #21814d; }
+.dot[data-direction="expense"] { background: #bf4850; }

@@ -8,7 +8,7 @@ export type OverviewFilters = {
   direction: "all" | "income" | "expense";
   spendingSort: "amount-desc" | "amount-asc" | "name" | "count";
 };
-export type OverviewSelection = { kind: "summary" | "period" | "category" | "transaction"; id: string };
+export type OverviewSelection = { kind: "summary" | "period" | "category" | "transaction" | "income" | "spending"; id: string; flow?: "income" | "spending" };
 export const DEFAULT_OVERVIEW_FILTERS: OverviewFilters = { range: "90d", from: "", to: "", account: "", category: "", budget: "", status: "cleared", direction: "all", spendingSort: "amount-desc" };
 const DAY = 86400000;
 const iso = (date: Date) => date.toISOString().slice(0, 10);
@@ -26,7 +26,9 @@ export function readOverviewUrl(params: URLSearchParams) {
   if (!validDate(filters.from)) filters.from = "";
   if (!validDate(filters.to)) filters.to = "";
   const kind = params.get("chart-detail");
-  const selection: OverviewSelection = { kind: kind === "period" || kind === "category" || kind === "transaction" ? kind : "summary", id: params.get("chart-id") || "" };
+  const selection: OverviewSelection = { kind: kind === "period" || kind === "category" || kind === "transaction" || kind === "income" || kind === "spending" ? kind : "summary", id: params.get("chart-id") || "" };
+  const flow = params.get("chart-flow");
+  if ((kind === "period" || kind === "category") && (flow === "income" || flow === "spending")) selection.flow = flow;
   return { filters, selection };
 }
 export function writeOverviewUrl(base: URLSearchParams, filters: OverviewFilters, selection: OverviewSelection) {
@@ -36,7 +38,8 @@ export function writeOverviewUrl(base: URLSearchParams, filters: OverviewFilters
     else params.set(`chart-${key}`, filters[key]);
   }
   if (selection.kind === "summary") { params.delete("chart-detail"); params.delete("chart-id"); }
-  else { params.set("chart-detail", selection.kind); params.set("chart-id", selection.id); }
+  else { params.set("chart-detail", selection.kind); if (selection.id) params.set("chart-id", selection.id); else params.delete("chart-id"); }
+  if (selection.flow && (selection.kind === "period" || selection.kind === "category")) params.set("chart-flow", selection.flow); else params.delete("chart-flow");
   return params;
 }
 export function overviewDate(value: string, options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" }) {

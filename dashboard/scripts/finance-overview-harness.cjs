@@ -58,4 +58,15 @@ assert.equal(financeMerchantMark({website:'https://vercel.com/'}),'vercel.svg');
 assert.equal(financeMerchantMark({website:'https://vercel.com.evil.test'}),undefined);
 assert.equal(financeMerchantMark({title:'Google',website:'https://unrelated.test'}),undefined);
 assert.equal(financeMerchantMark({website:'https://www.retellai.com/'}),'retell.svg');
+for (const [website, file] of [
+  ['https://7brew.com/', '7-brew.png'],
+  ['https://www.allstate.com/', 'allstate.svg'],
+  ['https://www.canva.com/about/', 'canva.svg'],
+  ['https://www.jimmyjohns.com/', 'jimmy-johns.png'],
+]) {
+  assert.equal(financeMerchantMark({website}), file);
+  assert(fs.existsSync(require('node:path').join(__dirname, '../public/finance-logos', file)));
+}
+assert.equal(financeMerchantMark({title:'Canva'}),undefined);
+assert.equal(financeMerchantMark({website:'https://canva.com.unrelated.test'}),undefined);
 console.log('Budget usage: exact/shared precedence, monthly scopes, zero/missing/ambiguous/over-budget, multiple months and read-only totals passed; exact merchant domains passed.');

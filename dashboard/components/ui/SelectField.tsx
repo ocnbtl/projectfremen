@@ -5,9 +5,9 @@ import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { matchesChoiceSearch } from "../../lib/ui/choice-search";
 type OptionProps = { value?: string | number; disabled?: boolean; children?: ReactNode; title?: string; "data-search"?: string };
-type Props = SelectHTMLAttributes<HTMLSelectElement> & { renderOptionLabel?: (value: string, label: ReactNode) => ReactNode; optionColors?: Record<string,string>; optionIcons?: Record<string,string>; pressSlide?: boolean; searchable?: boolean; autoFocusSearch?: boolean; contained?: boolean; columns?: number; triggerContent?: ReactNode; menuClassName?: string; onCreate?: () => void; createLabel?: string };
+type Props = SelectHTMLAttributes<HTMLSelectElement> & { renderOptionLabel?: (value: string, label: ReactNode) => ReactNode; optionColors?: Record<string,string>; optionIcons?: Record<string,string>; pressSlide?: boolean; searchable?: boolean; autoFocusSearch?: boolean; contained?: boolean; portalToBody?: boolean; columns?: number; triggerContent?: ReactNode; menuClassName?: string; onCreate?: () => void; createLabel?: string };
 /** Nonmodal choice menus keep nested dismissals local to their owning control. */
-export default function SelectField({ value, defaultValue, onChange, children, className, disabled, required, name, id, renderOptionLabel, optionColors, optionIcons, pressSlide = false, searchable = false, autoFocusSearch = true, contained = false, columns = 1, triggerContent, menuClassName = "", onCreate, createLabel = "Create organization", ...attributes }: Props) {
+export default function SelectField({ value, defaultValue, onChange, children, className, disabled, required, name, id, renderOptionLabel, optionColors, optionIcons, pressSlide = false, searchable = false, autoFocusSearch = true, contained = false, portalToBody = false, columns = 1, triggerContent, menuClassName = "", onCreate, createLabel = "Create organization", ...attributes }: Props) {
   const trigger = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null), search = useRef<HTMLInputElement>(null);
   const listId = useId();
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [internal, setInternal] = useState(String(defaultValue ?? "")), [fieldLabel, setFieldLabel] = useState<string>();
@@ -29,7 +29,7 @@ export default function SelectField({ value, defaultValue, onChange, children, c
   const enclosingDialog = trigger.current?.closest<HTMLElement>('[role="dialog"]');
   const inActionsMenu = Boolean(trigger.current?.closest(".workspace-actions-menu"));
   // A scrolling nonmodal Actions popover is not a modal boundary for its children.
-  const portalContainer = enclosingDialog?.classList.contains("workspace-actions-menu") ? undefined : enclosingDialog || undefined;
+  const portalContainer = portalToBody || enclosingDialog?.classList.contains("workspace-actions-menu") ? undefined : enclosingDialog || undefined;
   const label = attributes["aria-label"] || fieldLabel || "Select an option";
   const select = (next:string) => {setInternal(next); onChange?.({target:{value:next},currentTarget:{value:next}} as ChangeEvent<HTMLSelectElement>); setOpen(false); setQuery("");};
   return <Popover.Root open={open} onOpenChange={next => {setOpen(next); if (!next) setQuery("");}}>
