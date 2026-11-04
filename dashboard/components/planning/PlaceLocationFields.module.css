@@ -1,6 +1,10 @@
 .fields { display: grid; gap: 10px; min-width: 0; font: 400 13px/1.4 var(--font-body); }
 .fields label { display: grid; gap: 5px; min-width: 0; font: 500 13px/1.4 var(--font-body); }
 .fields input { width: 100%; min-width: 0; box-sizing: border-box; font: 400 13px/1.4 var(--font-body); }
+.placeLookup { display:flex; align-items:center; gap:10px; }
+.placeLookup > span { color:var(--text-secondary); font-size:12px; }
+.compact .placeLookup { grid-column:1 / -1; grid-row:3; }
+.attribution { padding:4px 6px; color:var(--text-secondary); font-size:11px; }
 .addressHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: -5px; }
 .addressHeading label { display: flex; align-items: center; gap: 6px; }
 .country.country { min-height: 30px; width: 96px; flex: 0 0 96px; padding: 3px 8px; }
@@ -21,7 +25,7 @@
 .coordinates { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .autofill.autofill { font: 500 13px/1.4 var(--font-body); min-height: 40px; white-space: nowrap; gap: 5px; }
 .message { font: 400 12px/1.4 var(--font-body); color: var(--text-secondary); margin: 0; }
-.matches { display: grid; gap: 6px; width: min(390px, calc(100vw - 40px)); max-height: min(320px, var(--radix-popover-content-available-height)); overflow: auto; border: 1px solid var(--module-border); border-radius: 12px; padding: 10px; background: #fff; color: var(--text-strong); box-shadow: 0 12px 36px #10202624; z-index: 1800; font: 400 13px/1.4 var(--font-body); }
+.matches { display: grid; gap: 6px; width: min(390px, calc(100vw - 40px), var(--radix-popover-content-available-width, 390px)); max-height: min(320px, var(--radix-popover-content-available-height)); overflow: auto; border: 1px solid var(--module-border); border-radius: 12px; padding: 10px; background: #fff; color: var(--text-strong); box-shadow: 0 12px 36px #10202624; z-index: 1800; font: 400 13px/1.4 var(--font-body); }
 .matches > strong { padding: 4px 6px; font-weight: 600; }
 .matches button { display: grid; text-align: left; gap: 3px; width: 100%; border: 0; border-radius: 8px; background: var(--module-quiet); color: inherit; padding: 9px; cursor: pointer; font: inherit; }
 .matches button:hover, .matches button:focus-visible { background: var(--module-secondary-100); }

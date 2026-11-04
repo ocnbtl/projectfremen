@@ -3,7 +3,7 @@ import { hasAdminSession } from "../../../lib/admin-session";
 import { isCsrfRequestValid } from "../../../lib/csrf";
 import { privateJsonStream } from "../../../lib/modules/planning/json-stream";
 import { worldRegions } from "../../../lib/modules/planning/world-regions";
-import { searchPlaceCoordinates } from "../../../lib/modules/planning/place-search";
+import { searchFullPlace, searchPlaceCoordinates } from "../../../lib/modules/planning/place-search";
 import { normalizeAddressCountry, normalizeAddressParts } from "../../../lib/modules/planning/place-address";
 import {
   demographics,
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 20000) throw new Error("Route request is too large");
     const body = JSON.parse(raw);
+    if (body.operation === "place_autofill") return json({ ok: true, data: await searchFullPlace(typeof body.query === "string" ? body.query : "", searchPlaces) });
     if (body.operation === "geocode") return json({ ok: true, data: await searchPlaceCoordinates(typeof body.address === "string" ? body.address : "", {
       name: typeof body.name === "string" ? body.name : undefined,
       countryCode: normalizeAddressCountry(body.countryCode),

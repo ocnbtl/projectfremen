@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), ts = require('typescript');
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename);
 const { splitPastedAddress, formatPlaceAddress } = require('../lib/modules/planning/place-address.ts');
-const { searchPlaceCoordinates } = require('../lib/modules/planning/place-search.ts');
+const { searchPlaceCoordinates, searchFullPlace, parsePlaceSearch } = require('../lib/modules/planning/place-search.ts');
 (async () => {
   const parts = { street: '3087 Terminal Dr', city: 'Hebron', region: 'KY', postalCode: '41048', district: '' };
   for (const address of ['3087 Terminal Dr, Hebron, KY 41048', '3087 Terminal Dr Hebron, KY 41048', '3087 Terminal Dr Hebron KY 41048', '3087 Terminal Dr, Hebron, Kentucky 41048, USA', '3087 Terminal Dr\nHebron, KY 41048\nUnited States', '3087 Terminal Dr, Hebron, KY, 41048']) {
@@ -37,5 +37,32 @@ const { searchPlaceCoordinates } = require('../lib/modules/planning/place-search
   assert.deepEqual(await searchPlaceCoordinates(address, {}, async () => []), []);
   await assert.rejects(() => searchPlaceCoordinates(address, {}, async () => { throw Error('Provider unavailable'); }), /Provider unavailable/);
   await assert.rejects(() => searchPlaceCoordinates('', {}, search), /address characters/);
+  // Provider-shaped fixtures: international areas must not invent street addresses.
+  const feature = (properties, coordinates = [-75.8217313, 23.441]) => ({ type: 'Feature', properties, geometry: { type: 'Point', coordinates } });
+  const worldwide = parsePlaceSearch({ features: [
+    feature({ name: 'Écuras', type: 'city', countrycode: 'FR', country: 'France', state: 'Nouvelle-Aquitaine' }, [.56, 45.68]),
+    feature({ name: 'Exuma', type: 'city', osm_key: 'boundary', osm_value: 'administrative', countrycode: 'BS', country: 'The Bahamas', osm_type: 'R', osm_id: 3776652 }),
+    feature({ name: 'The Bahamas', type: 'country', osm_key: 'place', osm_value: 'archipelago', countrycode: 'BS', country: 'The Bahamas', osm_type: 'R', osm_id: 547469 }, [-78, 24.77]),
+    feature({ name: 'Tokyo', type: 'city', countrycode: 'JP', country: 'Japan' }, [139.76, 35.68]),
+    feature({ name: 'Paris café', type: 'house', housenumber: '10', street: 'Rue de Test', city: 'Paris', postcode: '75001', countrycode: 'FR', country: 'France' }, [2.35, 48.85]),
+    feature({ name: 'Invalid' }, [NaN, 91])
+  ] }, 'Exumas');
+  assert.equal(worldwide.length, 5);
+  const exuma = worldwide.find(row => row.name === 'Exuma');
+  assert.equal(exuma.countryCode, 'BS'); assert.equal(exuma.addressParts.street, ''); assert.equal(exuma.addressParts.city, 'Exuma'); assert.equal(exuma.precision, 'area'); assert.equal(exuma.sourceUrl, 'https://www.openstreetmap.org/relation/3776652');
+  const bahamas = worldwide.find(row => row.name === 'The Bahamas');
+  assert.equal(bahamas.address, 'The Bahamas'); assert.equal(bahamas.addressParts.street, ''); assert.equal(bahamas.addressParts.postalCode, '');
+  const cafe = worldwide.find(row => row.name === 'Paris café'); assert.equal(cafe.addressParts.street, '10 Rue de Test'); assert.equal(cafe.precision, 'address'); assert.equal(cafe.countryCode, 'FR');
+  const globalCalls = [];
+  const globalSearch = async (...args) => { globalCalls.push(args); return [...worldwide, exuma]; };
+  const ranked = await searchFullPlace(' Exumas ', globalSearch);
+  assert.equal(ranked[0].name, 'Exuma'); assert.equal(ranked.length, 5);
+  assert.deepEqual(globalCalls, [['Exumas']], 'No implicit US or old-draft country filter');
+  assert.equal((await searchFullPlace('Bahamas', globalSearch))[0].name, 'The Bahamas');
+  await assert.rejects(() => searchFullPlace('https://example.com', globalSearch), /place name/);
+  await assert.rejects(() => searchFullPlace('a'.repeat(501), globalSearch), /place name/);
+  await assert.rejects(() => searchFullPlace('Exumas', async () => { throw Error('Rate limited'); }), /Rate limited/);
+  assert.deepEqual(await searchFullPlace('No known match', async () => []), []);
+  console.log('PASS: worldwide full-place lookup, Exumas/Bahamas ranking, international structured addresses, area-center precision, duplicate suggestions, invalid coordinates, bounded inputs and provider errors.');
   console.log('PASS: full-address paste, units, ZIP+4, conservative preservation, named venue priority, country filtering, deduplication, legacy address parsing and partial provider failure.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

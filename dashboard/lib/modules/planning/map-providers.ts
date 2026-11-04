@@ -41,7 +41,7 @@ export async function searchPlaces(query: string, countryCode?: string) {
   if (query.trim().length < 3 || query.length > 500)
     throw new Error("Enter between 3 and 500 characters");
   const data = await publicJson(
-    `https://photon.komoot.io/api/?${new URLSearchParams({ q: query, limit: "8", ...(countryCode ? { countrycode: countryCode } : {}) })}`,
+    `https://photon.komoot.io/api/?${new URLSearchParams({ q: query, limit: "8", lang: "en", ...(countryCode ? { countrycode: countryCode } : {}) })}`,
   );
   return parsePlaceSearch(data, query);
 }
