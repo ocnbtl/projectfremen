@@ -13,6 +13,7 @@ import { IconTile, money, Panel } from "./FinancePrimitives";
 import FinanceMerchantAvatar from "./FinanceMerchants";
 import FinanceOverviewChart from "./FinanceOverviewChart";
 import FinanceChartFilters from "./FinanceChartFilters";
+import { TransactionAccount } from "./FinanceTransactionAccount";
 import FinanceDirectionDot from "./FinanceDirectionDot";
 import chartStyles from "./FinanceChart.module.css";
 
@@ -66,6 +67,6 @@ export default function FinanceOverviewView({ state, model, filters, selection, 
       {model.spendingGroups.some(g=>g.budgetUsage.kind === "available") && <p className={styles.budgetNote}>Budget usage covers full saved months and all accounts{filters.status === "cleared" ? " · Posted only" : filters.status === "pending" ? " · Pending only" : " · Posted & pending"}.</p>}
       {!model.spendingGroups.length && <p className="finance-inline-empty">No spending matches these filters. Try another range, category or transaction type.</p>}
     </Panel>
-    <Panel className="finance-recent-transactions"><div className="finance-panel-heading"><div><h2>Recent transactions</h2></div><span>{model.transactions.length}</span></div><div className="finance-focus-queue" tabIndex={0} aria-label="Recent transactions, scroll for more">{model.transactions.map(t => <button type="button" aria-pressed={selection.kind === "transaction" && selection.id === t.id} key={t.id} onClick={() => onSelect({ kind: "transaction", id: t.id })}><FinanceMerchantAvatar kind="transaction" id={t.id} label={t.merchant}/><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.category}</small></span><strong>{money(t.direction === "income" ? t.amount : -t.amount, { sign: true, cents: true })}<FinanceDirectionDot direction={t.direction} /></strong></button>)}{!model.transactions.length && <p className="finance-inline-empty">Your matching transactions will appear here.</p>}</div></Panel>
+    <Panel className="finance-recent-transactions"><div className="finance-panel-heading"><div><h2>Recent transactions</h2></div><span>{model.transactions.length}</span></div><div className="finance-focus-queue" tabIndex={0} aria-label="Recent transactions, scroll for more">{model.transactions.map(t => <article key={t.id} className={styles.recentRow}><button type="button" aria-pressed={selection.kind === "transaction" && selection.id === t.id} onClick={() => onSelect({ kind: "transaction", id: t.id })}><FinanceMerchantAvatar kind="transaction" id={t.id} label={t.merchant}/><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.category}</small></span><strong>{money(t.direction === "income" ? t.amount : -t.amount, { sign: true, cents: true })}<FinanceDirectionDot direction={t.direction} /></strong></button><TransactionAccount id={t.accountId} label={model.accountNames.get(t.accountId)}/></article>)}{!model.transactions.length && <p className="finance-inline-empty">Your matching transactions will appear here.</p>}</div></Panel>
   </div>;
 }

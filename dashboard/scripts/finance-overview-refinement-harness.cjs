@@ -23,10 +23,10 @@ const ready=new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()
  }
  const snap=async name=>{await page.waitForTimeout(400);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Horizontal overflow '+name);await page.screenshot({path:path.join(output,name+'.png')});};
  await page.goto(base+'/admin/finance?view=overview');await expect(page.getByRole('heading',{name:'Income & spending'})).toBeVisible();await page.waitForTimeout(2500);
- await expect(page.locator('.finance-focus-queue>button')).toHaveCount(65);
+ await expect(page.locator('.finance-focus-queue>article>button:first-child')).toHaveCount(65);
  for(const file of ['google.png','retell.svg','vercel.svg','discord.svg']){const img=page.locator('.finance-focus-queue img[src="/finance-logos/'+file+'"]').first();await expect(img).toBeVisible();assert(await img.evaluate(i=>i.complete&&i.naturalWidth>0),'Loaded '+file);assert.equal(await img.evaluate(i=>getComputedStyle(i.parentElement).backgroundColor),'rgba(0, 0, 0, 0)');}
  for(const [,,file] of additionalBrands){const img=page.locator('.finance-focus-queue img[src="/finance-logos/'+file+'"]').first();await img.locator('xpath=ancestor::button[1]').evaluate(b=>b.scrollIntoView({block:'center'}));await expect.poll(()=>img.evaluate(i=>i.complete&&i.naturalWidth>0),{message:'Visible merchant mark '+file}).toBe(true);}
- assert.equal(await page.locator('.finance-focus-queue>button').filter({hasText:'Elevate Smoke Shop'}).first().locator('[data-brand-mark=true]').count(),0);
+ assert.equal(await page.locator('.finance-focus-queue>article>button:first-child').filter({hasText:'Elevate Smoke Shop'}).first().locator('[data-brand-mark=true]').count(),0);
  await expect(page.locator('.finance-spending-breakdown')).toContainText('Shared budget');await expect(page.locator('.finance-spending-breakdown')).toContainText('No budget set');
  const a=await page.locator('.finance-recent-transactions').boundingBox(),b=await page.locator('.finance-spending-breakdown').boundingBox();console.log('panel bounds',a,b);assert(Math.abs(a.y+a.height-b.y-b.height)<3,'Recent panel bottom aligns with spending');
  const queue=page.locator('.finance-focus-queue');assert(await queue.evaluate(q=>q.scrollHeight>q.clientHeight),'Recent activity scrolls');
@@ -52,7 +52,7 @@ const ready=new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()
    await expect(item).toBeVisible();const rect=await item.boundingBox();assert(rect.x>=0&&rect.x+rect.width<=321,'Visible option at narrow width: '+label);await item.click();await expect(page.locator('.app-select-menu')).toHaveCount(0);
  }
  await page.getByRole('combobox',{name:'Chart account',exact:true}).click();await page.getByRole('option',{name:'Emergency Savings',exact:true}).click();
- await expect(page.locator('.finance-filter-caption')).toContainText('Emergency Savings');await page.getByRole('button',{name:'Reset chart filters'}).click();await expect(queue.locator('button')).toHaveCount(65);
+ await expect(page.locator('.finance-filter-caption')).toContainText('Emergency Savings');await page.getByRole('button',{name:'Reset chart filters'}).click();await expect(queue.locator('article')).toHaveCount(65);
  await snap('chart-filter-mobile');
  await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Custom',exact:true}).click();await expect(page.getByRole('button',{name:'From date',exact:true})).toBeVisible();await snap('date-range-mobile');await page.getByRole('button',{name:'From date',exact:true}).click();await expect(page.getByLabel('Type from date',{exact:true})).toBeVisible();await snap('nested-date-mobile');await page.keyboard.press('Escape');await page.keyboard.press('Escape');
@@ -70,5 +70,25 @@ const ready=new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()
    await snap('account-'+tab.toLowerCase());
  }
  await page.setViewportSize({width:390,height:844});await page.getByRole('tab',{name:'Transactions',exact:true}).click();await snap('account-ledger-mobile');
+ // Exercise real touch events with an authenticated, local-only phone context.
+ const phone=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,serviceWorkers:'block',storageState:await context.storageState()});
+ await phone.route(/^https:\/\//,r=>r.abort());
+ const mobile=await phone.newPage();globalThis.qaPage=mobile;mobile.on('pageerror',e=>errors.push(e.message));mobile.on('request',r=>{if(r.url().includes('/api/finance')&&r.method()!=='GET')writes.push(r.url());});
+ await mobile.goto(base+'/admin/finance/transactions?query=Google');await mobile.waitForLoadState('networkidle');await mobile.waitForURL(url=>url.searchParams.has('selected'));
+ const tx=state.transactions.find(t=>t.id==='transaction-40'),acct=state.accounts.find(a=>a.id===tx.accountId);
+ const row=mobile.locator('[data-finance-transaction-id="'+tx.id+'"]'),trigger=row.getByRole('button',{name:'Preview account: '+acct.name,exact:true});
+ await trigger.scrollIntoViewIfNeeded();const beforeY=await trigger.evaluate(el=>el.getBoundingClientRect().top),beforeURL=mobile.url();
+ await trigger.tap();const preview=mobile.getByRole('dialog',{name:acct.name,exact:true});
+ await expect(preview).toBeVisible();await expect(preview).toContainText('Current balance');await expect(preview).toContainText(acct.currentBalance.toLocaleString('en-US',{style:'currency',currency:'USD'}));
+ await expect(preview.locator('li')).toHaveCount(3);const recent=state.transactions.filter(t=>t.accountId===acct.id).sort((a,b)=>b.occurredOn.localeCompare(a.occurredOn)||a.id.localeCompare(b.id)).slice(0,3);for(const [i,t] of recent.entries())await expect(preview.locator('li').nth(i)).toContainText(t.merchant);
+ const action=preview.getByRole('link',{name:'View full account'});await expect(action).toHaveAttribute('href','/admin/finance/accounts?selected='+acct.id);
+ const bounds=await action.boundingBox();assert(bounds.x>=0&&bounds.x+bounds.width<=390&&bounds.height>=44,'Account action fits phone');
+ await mobile.screenshot({path:path.join(output,'transaction-account-preview-phone.png')});
+ await preview.getByRole('button',{name:'Close account preview'}).tap();await expect(preview).toBeHidden();assert.equal(mobile.url(),beforeURL);await expect(mobile.getByRole('searchbox').first()).toHaveValue('Google');
+ await expect(trigger).toBeFocused();assert(Math.abs(beforeY-await trigger.evaluate(el=>el.getBoundingClientRect().top))<=2,'Closing preview preserves transaction scroll');
+ await row.getByRole('button',{name:/^Inspect /}).tap();const detail=mobile.locator('#finance-inspector');
+ await detail.getByRole('button',{name:'Preview account: '+acct.name}).last().tap();await expect(preview).toBeVisible();await mobile.keyboard.press('Escape');await expect(preview).toBeHidden();await expect(detail).toBeVisible();
+ await detail.getByRole('button',{name:'Preview account: '+acct.name}).last().tap();await action.tap();await expect(mobile.locator('#finance-inspector').getByRole('heading',{name:acct.name,exact:true})).toBeVisible();assert.equal(new URL(mobile.url()).searchParams.get('selected'),acct.id);
+ await phone.close();globalThis.qaPage=page;
  assert.deepEqual(errors.filter(e=>!e.includes('ResizeObserver loop')),[]);assert.deepEqual(writes,[]);assert.equal(fs.readFileSync(path.join(data,'finance.json'),'utf8'),before,'Financial data unchanged');console.log('PASS overview, budgets, transparent official marks, no-logo fallback, recent scroll/alignment, shared custom date editor, sorting, drilldown/return, 320/390/820/1440/3440 widths, reduced motion and empty state; no Finance writes.');
 })().catch(async e=>{await globalThis.qaPage?.screenshot({path:path.join(output,'failure.png')});console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

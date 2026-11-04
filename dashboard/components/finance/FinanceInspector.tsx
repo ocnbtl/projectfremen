@@ -2,6 +2,7 @@
 
 import FinanceMerchantAvatar,{FinanceMerchantPanel} from "./FinanceMerchants";
 import detailStyles from "./FinanceDetails.module.css";
+import { TransactionAccount } from "./FinanceTransactionAccount";
 import FinanceAccountDetails from "./FinanceAccountDetails";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import InspectorRail from "../admin-shell/InspectorRail";
@@ -155,7 +156,7 @@ function TransactionProperties({ transaction }: { transaction: FinanceTransactio
     ["Reviewed", transaction.ufInit ? "Yes" : "No"],
     ["Status", transaction.status]
   ];
-  return <div className={styles.factGrid}>{values.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>;
+  return <div className={styles.factGrid}>{values.map(([label, value]) => <div key={label}><span>{label}</span><strong>{label==="Account" ? <TransactionAccount id={transaction.accountId} label={value}/> : value}</strong></div>)}</div>;
 }
 
 function AuditTimeline({ events }: { events: readonly FinanceAuditEvent[] }) {
@@ -253,7 +254,7 @@ export default function FinanceInspector({
   const subtitle = accountRow
     ? undefined
     : transaction
-      ? `${transaction.account} · ${transaction.date}`
+      ? <><TransactionAccount id={transaction.accountId} label={transaction.account}/> · {transaction.date}</>
       : billRow
         ? `${billRow.bill.account} · ${billRow.bill.due}`
         : budgetRow
@@ -330,7 +331,7 @@ export default function FinanceInspector({
               <div><span>Amount</span><strong>{money(transaction.amount, { sign: true, cents: true })}</strong></div>
               <div><span>Status</span><strong>{transaction.status === "cleared" ? "Posted" : transaction.status === "pending" ? "Pending" : transaction.status}</strong></div>
               <div><span>Type</span><strong>{transaction.io === "income" ? "Money in" : transaction.io === "transfer" ? "Transfer" : "Money out"}</strong></div>
-              <div><span>Account</span><strong>{transaction.account}</strong></div>
+              <div><span>Account</span><TransactionAccount id={transaction.accountId} label={transaction.account}/></div>
               <div><span>Category</span><strong>{transaction.category}</strong></div>
               <div><span>Review</span><strong>{transaction.ufInit ? "Reviewed" : "To review"}</strong></div>
             </div>
@@ -350,7 +351,7 @@ export default function FinanceInspector({
               <h3>Related records</h3>
 
               <div className={styles.compactList}>
-                <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "accounts")}?query=${encodeURIComponent(transaction.account)}`}><span><strong>{transaction.account}</strong><small>Finance account search · display-name match</small></span><span>Open</span></a>
+                <div className={styles.compactRow}><span><small>Account</small><TransactionAccount id={transaction.accountId} label={transaction.account}/></span></div>
                 <a className={styles.compactRow} href={getModuleViewRoute("finance", "review")}><span><strong>Finance Monthly Review</strong><small>Finance owns close state</small></span><span>Open</span></a>
                 {linkedContext.map((item) => <a className={styles.compactRow} href={linkedContextRoute(item)} key={item.id}><span><strong>{item.title}</strong><small>{item.type} owner search</small></span><span>Open</span></a>)}
               </div>

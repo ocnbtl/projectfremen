@@ -6,6 +6,7 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { overviewDate, type FinanceOverviewModel, type OverviewSelection } from "../../lib/modules/finance/overview-model";
 import { money } from "./FinancePrimitives";
 import FinanceMerchantAvatar from "./FinanceMerchants";
+import { TransactionAccount } from "./FinanceTransactionAccount";
 import FinanceDirectionDot from "./FinanceDirectionDot";
 import styles from "./FinanceOverviewInspector.module.css";
 
@@ -38,7 +39,7 @@ export default function FinanceOverviewInspector({ model, selection, mobileOpen,
       <div className={styles.period}><UnigentamosIcon role="calendar" size={16}/><span>{overviewDate(period?.id || model.from)} – {overviewDate(period?.to || model.to)}</span><span aria-live="polite">{visibleRows.length} {flow ? flow+" " : ""}transaction{visibleRows.length===1?"":"s"}</span></div>
       {transaction ? <>
         <div className={styles.amount}><span>{transaction.direction === "income" ? "Income" : "Spending"}</span><strong>{money(transaction.amount,{cents:true})}</strong><small>{transaction.status === "cleared" ? "Posted" : "Pending"} · {transaction.reviewed ? "Reviewed" : "Needs review"}</small></div>
-        <dl className={styles.facts}>{[["Account",model.accountNames.get(transaction.accountId)||"Archived account"],["Category",transaction.category],["Date",overviewDate(transaction.occurredOn)],["Scope",transaction.entityScope]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+        <dl className={styles.facts}>{[["Account",model.accountNames.get(transaction.accountId)||"Archived account"],["Category",transaction.category],["Date",overviewDate(transaction.occurredOn)],["Scope",transaction.entityScope]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{label==="Account" ? <TransactionAccount id={transaction.accountId} label={value}/> : value}</dd></div>)}</dl>
         {transaction.memo && <section className={styles.notes}><h3>Notes</h3><p>{transaction.memo}</p></section>}
         <WorkspaceButton intent="primary" icon="edit" className={styles.open} onClick={()=>onOpenTransaction(transaction.id)}>Open transaction</WorkspaceButton>
       </> : <>
@@ -46,7 +47,7 @@ export default function FinanceOverviewInspector({ model, selection, mobileOpen,
           {([["income","Income",income,"banknote"],["spending","Spending",spending,"credit-card"]] as const).map(([key,label,value,icon])=><button type="button" key={key} aria-label={`Filter to ${key}`} aria-pressed={flow===key} onClick={()=>toggleFlow(key)}><span><UnigentamosIcon role={icon} size={16}/>{label}</span><strong>{money(value,{cents:true})}</strong></button>)}
           <div><span><UnigentamosIcon role="trending" size={16}/>Net flow</span><strong>{money(income-spending,{cents:true})}</strong></div>
         </div>
-        <div className={styles.transactions} key={flow || "all"}>{visibleRows.slice(0,limit).map(t=><button type="button" key={t.id} onClick={()=>{previousList.current={transactionId:t.id,selection};onSelect({kind:"transaction",id:t.id});}}><FinanceMerchantAvatar kind="transaction" id={t.id} label={t.merchant}/><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.category}</small><small>{model.accountNames.get(t.accountId)}{t.status==="pending"?" · Pending":""}</small></span><b>{money(t.direction==="income"?t.amount:-t.amount,{sign:true,cents:true})}<FinanceDirectionDot direction={t.direction}/></b><UnigentamosIcon role="chevron-right" size={16}/></button>)}</div>
+        <div className={styles.transactions} key={flow || "all"}>{visibleRows.slice(0,limit).map(t=><article className={styles.rangeRow} key={t.id}><button type="button" onClick={()=>{previousList.current={transactionId:t.id,selection};onSelect({kind:"transaction",id:t.id});}}><FinanceMerchantAvatar kind="transaction" id={t.id} label={t.merchant}/><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.category}</small>{t.status==="pending"&&<small>Pending</small>}</span><b>{money(t.direction==="income"?t.amount:-t.amount,{sign:true,cents:true})}<FinanceDirectionDot direction={t.direction}/></b><UnigentamosIcon role="chevron-right" size={16}/></button><TransactionAccount id={t.accountId} label={model.accountNames.get(t.accountId)}/></article>)}</div>
         {visibleRows.length>limit && <WorkspaceButton icon="chevron-down" className={styles.more} onClick={()=>setLimit(n=>n+40)}>Show more ({visibleRows.length-limit})</WorkspaceButton>}
         {!visibleRows.length && <p className={styles.empty}>No {flow ? flow+" " : ""}transactions match this range and its filters.</p>}
       </>}

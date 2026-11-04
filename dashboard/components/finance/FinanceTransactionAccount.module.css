@@ -1,0 +1,22 @@
+.trigger.trigger {position:relative;z-index:1;display:inline-flex;align-items:center;gap:5px;width:fit-content;max-width:100%;padding:3px 6px;min-height:28px;border:0;border-radius:6px;background:var(--module-primary-50,#eef7f0);color:#155b3c;font:500 12px/1.4 var(--font-body,sans-serif);text-align:start;cursor:pointer;}
+.trigger svg,.full svg {flex:none;}
+.trigger span,.panel h3,.panel li span {min-width:0;overflow-wrap:anywhere;}
+.trigger:hover,.trigger:focus-visible {background:#d5eddf;}
+.panel {box-sizing:border-box;z-index:220;width:min(342px,calc(100vw - 24px));max-height:min(85dvh,var(--radix-popover-content-available-height));overflow:auto;overscroll-behavior:contain;border:1px solid #cddbd3;padding:16px;background:white;border-radius:15px;color:#182e25;box-shadow:0 8px 32px #18382a24;font:400 14px/1.45 var(--font-body,sans-serif);transform-origin:var(--radix-popover-content-transform-origin);}
+.panel header {display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.panel h3,.panel h4,.panel p {margin:0;}
+.panel h3 {font-size:17px;line-height:1.3;}
+.panel h4 {font-size:13px;margin:13px 0 6px;}
+.panel small {font:400 12px/1.4 var(--font-body,sans-serif);color:#50685d;}
+.panel .close {display:grid;place-items:center;flex:none;width:40px;height:40px;padding:0;border:1px solid #cddbd3;border-radius:9px;background:white;color:inherit;cursor:pointer;}
+.balance {display:grid;gap:2px;margin-top:12px;padding:12px;border-radius:10px;background:#edf6f0;}
+.balance strong {font-size:21px;font-weight:600;}
+.panel ul {list-style:none;padding:0;margin:0;display:grid;gap:8px;}
+.panel li {display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:8px;}
+.panel li>span:first-child {width:32px;height:32px;}
+.panel li>span:nth-child(2) {display:grid;}
+.panel li b {font:550 13px/1.4 var(--font-body,sans-serif);}
+.panel .full {display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;margin-top:14px;border-radius:9px;background:#0a5a36;color:white;font-weight:600;text-decoration:none;}
+.panel .full:hover {background:#084b2d;}
+@media(pointer:coarse){.trigger.trigger{min-height:36px;}}
+@media(prefers-reduced-motion:no-preference){.panel[data-state=open]{animation:appear .16s ease-out;}@keyframes appear{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}}

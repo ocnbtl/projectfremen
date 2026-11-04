@@ -1,4 +1,5 @@
 "use client";
+import { TransactionAccountProvider } from "./finance/FinanceTransactionAccount";
 import {FinanceMerchantsProvider} from "./finance/FinanceMerchants";
 import type {FinanceMerchantsData} from "../lib/modules/finance/merchants";
 import SearchField from "./ui/SearchField";
@@ -853,7 +854,7 @@ export default function FinanceWorkspace({
   }
 
   return (
-    <FinanceMerchantsProvider initial={initialMerchants} transactions={financeState.transactions}><ModuleShell
+    <FinanceMerchantsProvider initial={initialMerchants} transactions={financeState.transactions}><TransactionAccountProvider state={financeState}><ModuleShell
       detailOpen={inspectorOpen || showContext}
       onBack={closeInspector}
       module="finance"
@@ -1139,6 +1140,6 @@ export default function FinanceWorkspace({
           setOperationTarget(null);
         }}
       />
-    </ModuleShell></FinanceMerchantsProvider>
+    </ModuleShell></TransactionAccountProvider></FinanceMerchantsProvider>
   );
 }
