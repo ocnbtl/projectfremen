@@ -28,7 +28,7 @@ export function normalizePlaceImage(value: unknown): string | undefined {
 export type PlaceOrganization = { objectId: string; label: string; href: string; imageUrl?: string; imageUpdatedAt?: string; hasProfileLocation?: boolean; organizationType?: string; industry?: string };
 export function placePicture(place: Partial<Place>, organizations: PlaceOrganization[] = []) {
   if (place.image) return place.image;
-  if (isAreaPlace(place)) return areaFlagUrl({name:place.name||"",country:place.countryCode,latitude:place.latitude,longitude:place.longitude});
+  if (isAreaPlace(place)) return areaFlagUrl({name:place.name||"",country:place.countryCode,latitude:place.latitude,longitude:place.longitude,kind: ["country", "state", "city"].includes(place.lookup?.kind || "") ? place.lookup?.kind : undefined});
   const name = placeDisplayName({ name: place.name || "", address: place.address || "" }).toLocaleLowerCase();
   // An organization's canonical address link survives abbreviations such as CVG.
   // Generic linked objects alone do not identify the place, and areas keep flags.

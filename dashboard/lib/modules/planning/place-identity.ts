@@ -7,6 +7,21 @@ export function addressIdentity(address: string) {
   const normalized = parts ? formatPlaceAddress(parts, "US") : address;
   return normalized.normalize("NFKC").toLocaleLowerCase("en-US").replace(/[,\n\r]+/g, " ").replace(/\s+/g, " ").trim();
 }
+/** Provider identity distinguishes venues sharing an address. Legacy postal-only
+ * records retain their existing reuse behavior; ambiguous candidates stay explicit. */
+export function reusablePlaces(places: Place[], candidate: Partial<Place>): Place[] {
+  const key = (s = "") => s.normalize("NFKC").toLocaleLowerCase("en-US").trim();
+  return places.filter(place => {
+    if (place.archivedAt) return false;
+    if (place.lookup?.sourceId && candidate.lookup?.sourceId) return place.lookup.sourceId === candidate.lookup.sourceId;
+    if (place.countryCode && candidate.countryCode && place.countryCode !== candidate.countryCode) return false;
+    const sameAddress = !!candidate.address?.trim() && addressIdentity(place.address) === addressIdentity(candidate.address);
+    if (!place.lookup && !candidate.lookup) return sameAddress;
+    const sameName = key(place.name) === key(candidate.name);
+    if (sameAddress && sameName) return true;
+    return sameName && typeof place.latitude === "number" && typeof candidate.latitude === "number" && typeof place.longitude === "number" && typeof candidate.longitude === "number" && Math.abs(place.latitude - candidate.latitude) < .00001 && Math.abs(place.longitude - candidate.longitude) < .00001;
+  });
+}
 export function profilePlaceAddress(address = "", locality = "") {
   const a = address.trim(), l = locality.trim();
   // Contact imports often repeat the locality after an already complete postal

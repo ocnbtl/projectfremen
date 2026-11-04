@@ -11,6 +11,7 @@ export function planningWritableKeys(collection: PlanningCollection): string[] {
       "address",
       "countryCode",
       "addressParts",
+      "lookup",
       "latitude",
       "longitude",
       "notes",

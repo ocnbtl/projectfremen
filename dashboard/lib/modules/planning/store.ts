@@ -4,7 +4,7 @@ import { mutateJsonFile, readJsonFile } from "../../file-store";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
 import { instantFor, validateEventTime } from "./calendar-model";
-import { addressIdentity } from "./place-identity";
+import { reusablePlaces } from "./place-identity";
 import {
   emptyPlanningState,
   PLANNING_COLLECTIONS,
@@ -51,16 +51,19 @@ export async function savePlanningRecord<K extends PlanningCollection>(
     (raw) => {
       const state = planningState(raw),
         id = typeof input.id === "string" ? input.id : crypto.randomUUID();
-      if (collection === "places" && !input.id && typeof input.address === "string" && input.address.trim()) {
-        const matches = state.places.filter(place => !place.archivedAt && addressIdentity(place.address) === addressIdentity(String(input.address)));
-        if (matches.length > 1) throw new Error("Several places use this address. Choose the saved place to link.");
+      if (collection === "places" && !input.id) {
+        // Validate before reuse as well: a duplicate must not bypass input validation.
+        const candidate = normalizePlanningRecord("places", { ...input, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        const matches = reusablePlaces(state.places, candidate);
+        if (matches.length > 1) throw new Error("Several saved places match. Choose the saved place to link.");
         if (matches.length === 1) {
           const existing = matches[0];
           const refs = [...new Map([...existing.linkedRefs, ...(Array.isArray(input.linkedRefs) ? input.linkedRefs : [])].map(ref => [`${ref.module}:${ref.objectType}:${ref.objectId}`, ref])).values()];
           // A confirmed pin may enrich an address-only place; never move an existing pin implicitly.
           const pin = existing.latitude == null && existing.longitude == null && input.latitude != null && input.longitude != null ? { latitude: input.latitude, longitude: input.longitude } : {};
-          if (refs.length === existing.linkedRefs.length && !("latitude" in pin)) return { value: state, result: existing as PlanningCollections[K], changed: false };
-          const item = normalizePlanningRecord("places", { ...existing, ...pin, linkedRefs: refs, updatedAt: new Date(Math.max(Date.now(), Date.parse(existing.updatedAt) + 1)).toISOString() });
+          const lookup = !existing.lookup && candidate.lookup ? { lookup: candidate.lookup } : {};
+          if (refs.length === existing.linkedRefs.length && !("latitude" in pin) && !("lookup" in lookup)) return { value: state, result: existing as PlanningCollections[K], changed: false };
+          const item = normalizePlanningRecord("places", { ...existing, ...pin, ...lookup, linkedRefs: refs, updatedAt: new Date(Math.max(Date.now(), Date.parse(existing.updatedAt) + 1)).toISOString() });
           return { value: { ...state, places: state.places.map(place => place.id === item.id ? item : place) }, result: item as PlanningCollections[K] };
         }
       }
@@ -82,6 +85,8 @@ export async function savePlanningRecord<K extends PlanningCollection>(
       const item = normalizePlanningRecord(collection, {
         ...current,
         ...input,
+        ...(collection === "places" && current && (!Object.hasOwn(input, "lookup") || JSON.stringify(input.lookup) === JSON.stringify((current as unknown as Record<string, unknown>).lookup)) &&
+          ["address", "countryCode", "addressParts", "latitude", "longitude"].some(key => Object.hasOwn(input, key) && JSON.stringify(input[key]) !== JSON.stringify((current as unknown as Record<string, unknown>)[key])) ? { lookup: undefined } : {}),
         ...(collection === "places" && current && (!Object.hasOwn(input, "locationVerification") || JSON.stringify(input.locationVerification) === JSON.stringify((current as unknown as Record<string, unknown>).locationVerification)) &&
           ["address", "countryCode", "addressParts", "latitude", "longitude"].some(key => Object.hasOwn(input, key) && JSON.stringify(input[key]) !== JSON.stringify((current as unknown as Record<string, unknown>)[key]))
           ? { locationVerification: undefined } : {}),

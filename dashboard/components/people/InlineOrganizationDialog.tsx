@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import type { PersonalRecord } from "../../lib/personal-records-store";
@@ -11,19 +11,24 @@ import TeamSizeInput from "./TeamSizeInput";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./PeopleProfilePhoto";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import ProfilePlaceField from "../planning/ProfilePlaceField";
+import { planningRequest, type PlanningSnapshot } from "../../lib/modules/planning/repository";
+import type { Place } from "../../lib/modules/planning/types";
 
 /** An independent draft layered over the person editor; parent state never unmounts. */
 export default function InlineOrganizationDialog({existingIds,onSaved,onClose,school=false,returnLabel="person draft",existingNames=[]}:{returnLabel?:string;existingNames?:string[];existingIds:string[];onSaved:(record:PersonalRecord,records:PersonalRecord[])=>void;onClose:()=>void;school?:boolean}) {
   const [values,setValues]=useState<OrganizationAutofillValues>(school ? { organizationType: "University / School" } : {});
   const [photo,setPhoto]=useState(""),[photoOpen,setPhotoOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[discard,setDiscard]=useState(false);
   const locked=useRef(false);
+  const [places,setPlaces]=useState<Place[]>([]),[selectedPlace,setSelectedPlace]=useState<Place>();
+  useEffect(()=>{let active=true;void planningRequest<PlanningSnapshot>().then(snapshot=>{if(active)setPlaces(snapshot.state.places.filter(place=>!place.archivedAt));}).catch(()=>{});return()=>{active=false;};},[]);
   const change=(field:keyof OrganizationAutofillValues,value:string)=>setValues(current=>({...current,[field]:value}));
   const close=()=>{if(locked.current)return; if(Object.entries(values).some(([key,value])=>Boolean(value) && !(school && key === "organizationType" && value === "University / School"))||photo)setDiscard(true);else onClose();};
   async function save(event:React.FormEvent) {
     event.preventDefault(); event.stopPropagation(); if(existingNames.some(name=>name.trim().toLowerCase()===values.name?.trim().toLowerCase())){setError("An organization with this name already exists. Choose it from the organization list.");return;} if(locked.current || !values.name?.trim())return; locked.current=true;setBusy(true);setError("");
     try {
       const {name,headquarters,streetAddress,...fields}=values;
-      const profile={...fields,fullName:name!.trim(),industry:normalizeOrganizationIndustry(values.organizationType || "",values.industry || ""),headquarters:headquarters || "",address:streetAddress || "",notes:"",locations:headquarters || streetAddress?[{id:crypto.randomUUID(),label:"Headquarters",location:headquarters || "",address:streetAddress || ""}]:[]};
+      const profile={...fields,fullName:name!.trim(),industry:normalizeOrganizationIndustry(values.organizationType || "",values.industry || ""),headquarters:headquarters || "",address:streetAddress || "",notes:"",locations:selectedPlace?[{id:crypto.randomUUID(),label:"Headquarters",placeId:selectedPlace.id,address:selectedPlace.address,location:""}]:headquarters || streetAddress?[{id:crypto.randomUUID(),label:"Headquarters",location:headquarters || "",address:streetAddress || ""}]:[]};
       const input=peopleCreateInputToLegacy({fullName:name!.trim(),type:"organization",status:"active",context:values.context,profile,areas:["Relationships"],subjects:[],projects:[],externalSources:ORGANIZATION_LINK_FIELDS.map(key=>values[key] || "").filter(Boolean),sourceUrl:values.website});
       const response=await fetch("/api/personal/records",{method:"POST",headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({...input,initialPhoto:photo || undefined})});
       const payload=await response.json();if(!response.ok || !payload.ok || !Array.isArray(payload.items))throw new Error(payload.error || "Organization could not be saved.");
@@ -45,8 +50,9 @@ export default function InlineOrganizationDialog({existingIds,onSaved,onClose,sc
         <label className="is-wide">Description<textarea rows={2} value={values.context || ""} onChange={event=>change("context",event.target.value)}/></label>
         </div><div className="people-inline-org-group"><div className="people-inline-org-links-heading is-wide"><h4>Links</h4><OrganizationAutofill name={values.name || ""} values={values} disabled={busy} hasPhoto={!!photo} onPhoto={setPhoto} onDescription={context=>change("context",context)} onApply={suggestions=>setValues(current=>{const next={...current};emptyOrganizationSuggestions(suggestions,current).forEach(item=>{next[item.field]=item.value;});next.industry=normalizeOrganizationIndustry(next.organizationType || "",next.industry || "");return next;})}/></div>
         {ORGANIZATION_LINK_FIELDS.map(field=><label key={field}>{ORGANIZATION_AUTOFILL_LABELS[field]}<input value={values[field] || ""} onChange={event=>change(field,event.target.value)} placeholder="https://…"/></label>)}
-        <label className="is-wide">Headquarters<input value={values.headquarters || ""} onChange={event=>change("headquarters",event.target.value)}/></label>
-        <label className="is-wide">Street address<input value={values.streetAddress || ""} onChange={event=>change("streetAddress",event.target.value)}/></label>
+        <div className="is-wide"><ProfilePlaceField places={places} placeId={selectedPlace?.id} index={0} initialQuery={values.headquarters || values.streetAddress || values.name || ""} onSelect={place=>{setPlaces(current=>[...current.filter(row=>row.id!==place.id),place]);setSelectedPlace(place);change("headquarters",place.address || place.name);change("streetAddress","");}} onEdit={()=>setSelectedPlace(undefined)}/></div>
+        {!selectedPlace && <><label className="is-wide">Headquarters<input value={values.headquarters || ""} onChange={event=>change("headquarters",event.target.value)}/></label>
+        <label className="is-wide">Street address<input value={values.streetAddress || ""} onChange={event=>change("streetAddress",event.target.value)}/></label></>}
       </div></fieldset>
       {error && <p role="alert">{error}</p>}
       {discard && <div className="people-inline-discard" role="alert"><span>Discard this organization draft?</span><button type="button" onClick={()=>setDiscard(false)}>Keep editing</button><button type="button" onClick={onClose}>Discard organization</button></div>}

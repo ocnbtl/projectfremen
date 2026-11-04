@@ -3,7 +3,7 @@ import type { Place } from "./types";
 import { countryDestinations, stateDestinations, type TravelDestination } from "./travel";
 
 export function isAreaPlace(place: Partial<Place>) {
-  return place.tags?.some(tag=>tag.trim().toLowerCase()==="area") || place.locationVerification?.precision==="area";
+  return place.tags?.some(tag=>tag.trim().toLowerCase()==="area") || place.locationVerification?.precision==="area" || place.lookup?.precision === "area";
 }
 
 /** Names identify areas only within a country; never infer a flag from linked organizations. */
@@ -25,8 +25,8 @@ export function travelFlagUrl(destination: TravelDestination) {
   return undefined;
 }
 export function fixedAreaFlag(name:string,country:string,kind?:string) {
-  const key=name.trim().toLocaleLowerCase();
-  const nation=countryDestinations.find(c=>c.country===country && (c.name.toLocaleLowerCase()===key || key===country.toLowerCase() || (country==="US"&&["united states","usa","united states of america"].includes(key))));
+  const key=name.trim().toLocaleLowerCase().replace(/^the\s+/, "");
+  const nation=countryDestinations.find(c=>c.country===country && (kind === "country" || c.name.toLocaleLowerCase().replace(/^the\s+/, "")===key || key===country.toLowerCase() || (country==="US"&&["united states","usa","united states of america"].includes(key))));
   if(nation&&(!kind||kind==="country"))return {kind:"country" as const,code:country};
   const state=country==="US"&&(!kind||kind==="state")?stateDestinations.find(s=>s.name.toLocaleLowerCase()===key||s.id.slice(-2).toLowerCase()===key):undefined;
   return state?{kind:"state" as const,code:state.id.slice(-2).toLowerCase()}:undefined;

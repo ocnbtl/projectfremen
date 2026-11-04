@@ -31,6 +31,13 @@ function coordinate(value: unknown, max: number) {
     throw new Error("Choose valid map coordinates");
   return n;
 }
+function normalizePlaceLookup(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid place lookup");
+  const v = value as Record<string, unknown>;
+  if (typeof v.kind !== "string" || !/^[a-z_]{1,40}$/.test(v.kind) || !["address", "approximate", "area"].includes(String(v.precision))) throw new Error("Invalid place lookup details");
+  if (v.sourceId != null && (typeof v.sourceId !== "string" || !/^https:\/\/www\.openstreetmap\.org\/(node|way|relation)\/[1-9]\d{0,15}$/.test(v.sourceId))) throw new Error("Invalid place source");
+  return { kind: v.kind, precision: v.precision, ...(v.sourceId ? { sourceId: v.sourceId } : {}) };
+}
 function normalizePlaceVerification(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid location verification");
   const v = value as Record<string, unknown>;
@@ -90,6 +97,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       address: string(raw.address, "Address", 1400),
       ...(raw.countryCode ? { countryCode: normalizeAddressCountry(raw.countryCode) } : {}),
       ...(raw.addressParts != null ? { addressParts: normalizeAddressParts(raw.addressParts) } : {}),
+      ...(raw.lookup ? { lookup: normalizePlaceLookup(raw.lookup) } : {}),
       ...(raw.locationVerification ? { locationVerification: normalizePlaceVerification(raw.locationVerification) } : {}),
       ...((raw.latitude == null || raw.latitude === "") && (raw.longitude == null || raw.longitude === "")
         ? { latitude: undefined, longitude: undefined }

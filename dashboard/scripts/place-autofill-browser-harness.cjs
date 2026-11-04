@@ -18,7 +18,7 @@ let browser,page;
  await context.addCookies([{name:'admin_session',value:payload+'.'+crypto.createHmac('sha256',secret).update(payload).digest('base64url'),url:base},{name:'admin_csrf',value:csrf,url:base}]);
  const calls=[],errors=[];let delayed;
  await context.route('**/*',async route=>{
-  const req=route.request();if(new URL(req.url()).origin!==base)return route.abort();
+  const req=route.request();if(new URL(req.url()).origin!==base)return route.abort();if(req.url().includes('/api/map/flags?')&&!req.url().includes('kind=country'))return route.fulfill({status:404,body:''});
   if(req.url()===base+'/api/map'&&req.method()==='POST'){
    const body=req.postDataJSON();calls.push(body);
    if(body.operation==='place_autofill'){
@@ -66,5 +66,29 @@ let browser,page;
  // Fill a US address normally and use coordinate-only action; the custom name stays.
  await create.getByLabel('Address',{exact:true}).fill('3087 Terminal Dr, Hebron, KY 41048');await expect(create.getByRole('combobox',{name:'Address country',exact:true})).toContainText('US');
  await create.getByRole('button',{name:'Autofill coordinates',exact:true}).click();await expect(create.getByLabel('Latitude',{exact:true})).toHaveValue('39.0499');await expect(create.getByLabel('Place name',{exact:true})).toHaveValue('CVG custom name');assert.equal(calls.at(-1).countryCode,'US');assert.equal(state().places.length,2);
- assert.deepEqual(errors,[]);console.log('PASS local WebKit: Map create/edit, worldwide name lookup, explicit choice, structured international fields, area labels, draft-only cancellation, stale/error/empty recovery, mobile Calendar create/link, coordinate-only name preservation, auth/CSRF and private responses.');
+ // Profile creation uses the same editor and reuses the Calendar/Map place IDs.
+ const profiles=()=>JSON.parse(fs.readFileSync(path.join(data,'personal-records.json'),'utf8'));
+ for(const [kind,width,label] of [['person',1440,'Worldwide person'],['organization',390,'Worldwide organization']]){
+  await page.setViewportSize({width,height:900});await navigate('/admin/people');if(width<600)await page.getByRole('button',{name:'People actions',exact:true}).click();await page.getByRole('button',{name:'Add '+kind,exact:true}).click();
+  const form=page.locator('.people-capture-form');await form.getByRole('textbox',{name:kind==='person'?'Full name':'Organization name',exact:true}).fill(label);
+  const locations=form.locator('[data-people-location-editor]');if(!await locations.locator('[data-location-entry]').count())await locations.getByRole('button',{name:/Place/}).click();
+  await locations.getByRole('button',{name:'Find a place worldwide',exact:true}).first().click();
+  const finder=page.getByRole('dialog',{name:'Find a place',exact:true});await finder.getByRole('textbox',{name:'Place name',exact:true}).fill('Exumas');await finder.getByRole('button',{name:'Autofill place',exact:true}).click();
+  await page.getByRole('dialog',{name:'Matching places',exact:true}).getByRole('button',{name:/^Exuma /}).click();await expect(finder).toContainText('Already saved');await snap('profile-'+kind+'-reuse');
+  await finder.getByRole('button',{name:'Use saved place',exact:true}).click();await expect(finder).toHaveCount(0);await expect(locations.getByRole('combobox',{name:'Saved place 1',exact:true})).toContainText('Exuma');assert.equal(state().places.length,2);
+  await (width<600?page.getByRole('navigation',{name:'People quick actions'}):form).getByRole('button',{name:'Save',exact:true}).click();await expect.poll(()=>profiles().some(p=>p.title===label)).toBeTruthy();const record=profiles().find(p=>p.title===label);assert.equal(record.profile.locations[0].placeId,state().places.find(p=>p.name==='Exuma').id);
+  await page.waitForURL(url=>url.pathname==='/admin/people/'+record.id);await navigate('/admin/people/'+record.id+'/edit?tab=properties');const propertyPlaces=page.locator('[data-people-location-editor]');await expect(propertyPlaces.getByRole('combobox',{name:'Saved place 1',exact:true})).toContainText('Exuma');await snap('profile-'+kind+'-persisted');
+  if(kind==='organization'){
+   await propertyPlaces.getByRole('button',{name:'Add place',exact:true}).click();await propertyPlaces.getByRole('button',{name:'Find a place worldwide',exact:true}).click();
+   await finder.getByRole('textbox',{name:'Place name',exact:true}).fill('Tokyo');await finder.getByRole('button',{name:'Autofill place',exact:true}).click();await page.getByRole('dialog',{name:'Matching places',exact:true}).getByRole('button',{name:/^Tokyo /}).click();await snap('profile-organization-new-place');
+   await finder.getByRole('button',{name:'Save and select',exact:true}).click();await expect(finder).toHaveCount(0);await expect(propertyPlaces.getByRole('combobox',{name:'Saved place 2',exact:true})).toContainText('Tokyo');assert.equal(state().places.length,3);
+   await page.getByRole('navigation',{name:'People quick actions'}).getByRole('button',{name:'Save',exact:true}).click();await expect.poll(()=>profiles().find(p=>p.id===record.id).profile.locations.length).toBe(2);assert.equal(profiles().find(p=>p.id===record.id).profile.locations[1].placeId,state().places.find(p=>p.name==='Tokyo').id);
+  }
+ }
+ await page.setViewportSize({width:820,height:1180});const person=profiles().find(p=>p.title==='Worldwide person');await navigate('/admin/people/'+person.id+'/edit?tab=properties');
+ await page.getByRole('button',{name:'Add occupation',exact:true}).click();await page.getByRole('combobox',{name:'Job 1 organization',exact:true}).click();await page.getByRole('button',{name:'Create organization',exact:true}).click();
+ const inline=page.getByRole('dialog',{name:'New organization',exact:true});await inline.getByRole('textbox',{name:'Organization name',exact:true}).fill('Worldwide employer');await inline.getByRole('button',{name:'Find a place worldwide',exact:true}).click();
+ const nested=page.getByRole('dialog',{name:'Find a place',exact:true});await nested.getByRole('textbox',{name:'Place name',exact:true}).fill('Tokyo');await nested.getByRole('button',{name:'Autofill place',exact:true}).click();await page.getByRole('dialog',{name:'Matching places',exact:true}).getByRole('button',{name:/^Tokyo /}).click();await snap('inline-organization-place');await nested.getByRole('button',{name:'Use saved place',exact:true}).click();await expect(nested).toHaveCount(0);
+ await inline.getByRole('button',{name:'Save organization',exact:true}).click();await expect(inline).toHaveCount(0);await expect.poll(()=>profiles().some(p=>p.title==='Worldwide employer')).toBeTruthy();assert.equal(profiles().find(p=>p.title==='Worldwide employer').profile.locations[0].placeId,state().places.find(p=>p.name==='Tokyo').id);assert.equal(state().places.length,3);
+ assert.deepEqual(errors,[]);console.log('PASS local WebKit: Map create/edit, worldwide lookup, explicit choice, area labels, cancellation, stale/error recovery, mobile Calendar create/link, coordinate-only preservation, People and Organization create/profile reload, nested employer creation at tablet size, saved-place reuse, auth/CSRF and private responses.');
 })().catch(async e=>{console.error(e);if(page){await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});fs.writeFileSync(path.join(out,'failure.txt'),await page.locator('body').innerText().catch(()=>''));}process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

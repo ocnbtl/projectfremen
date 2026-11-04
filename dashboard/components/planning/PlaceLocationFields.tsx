@@ -8,9 +8,9 @@ import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./PlaceLocationFields.module.css";
-import type { PlaceSearchResult } from "../../lib/modules/planning/place-search";
+import { placeFromSearch, type PlaceSearchResult } from "../../lib/modules/planning/place-search";
 
-export type PlaceLocation = { name?: string; address?: string; latitude?: number; longitude?: number; countryCode?: string; addressParts?: AddressParts };
+export type PlaceLocation = { name?: string; address?: string; latitude?: number; longitude?: number; countryCode?: string; addressParts?: AddressParts; lookup?: import("../../lib/modules/planning/types").Place["lookup"] };
 const extraFlags = new Set(["AQ", "BV", "GS", "HM", "PN", "TF", "UM"]);
 function CountryFlag({ code }: { code: string }) {
   return extraFlags.has(code) ? <img className={styles.flag} src={`/address-flags/${code}.svg`} alt="" /> : <svg className={styles.flag} viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${code}`} /></svg>;
@@ -42,7 +42,7 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
   function changeAddress(next: AddressParts, nextCountry = country) {
     cancelLookup();
     const changed = nextCountry !== country || formatPlaceAddress(next, nextCountry) !== formatPlaceAddress(parts, country);
-    onChange({ addressParts: next, countryCode: nextCountry, address: formatPlaceAddress(next, nextCountry),
+    onChange({ addressParts: next, countryCode: nextCountry, address: formatPlaceAddress(next, nextCountry), lookup: undefined,
       // A pin chosen on an empty map form is intentional; an old address's pin is not.
       ...(changed && pinAddress.current.trim() ? { latitude: undefined, longitude: undefined } : {}) });
   }
@@ -57,8 +57,8 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
     if (lookupMode === "place") {
       applying.current = true;
       pinAddress.current = match.address;
-      onChange({ name: match.name, address: match.address, countryCode: match.countryCode || "", addressParts: match.addressParts || { street: "", city: "", region: "", postalCode: "", district: "" }, latitude: match.latitude, longitude: match.longitude });
-      setMessage("Place filled. Review the details, then save.");
+      onChange(placeFromSearch(match));
+      setMessage(match.countryCode ? "Place filled. Review the details, then save." : "Place filled. The provider did not supply a country; review it before saving.");
     } else {
       pinAddress.current = address; onChange({ latitude: match.latitude, longitude: match.longitude }); setMessage("Coordinates filled.");
     }
@@ -86,7 +86,7 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
   </Popover.Content>;
   return <div className={`${styles.fields} ${compact ? styles.compact : ""}`}>
     {leading}
-    <div className={styles.placeLookup} ref={placeTrigger}><Popover.Root open={lookupMode === "place" && !!matches.length} onOpenChange={open => { if (!open) setMatches([]); }}><Popover.Anchor asChild><Button type="button" icon="search" className={styles.autofill} aria-label="Autofill place" busy={busy && lookupMode === "place"} disabled={busy || (value.name?.trim() || address.trim()).length < 3} onClick={() => void lookup("place")}>Autofill place</Button></Popover.Anchor><Popover.Portal container={placeTrigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}>{choices}</Popover.Portal></Popover.Root><span>Worldwide</span></div>
+    <div className={styles.placeLookup} ref={placeTrigger}><Popover.Root open={lookupMode === "place" && !!matches.length} onOpenChange={open => { if (!open) setMatches([]); }}><Popover.Anchor asChild><Button type="button" icon="search" className={styles.autofill} aria-label="Autofill place" busy={busy && lookupMode === "place"} disabled={busy || (value.name?.trim() || address.trim()).length < 2} onClick={() => void lookup("place")}>Autofill place</Button></Popover.Anchor><Popover.Portal container={placeTrigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}>{choices}</Popover.Portal></Popover.Root><span>Worldwide</span></div>
     <div className={styles.addressHeading}><label htmlFor={addressId}><UnigentamosIcon role="location" size={16} />Address</label><SelectField searchable autoFocusSearch={false} className={styles.country} aria-label="Address country" value={country} triggerContent={<span className={styles.countryValue}>{country ? <CountryFlag code={country} /> : <UnigentamosIcon role="travel-kind-country" size={16} />}<span>{country || "Auto"}</span><UnigentamosIcon role="chevron-down" size={14} /></span>} onChange={e => {
       const countryCode = e.target.value;
       changeAddress(parts, countryCode);
@@ -98,7 +98,7 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
     }} />
     <div className={styles.locality} style={{ gridTemplateColumns: `repeat(${Math.min(localFields.length, 3)}, minmax(0, 1fr))` }}>{localFields.map(field => <label key={field}>{addressFieldLabel(field, country)}<input value={parts[field]} maxLength={240} autoComplete={field === "postalCode" ? "postal-code" : field === "region" ? "address-level1" : field === "city" ? "address-level2" : "address-level3"} onChange={e => updatePart(field, e.target.value)} /></label>)}</div>
     <div className={styles.coordinates}>
-      {(["latitude", "longitude"] as const).map(axis => <label key={axis}>{axis === "latitude" ? "Latitude" : "Longitude"}<input aria-label={axis === "latitude" ? "Latitude" : "Longitude"} type="number" step="any" min={axis === "latitude" ? -90 : -180} max={axis === "latitude" ? 90 : 180} value={value[axis] ?? ""} onChange={e => { cancelLookup(); pinAddress.current = address; onChange({ [axis]: e.target.value === "" ? undefined : Number(e.target.value) }); }} /></label>)}
+      {(["latitude", "longitude"] as const).map(axis => <label key={axis}>{axis === "latitude" ? "Latitude" : "Longitude"}<input aria-label={axis === "latitude" ? "Latitude" : "Longitude"} type="number" step="any" min={axis === "latitude" ? -90 : -180} max={axis === "latitude" ? 90 : 180} value={value[axis] ?? ""} onChange={e => { cancelLookup(); pinAddress.current = address; onChange({ lookup: undefined, [axis]: e.target.value === "" ? undefined : Number(e.target.value) }); }} /></label>)}
       <div ref={trigger}><Popover.Root open={lookupMode === "coordinates" && !!matches.length} onOpenChange={open => { if (!open) setMatches([]); }}><Popover.Anchor asChild><Button className={styles.autofill} aria-label="Autofill coordinates" icon="search" type="button" busy={busy && lookupMode === "coordinates"} disabled={busy || address.trim().length < 3 || /^https?:\/\//i.test(address)} onClick={() => void lookup()}>Autofill<span className={styles.fullLabel}> coordinates</span></Button></Popover.Anchor>
       <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}>{choices}</Popover.Portal></Popover.Root></div>
     </div>

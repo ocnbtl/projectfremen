@@ -12,6 +12,7 @@ export type Place = PlanningBase & {
   address: string;
   countryCode?: string;
   addressParts?: import("./place-address").AddressParts;
+  lookup?: { sourceId?: string; kind: string; precision: "address" | "approximate" | "area" };
   latitude?: number;
   longitude?: number;
   locationVerification?: {

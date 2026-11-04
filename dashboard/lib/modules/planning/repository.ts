@@ -22,6 +22,7 @@ import type { PersonalTrip } from "../personal-life/types";
 import { planningOwner, planningWritableKeys } from "./ownership";
 import { normalizePlanningRecord } from "./record-validation";
 import { placeWriteInput } from "./place-address";
+import { reusablePlaces } from "./place-identity";
 import {
   PLANNING_COLLECTIONS,
   type PlanningCollection,
@@ -202,6 +203,9 @@ export async function savePlanning<K extends PlanningCollection>(
     const item = normalize(collection, {
       ...previous,
       ...input,
+      ...(collection === "places" && previous && (!Object.hasOwn(input, "lookup") || JSON.stringify((input as unknown as Record<string, unknown>).lookup) === JSON.stringify((previous as unknown as Record<string, unknown>).lookup)) &&
+        ["address", "countryCode", "addressParts", "latitude", "longitude"].some(key => Object.hasOwn(input, key) && JSON.stringify((input as unknown as Record<string, unknown>)[key]) !== JSON.stringify((previous as unknown as Record<string, unknown>)[key]))
+        ? { lookup: undefined } : {}),
       ...(collection === "places" && previous && (!Object.hasOwn(input, "locationVerification") || JSON.stringify((input as unknown as Record<string, unknown>).locationVerification) === JSON.stringify((previous as unknown as Record<string, unknown>).locationVerification)) &&
         ["address", "countryCode", "addressParts", "latitude", "longitude"].some(key => Object.hasOwn(input, key) && JSON.stringify((input as unknown as Record<string, unknown>)[key]) !== JSON.stringify((previous as unknown as Record<string, unknown>)[key]))
         ? { locationVerification: undefined } : {}),
@@ -209,6 +213,11 @@ export async function savePlanning<K extends PlanningCollection>(
       createdAt: previous?.createdAt || stamp,
       updatedAt: stamp,
     });
+    if (collection === "places" && !input.id) {
+      const matches = reusablePlaces(cached.state.places, item as import("./types").Place);
+      if (matches.length > 1) throw new Error("Several saved places match. Choose the saved place to link.");
+      if (matches.length === 1) return matches[0] as PlanningCollections[K];
+    }
     const module = planningOwner(collection),
       canonicalId = `${module}:${collection}:${id}`,
       objectId = await deterministicVaultObjectId(canonicalId);

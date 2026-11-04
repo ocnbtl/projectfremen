@@ -1,11 +1,15 @@
 import { ADDRESS_COUNTRIES, formatPlaceAddress, splitPastedAddress, type AddressParts } from "./place-address";
 export type PlaceSearchResult = { name: string; address: string; latitude: number; longitude: number; countryCode?: string; addressParts?: AddressParts; kind?: string; precision?: "address" | "area" | "approximate"; sourceUrl?: string };
+export function placeFromSearch(match: PlaceSearchResult) {
+  return { name: match.name, address: match.address, countryCode: match.countryCode || "", addressParts: match.addressParts || { street: "", city: "", region: "", postalCode: "", district: "" }, latitude: match.latitude, longitude: match.longitude,
+    lookup: { ...(match.sourceUrl ? { sourceId: match.sourceUrl } : {}), kind: match.kind || "place", precision: match.precision || "approximate" as const } };
+}
 
 /** Name lookup is worldwide, independent of a draft's old/default address country.
  * Ranking only helps display choices; it never decides which place to save. */
 export async function searchFullPlace(query: string, search: (query: string) => Promise<PlaceSearchResult[]>): Promise<PlaceSearchResult[]> {
   const name = query.trim();
-  if (name.length < 3 || name.length > 500 || /^https?:\/\//i.test(name)) throw new Error("Enter a place name or address between 3 and 500 characters");
+  if (name.length < 2 || name.length > 500 || /^https?:\/\//i.test(name)) throw new Error("Enter a place name or address between 2 and 500 characters");
   const key = (text: string) => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/^the\s+/, "").replace(/s$/, "").trim();
   const wanted = key(name), seen = new Set<string>();
   return (await search(name)).filter(row => {
@@ -54,7 +58,7 @@ export function parsePlaceSearch(data: unknown, query: string): PlaceSearchResul
     const [longitude, latitude] = geometry.coordinates;
     if (typeof latitude !== "number" || typeof longitude !== "number" || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return [];
     const text = (key: string) => typeof properties[key] === "string" ? properties[key].trim().slice(0, 240) : "";
-    const name = text("name") || text("street") || query;
+    const name = text("name") || text("street") || query.slice(0, 240);
     const layer = text("type"), osmKey = text("osm_key"), osmValue = text("osm_value");
     const area = ["country", "state", "county", "city", "district", "locality"].includes(layer)
       || (osmKey === "place" && ["island", "islet", "archipelago", "continent"].includes(osmValue));
