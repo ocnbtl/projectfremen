@@ -4,7 +4,28 @@
 .trigger[data-area=true]>img{object-fit:contain;border-radius:2px;background:transparent;clip-path:none}
 .trigger>span{position:absolute;bottom:-2px;right:-2px;display:grid;place-items:center;width:15px;height:15px;border:1px solid #d5e2e7;border-radius:50%;background:white}
 .trigger:focus-visible{outline:2px solid var(--module-accent,#597342);outline-offset:3px}
-.menu{z-index:150;width:240px;max-width:calc(100vw - 24px);padding:12px;display:grid;gap:6px;border:1px solid #d5e2e7;border-radius:12px;background:white;color:#172b33;box-shadow:0 8px 24px #172b3320;animation:appear .16s ease-out;transform-origin:var(--radix-popover-content-transform-origin)}
-.menu strong{font-size:14px}.menu small{font-size:12px;line-height:1.5;color:#65757b}
-.menu button{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px;border:0;border-radius:7px;background:#f3f8ed;text-align:left;color:#172b33;font:inherit;font-size:13px;cursor:pointer}.menu button:hover{background:#e6efdd}.menu button:disabled{opacity:.5;cursor:wait}
+.menu {
+  z-index:150; box-sizing:border-box; width:254px; max-width:calc(100vw - 24px);
+  max-height:var(--radix-popover-content-available-height); overflow:auto;
+  padding:14px; display:grid; gap:12px; border:1px solid #d5e2e7; border-radius:14px;
+  background:white; color:#172b33; box-shadow:0 8px 24px #172b3320;
+  animation:appear .16s ease-out; transform-origin:var(--radix-popover-content-transform-origin);
+}
+.heading {display:flex; align-items:center; justify-content:space-between; gap:12px;}
+.heading div {min-width:0; display:grid; gap:2px;}
+.menu strong {font-size:15px;}
+.menu small {font-size:12px; line-height:1.45; color:#506269; overflow-wrap:anywhere;}
+.actions {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
+.menu button {
+  display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:40px;
+  padding:6px 9px; border:1px solid #d3ded0; border-radius:9px; background:#f3f8ed;
+  color:#263e25; font:inherit; font-size:13px; font-weight:550; cursor:pointer;
+}
+.menu .close {width:36px; min-height:36px; flex:none; padding:0; background:white;}
+.menu .remove {justify-self:start; padding-inline:4px; background:transparent; border-color:transparent; color:#91352d;}
+.menu button:hover {background:#e6efdd;}
+.menu button:focus-visible {outline:2px solid #55783c; outline-offset:2px;}
+.menu button:disabled {color:#586758; cursor:wait;}
+.menu [role=alert] {color:#91352d;}
+@media(pointer:coarse){.menu button,.menu .close {min-height:44px;} .menu .close {width:44px;}}
 @keyframes appear{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.menu{animation:none}}

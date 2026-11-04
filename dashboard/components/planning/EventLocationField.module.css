@@ -25,6 +25,12 @@
 @media(max-width:700px){.location .address input {font-size:16px;} .popover {padding:12px;} .create footer {flex-wrap:wrap;}}
 
 .popover:global(.work-form) { gap:8px; }
+.popover[data-mode="create"] {
+  box-sizing: border-box;
+  width: min(660px, calc(100vw - 32px), var(--radix-popover-content-available-width));
+  gap: 14px;
+  container-type: inline-size;
+}
 .popover header { margin:0; }
 .popover header strong { font-size:13px; font-weight:600; }
 .popover header button:hover { background:var(--module-quiet); color:var(--module-action); }

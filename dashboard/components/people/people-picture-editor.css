@@ -1,0 +1,134 @@
+/* The editor can open above any workspace or an existing modal. */
+.people-photo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1610;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(16 32 38 / 48%);
+}
+
+.people-photo-dialog {
+  --photo-line: #ced9de;
+  --photo-ink: #20343e;
+  --photo-muted: #52636d;
+  --photo-action: var(--module-action, var(--action-primary, #133c5e));
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 530px);
+  max-height: calc(100dvh - 40px);
+  min-height: 0;
+  border: 1px solid #becbd0;
+  border-radius: 18px;
+  background: #fff;
+  color: var(--photo-ink);
+  box-shadow: 0 18px 70px rgb(8 24 32 / 28%);
+  font: 400 14px/1.5 var(--font-body);
+  outline: none;
+}
+.people-photo-dialog[data-editing] { width: min(100%, 740px); }
+.people-photo-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid var(--photo-line);
+}
+.people-photo-dialog > header div { min-width: 0; }
+.people-photo-dialog > header span { color: var(--photo-muted); font-size: 12px; font-weight: 600; }
+.people-photo-dialog > header h2 { margin: 1px 0 0; overflow-wrap: anywhere; font: 700 20px/1.3 var(--font-heading); }
+.people-photo-body {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 18px 22px 22px;
+}
+.people-photo-body > p { margin: 0; color: var(--photo-muted); }
+.people-photo-dialog :is(header, footer, .people-photo-editor-tools, .people-photo-zoom-control) button,
+.people-photo-adjust, .people-photo-options button {
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid var(--photo-line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--photo-ink);
+  font: 650 13px/1.4 var(--font-body);
+  cursor: pointer;
+}
+.people-photo-dialog :is(header, footer, .people-photo-editor-tools, .people-photo-zoom-control) button:enabled:hover,
+.people-photo-adjust:enabled:hover, .people-photo-options button:enabled:hover { border-color: #879aa4; background: #f3f7f8; }
+.people-photo-dialog > header > button { display: grid; place-items: center; flex: 0 0 40px; }
+.people-photo-dialog :is(button, input, .people-photo-crop-frame):focus-visible { outline: 2px solid var(--photo-action); outline-offset: 2px; }
+.people-photo-dialog button:disabled { color: var(--photo-muted); background: #f3f5f6; opacity: 1; cursor: default; }
+.people-photo-adjust { display: flex; align-items: center; gap: 12px; padding: 14px; text-align: left; }
+.people-photo-adjust > span { display: grid; gap: 2px; }
+.people-photo-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.people-photo-options button { display: grid; align-content: start; justify-items: start; gap: 4px; padding: 13px; text-align: left; }
+.people-photo-options button > span { display: grid; width: 32px; height: 32px; margin-bottom: 4px; place-items: center; border-radius: 8px; color: var(--module-icon, var(--photo-action)); background: var(--module-quiet, #edf2f4); }
+.people-photo-options strong, .people-photo-adjust strong { font-size: 14px; }
+.people-photo-options small, .people-photo-adjust small { color: var(--photo-muted); font-size: 12px; font-weight: 450; }
+.people-photo-paste-hint { font-size: 12px; }
+.people-photo-paste-hint kbd { color: var(--photo-ink); font: 600 12px var(--font-mono); }
+
+.people-photo-editor { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
+.people-photo-preview { display: grid; gap: 6px; margin: 0; min-width: 0; }
+.people-photo-preview figcaption { color: var(--photo-muted); font: 500 12px/1.4 var(--font-mono); text-align: center; }
+.people-photo-crop-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #acbcc3;
+  border-radius: 10px;
+  background: repeating-conic-gradient(#e4ebed 0 25%, #f7f9fa 0 50%) 0 0 / 16px 16px;
+  cursor: grab;
+  touch-action: none;
+}
+.people-photo-crop-frame:active { cursor: grabbing; }
+.people-photo-crop-frame img { position: absolute; display: block; max-width: none; max-height: none; pointer-events: none; user-select: none; }
+.people-photo-crop-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, transparent calc(100% - 1px), rgb(255 255 255 / 55%) 0) 0 0 / calc(100% / 3) 100%,
+    linear-gradient(to bottom, transparent calc(100% - 1px), rgb(255 255 255 / 55%) 0) 0 0 / 100% calc(100% / 3);
+}
+.people-photo-editor-controls { display: grid; gap: 13px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.people-photo-editor-controls label, .people-photo-slider { display: grid; align-content: start; gap: 4px; font-size: 13px; font-weight: 650; }
+.people-photo-control-label, .people-photo-editor-controls .people-photo-size { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.people-photo-control-label > span + span { color: var(--photo-muted); font: 600 13px var(--font-mono); }
+.people-photo-size .app-select-trigger { width: auto; min-width: 100px; background: #fff; border-color: var(--photo-line); color: var(--photo-ink); }
+.people-photo-zoom-control { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 8px; align-items: center; }
+.people-photo-zoom-control button { display: grid; place-items: center; min-height: 36px; }
+.people-photo-editor-controls input[type="range"] { width: 100%; min-width: 0; height: 24px; margin: 0; accent-color: var(--photo-action); }
+.people-photo-editor-tools { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 10px; border-top: 1px solid var(--photo-line); }
+.people-photo-dialog .people-photo-editor-tools button { padding: 7px 10px; font-size: 12px; }
+.people-photo-dialog footer, .people-photo-remove-confirm { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.people-photo-dialog footer { padding: 14px 22px; border-top: 1px solid var(--photo-line); }
+.people-photo-dialog .people-photo-editor-actions { justify-content: space-between; }
+.people-photo-dialog footer button.is-primary { border-color: var(--photo-action); background: var(--photo-action); color: var(--module-action-contrast, #fff); }
+.people-photo-dialog footer button.is-primary:enabled:hover { border-color: var(--module-action-hover, #0c2b44); background: var(--module-action-hover, #0c2b44); }
+.people-photo-dialog footer :is(.is-danger, .people-photo-remove) { color: #9f3529; }
+.people-photo-dialog .people-photo-error, .people-photo-dialog .people-photo-status { margin: 0; padding: 10px 22px; color: #203f51; background: #eef4f7; font-size: 13px; font-weight: 600; }
+.people-photo-dialog .people-photo-error { color: #8a2c21; background: #fff0ec; }
+.people-photo-dialog[data-saving] :disabled { cursor: wait; opacity: 1; }
+
+@media (max-width: 620px) {
+  .people-photo-overlay { padding: 8px; }
+  .people-photo-dialog { max-height: calc(100dvh - 16px); }
+  .people-photo-dialog > header, .people-photo-dialog footer { padding: 12px 16px; }
+  .people-photo-body { padding: 14px 16px 18px; gap: 14px; }
+  .people-photo-editor { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .people-photo-preview { width: min(100%, 230px); justify-self: center; }
+}
+@media (max-width: 420px) {
+  .people-photo-options { grid-template-columns: 1fr; }
+  .people-photo-options button { grid-template-columns: 34px minmax(0, 1fr); align-items: center; column-gap: 10px; row-gap: 1px; padding: 9px 12px; }
+  .people-photo-options button > span { grid-row: span 2; margin: 0; }
+  .people-photo-options small { grid-column: 2; }
+}

@@ -1,6 +1,8 @@
 "use client";
 import { MorphingSpan } from "../ui/DirectoryLayout";
 import SelectField from "../ui/SelectField";
+import * as Dialog from "@radix-ui/react-dialog";
+import "./people-picture-editor.css";
 
 import { useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
@@ -211,11 +213,9 @@ export default function PeopleProfilePhotoDialog({
 
   useEffect(() => {
     if (!open) return;
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setError("");
     setConfirmRemove(false);
-    window.setTimeout(() => dialogRef.current?.focus(), 0);
-    return () => returnFocusRef.current?.focus();
+    return () => { loadVersionRef.current++; };
   }, [open]);
 
   useEffect(() => () => {
@@ -404,179 +404,177 @@ export default function PeopleProfilePhotoDialog({
   }
 
   return (
-    <div className="people-photo-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !saving) closeDialog();
-    }}>
-      <div
-        ref={dialogRef}
-        className="people-photo-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="people-photo-dialog-title"
-        tabIndex={-1}
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && !saving) closeDialog();
-          if (event.key === "Tab") {
-            const controls = Array.from(
-              event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')
-            ).filter((control) => control.offsetParent !== null);
-            const first = controls[0];
-            const last = controls[controls.length - 1];
-            if (!first || !last) {
+    <Dialog.Root open={open} onOpenChange={next => { if (!next) closeDialog(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="people-photo-overlay">
+          <Dialog.Content
+            className="people-photo-dialog"
+            data-editing={editing || undefined}
+            data-saving={saving || undefined}
+            ref={dialogRef}
+            tabIndex={-1}
+            onOpenAutoFocus={event => {
               event.preventDefault();
-              return;
-            }
-            if (event.shiftKey && document.activeElement === first) {
-              event.preventDefault();
-              last.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-              event.preventDefault();
-              first.focus();
-            }
-          }
-        }}
-        onPaste={(event) => {
-          if (loading || saving) return;
-          const image = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"))?.getAsFile();
-          if (image) {
-            event.preventDefault();
-            void beginEditing(image);
-          }
-        }}
-      >
-        <header>
-          <div>
-            <span>Profile picture</span>
-            <h2 id="people-photo-dialog-title">{personName}</h2>
-          </div>
-          <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving} data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button>
-        </header>
-        <p>{photoDraft ? cropDescription : "Adjust your current picture or choose a new one."}</p>
-        {!photoDraft && hasPhoto && <button type="button" className="people-photo-adjust" onClick={() => void editCurrentPhoto()} disabled={saving || loading}>
-          <UnigentamosIcon role="edit" size={20} /><span><strong>{loading ? "Opening picture…" : "Adjust crop"}</strong><small>Zoom and reposition the current picture</small></span>
-        </button>}
-        {!photoDraft && <div className="people-photo-options">
-          <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={saving}>
-            <span aria-hidden="true"><UnigentamosIcon role="photo-upload" size={19} /></span><strong>Upload</strong><small>Choose a saved picture</small>
-          </button>
-          <button type="button" onClick={() => void pasteFromClipboard()} disabled={saving}>
-            <span aria-hidden="true"><UnigentamosIcon role="photo-paste" size={19} /></span><strong>Paste</strong><small>Use the clipboard</small>
-          </button>
-          <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={saving}>
-            <span aria-hidden="true"><UnigentamosIcon role="photo-camera" size={19} /></span><strong>Take picture</strong><small>Open the camera</small>
-          </button>
-        </div>}
-        {!photoDraft && <div className="people-photo-paste-hint" tabIndex={0}>You can also paste a picture here with Ctrl+V or Command+V.</div>}
-        {photoDraft && <section className="people-photo-editor" aria-label="Crop and resize profile picture">
-          <div
-            ref={cropFrameRef}
-            className="people-photo-crop-frame"
-            role="img"
-            aria-label={`Square crop preview for ${personName}. Drag to reposition.`}
-            tabIndex={0}
-            onPointerDown={(event) => {
-              if (saving || event.button !== 0 || dragRef.current) return;
-              event.preventDefault();
-              event.currentTarget.focus();
-              dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-              event.currentTarget.setPointerCapture(event.pointerId);
+              returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+              dialogRef.current?.focus();
             }}
-            onPointerMove={(event) => {
-              const drag = dragRef.current;
-              if (saving || !drag || drag.pointerId !== event.pointerId) return;
-              const dx = (event.clientX - drag.x) / event.currentTarget.clientWidth;
-              const dy = (event.clientY - drag.y) / event.currentTarget.clientHeight;
-              dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-              setPhotoDraft(current => current ? movePhotoCrop(current, dx, dy) : current);
-            }}
-            onPointerUp={(event) => {
-              if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-              if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-            }}
-            onPointerCancel={() => { dragRef.current = null; }}
-            onLostPointerCapture={() => { dragRef.current = null; }}
-            onKeyDown={(event) => {
-              const next = event.key === "ArrowLeft" ? { panX: -0.05, panY: 0 }
-                : event.key === "ArrowRight" ? { panX: 0.05, panY: 0 }
-                  : event.key === "ArrowUp" ? { panX: 0, panY: -0.05 }
-                    : event.key === "ArrowDown" ? { panX: 0, panY: 0.05 }
-                      : null;
-              if (!next || saving) return;
+            onCloseAutoFocus={event => {
               event.preventDefault();
-              setPhotoDraft((current) => current ? movePhotoCrop(current, next.panX, next.panY) : current);
+              returnFocusRef.current?.focus({ preventScroll: true });
+            }}
+            onEscapeKeyDown={event => { if (saving) event.preventDefault(); }}
+            onPointerDownOutside={event => { if (saving) event.preventDefault(); }}
+            onPaste={(event) => {
+              if (loading || saving) return;
+              const image = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"))?.getAsFile();
+              if (image) {
+                event.preventDefault();
+                void beginEditing(image);
+              }
             }}
           >
-            <img
-              src={photoDraft.previewUrl}
-              alt=""
-              draggable={false}
-              style={{
-                width: `${photoDraft.sourceWidth / crop!.side * 100}%`,
-                height: `${photoDraft.sourceHeight / crop!.side * 100}%`,
-                left: `${-crop!.x / crop!.side * 100}%`,
-                top: `${-crop!.y / crop!.side * 100}%`
-              }}
-            />
-            <span className="people-photo-crop-grid" aria-hidden="true" />
-          </div>
-          {projectLogo && <div className="people-photo-editor-meta"><button type="button" aria-pressed={!!photoDraft.clearMatte} disabled={saving || loading} onClick={() => void toggleLogoBackground()}>{photoDraft.clearMatte ? "Restore original background" : "Remove solid background"}</button></div>}
-          <fieldset className="people-photo-editor-controls" disabled={saving}>
-            <label>
-              <span>Zoom</span>
-              <div className="people-photo-zoom-control">
-                <button type="button" aria-label="Zoom out" disabled={photoDraft.zoom <= 1} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom - .1) : current)} data-icon-button="compact"><UnigentamosIcon role="minus" size={16} /></button>
-                <input aria-label="Zoom" type="range" min="1" max="3" step="0.01" value={photoDraft.zoom} onChange={(event) => setPhotoDraft((current) => current ? zoomPhotoCrop(current, Number(event.target.value)) : current)} />
-                <button type="button" aria-label="Zoom in" disabled={photoDraft.zoom >= 3} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom + .1) : current)} data-icon-button="compact"><UnigentamosIcon role="plus" size={14} /></button>
+            <header>
+              <div>
+                <span>{projectLogo ? "Project picture" : "Profile picture"}</span>
+                <Dialog.Title>{personName}</Dialog.Title>
               </div>
-            </label>
-            <label><span>Horizontal crop</span><input aria-label="Horizontal crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panX} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panX: Number(event.target.value) } : current)} /></label>
-            <label><span>Vertical crop</span><input aria-label="Vertical crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panY} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panY: Number(event.target.value) } : current)} /></label>
-            <label><span>Resize output</span><SelectField aria-label="Resize output" value={photoDraft.outputSize} onChange={(event) => setPhotoDraft((current) => current ? { ...current, outputSize: Number(event.target.value) as PhotoEditorDraft["outputSize"] } : current)}><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></SelectField></label>
-          </fieldset>
-          <div className="people-photo-editor-meta"><span>{photoDraft.sourceWidth} × {photoDraft.sourceHeight} source</span><button type="button" disabled={saving} onClick={() => setPhotoDraft((current) => current ? { ...current, zoom: 1, panX: 0, panY: 0, fit: projectLogo ? "contain" : undefined } : current)}>{projectLogo ? "Fit whole logo" : "Center crop"}</button></div>
-        </section>}
-        <input
-          ref={uploadInputRef}
-          className="sr-only"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0];
-            event.currentTarget.value = "";
-            if (file) void beginEditing(file);
-          }}
-        />
-        <input
-          ref={cameraInputRef}
-          className="sr-only"
-          type="file"
-          accept="image/*"
-          capture="user"
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0];
-            event.currentTarget.value = "";
-            if (file) void beginEditing(file);
-          }}
-        />
-        {error && <p className="personal-record-error" role="alert">{error}</p>}
-        {saving && <p className="people-photo-status" role="status">Preparing and saving picture…</p>}
-        {photoDraft ? (
-          <footer className="people-photo-editor-actions">
-            <button type="button" onClick={() => { loadVersionRef.current++; releasePreview(); setPhotoDraft(null); }} disabled={saving || loading}>Choose another</button>
-            <button type="button" className="is-primary" onClick={() => void uploadEditedPhoto()} disabled={saving || loading}>{saving ? "Preparing…" : onPrepared ? "Use picture" : "Save picture"}</button>
-          </footer>
-        ) : hasPhoto && (
-          <footer>
-            {confirmRemove ? (
-              <div className="people-photo-remove-confirm">
-                <span>Remove this profile picture?</span>
-                <button type="button" onClick={() => setConfirmRemove(false)} disabled={saving}>Cancel</button>
-                <button type="button" className="is-danger" onClick={() => void removePhoto()} disabled={saving}>Remove</button>
-              </div>
-            ) : <button type="button" className="people-photo-remove" onClick={() => setConfirmRemove(true)} disabled={saving}>Remove current picture</button>}
-          </footer>
-        )}
-      </div>
-    </div>
+              <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving} data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button>
+            </header>
+            <div className="people-photo-body">
+              <Dialog.Description>{photoDraft ? cropDescription : hasPhoto ? "Adjust your current picture or choose a new one." : "Choose a picture to crop and save."}</Dialog.Description>
+              {!photoDraft && hasPhoto && <button type="button" className="people-photo-adjust" onClick={() => void editCurrentPhoto()} disabled={saving || loading}>
+                <UnigentamosIcon role="edit" size={20} /><span><strong>{loading ? "Opening picture…" : "Adjust crop"}</strong><small>Zoom and reposition the current picture</small></span>
+              </button>}
+              {!photoDraft && <div className="people-photo-options">
+                <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={saving || loading}>
+                  <span aria-hidden="true"><UnigentamosIcon role="photo-upload" size={19} /></span><strong>Upload</strong><small>Choose a saved picture</small>
+                </button>
+                <button type="button" onClick={() => void pasteFromClipboard()} disabled={saving || loading}>
+                  <span aria-hidden="true"><UnigentamosIcon role="photo-paste" size={19} /></span><strong>Paste</strong><small>Use the clipboard</small>
+                </button>
+                <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={saving || loading}>
+                  <span aria-hidden="true"><UnigentamosIcon role="photo-camera" size={19} /></span><strong>Take picture</strong><small>Open the camera</small>
+                </button>
+              </div>}
+              {!photoDraft && <p className="people-photo-paste-hint">Paste a picture anywhere in this window with <kbd>Ctrl</kbd> + <kbd>V</kbd> or <kbd>⌘</kbd> + <kbd>V</kbd>.</p>}
+              {photoDraft && <section className="people-photo-editor" aria-label="Crop and resize profile picture">
+                <figure className="people-photo-preview">
+                  <div
+                    ref={cropFrameRef}
+                    className="people-photo-crop-frame"
+                    role="img"
+                    aria-label={`Square crop preview for ${personName}. Drag or use the arrow keys to reposition.`}
+                    tabIndex={0}
+                    onPointerDown={(event) => {
+                      if (saving || event.button !== 0 || dragRef.current) return;
+                      event.preventDefault();
+                      event.currentTarget.focus();
+                      dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                      const drag = dragRef.current;
+                      if (saving || !drag || drag.pointerId !== event.pointerId) return;
+                      const dx = (event.clientX - drag.x) / event.currentTarget.clientWidth;
+                      const dy = (event.clientY - drag.y) / event.currentTarget.clientHeight;
+                      dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+                      setPhotoDraft(current => current ? movePhotoCrop(current, dx, dy) : current);
+                    }}
+                    onPointerUp={(event) => {
+                      if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+                    }}
+                    onPointerCancel={() => { dragRef.current = null; }}
+                    onLostPointerCapture={() => { dragRef.current = null; }}
+                    onKeyDown={(event) => {
+                      const next = event.key === "ArrowLeft" ? { panX: -0.05, panY: 0 }
+                        : event.key === "ArrowRight" ? { panX: 0.05, panY: 0 }
+                          : event.key === "ArrowUp" ? { panX: 0, panY: -0.05 }
+                            : event.key === "ArrowDown" ? { panX: 0, panY: 0.05 }
+                              : null;
+                      if (!next || saving) return;
+                      event.preventDefault();
+                      setPhotoDraft((current) => current ? movePhotoCrop(current, next.panX, next.panY) : current);
+                    }}
+                  >
+                    <img
+                      src={photoDraft.previewUrl}
+                      alt=""
+                      draggable={false}
+                      style={{
+                        width: `${photoDraft.sourceWidth / crop!.side * 100}%`,
+                        height: `${photoDraft.sourceHeight / crop!.side * 100}%`,
+                        left: `${-crop!.x / crop!.side * 100}%`,
+                        top: `${-crop!.y / crop!.side * 100}%`
+                      }}
+                    />
+                    <span className="people-photo-crop-grid" aria-hidden="true" />
+                  </div>
+                  <figcaption>{photoDraft.sourceWidth} × {photoDraft.sourceHeight} px</figcaption>
+                </figure>
+                <fieldset className="people-photo-editor-controls" aria-label="Picture adjustments" disabled={saving || loading}>
+                  <div className="people-photo-slider">
+                    <div className="people-photo-control-label"><span>Zoom</span><span>{Math.round(photoDraft.zoom * 100)}%</span></div>
+                    <div className="people-photo-zoom-control">
+                      <button type="button" aria-label="Zoom out" disabled={photoDraft.zoom <= 1} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom - .1) : current)} data-icon-button="compact"><UnigentamosIcon role="minus" size={16} /></button>
+                      <input aria-label="Zoom" type="range" min="1" max="3" step="0.01" value={photoDraft.zoom} onChange={(event) => setPhotoDraft((current) => current ? zoomPhotoCrop(current, Number(event.target.value)) : current)} />
+                      <button type="button" aria-label="Zoom in" disabled={photoDraft.zoom >= 3} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom + .1) : current)} data-icon-button="compact"><UnigentamosIcon role="plus" size={14} /></button>
+                    </div>
+                  </div>
+                  <label><span>Horizontal crop</span><input aria-label="Horizontal crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panX} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panX: Number(event.target.value) } : current)} /></label>
+                  <label><span>Vertical crop</span><input aria-label="Vertical crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panY} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panY: Number(event.target.value) } : current)} /></label>
+                  <label className="people-photo-size"><span>Resize output</span><SelectField aria-label="Resize output" value={photoDraft.outputSize} onChange={(event) => setPhotoDraft((current) => current ? { ...current, outputSize: Number(event.target.value) as PhotoEditorDraft["outputSize"] } : current)}><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></SelectField></label>
+                  <div className="people-photo-editor-tools">
+                    <button type="button" onClick={() => setPhotoDraft(current => current ? { ...current, zoom: 1, panX: 0, panY: 0, fit: projectLogo ? "contain" : undefined } : current)}>{projectLogo ? "Fit whole logo" : "Center crop"}</button>
+                    {projectLogo && <button type="button" aria-pressed={!!photoDraft.clearMatte} onClick={() => void toggleLogoBackground()}>{photoDraft.clearMatte ? "Restore original background" : "Remove solid background"}</button>}
+                  </div>
+                </fieldset>
+              </section>}
+              <input
+                ref={uploadInputRef}
+                hidden
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  if (file) void beginEditing(file);
+                }}
+              />
+              <input
+                ref={cameraInputRef}
+                hidden
+                type="file"
+                accept="image/*"
+                capture="user"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  event.currentTarget.value = "";
+                  if (file) void beginEditing(file);
+                }}
+              />
+            </div>
+            {error && <p className="people-photo-error" role="alert">{error}</p>}
+            {saving && <p className="people-photo-status" role="status">{photoDraft ? onPrepared ? "Preparing picture…" : "Saving picture…" : "Removing picture…"}</p>}
+            {photoDraft ? (
+              <footer className="people-photo-editor-actions">
+                <button type="button" onClick={() => { loadVersionRef.current++; releasePreview(); setPhotoDraft(null); }} disabled={saving || loading}>Choose another</button>
+                <button type="button" className="is-primary" onClick={() => void uploadEditedPhoto()} disabled={saving || loading}>{saving ? onPrepared ? "Preparing…" : "Saving…" : onPrepared ? "Use picture" : "Save picture"}</button>
+              </footer>
+            ) : hasPhoto && (
+              <footer>
+                {confirmRemove ? (
+                  <div className="people-photo-remove-confirm">
+                    <span>Remove this profile picture?</span>
+                    <button type="button" onClick={() => setConfirmRemove(false)} disabled={saving}>Cancel</button>
+                    <button type="button" className="is-danger" onClick={() => void removePhoto()} disabled={saving}>Remove</button>
+                  </div>
+                ) : <button type="button" className="people-photo-remove" onClick={() => setConfirmRemove(true)} disabled={saving}>Remove current picture</button>}
+              </footer>
+            )}
+          </Dialog.Content>
+        </Dialog.Overlay>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

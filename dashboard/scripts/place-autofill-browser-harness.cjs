@@ -53,6 +53,33 @@ let browser,page;
  await dialog.getByLabel('Name',{exact:true}).fill('No results');await dialog.getByRole('button',{name:'Autofill place',exact:true}).click();await expect(dialog.getByRole('status')).toContainText('No matches');
  await dialog.getByLabel('Name',{exact:true}).fill('Tokyo');await dialog.getByRole('button',{name:'Autofill place',exact:true}).click();await page.getByRole('dialog',{name:'Matching places',exact:true}).getByRole('button',{name:/^Tokyo /}).click();await expect(dialog.getByRole('combobox',{name:'Address country',exact:true})).toContainText('JP');await expect(dialog.getByRole('textbox',{name:'Notes',exact:true})).toHaveValue('Keep my private note');
  await dialog.getByRole('button',{name:'Close details',exact:true}).click();assert.equal(state().places[0].name,'Exuma','Cancel edit preserves saved place');
+ for(const width of [1440,820,390,320]){
+  await page.setViewportSize({width,height:width>600?1000:844});
+  await navigate('/admin/calendar');
+  await page.getByRole('button',{name:'Add event',exact:true}).click();
+  const editor=page.getByRole('dialog',{name:'New event',exact:true});
+  await editor.getByRole('button',{name:'Choose saved place',exact:true}).click();
+  const saved=page.getByRole('dialog',{name:'Saved places',exact:true});
+  await expect(saved.getByRole('button',{name:/Exuma/})).toBeVisible();
+  const savedWidth=(await saved.boundingBox()).width;
+  await saved.getByRole('button',{name:'Close places'}).click();
+  await editor.getByRole('button',{name:'Create place',exact:true}).click();
+  const panel=page.getByRole('dialog',{name:'Create place',exact:true});
+  await expect(panel).toBeVisible();
+  await panel.evaluate(async node=>{await Promise.all(node.getAnimations().map(a=>a.finished));});
+  const [box,name,address,lookup]=await Promise.all([panel,panel.getByLabel('Place name',{exact:true}),panel.getByLabel('Address',{exact:true}),panel.getByRole('button',{name:'Autofill place',exact:true})].map(loc=>loc.boundingBox()));
+  assert(box.x>=0&&box.x+box.width<=width+1,'Create panel fits at '+width);
+  assert(await panel.evaluate(node=>node.scrollWidth<=node.clientWidth+1),'No horizontal scroll at '+width);
+  if(width>=820){
+   assert(box.width>savedWidth+50,'Only the create panel is wider: '+JSON.stringify({width,create:box.width,saved:savedWidth}));
+   assert(Math.abs(name.y-address.y)<2&&Math.abs(address.y-lookup.y)<2,'Name, address and Autofill share one row at '+width);
+  } else if(width===390){
+   assert(Math.abs(name.y-lookup.y)<2&&name.y<address.y&&address.width>name.width,'Phone name and Autofill share a row above a full-width address');
+  } else {
+   assert(name.y<address.y&&address.y<lookup.y,'Stack fields and action on narrow phones');
+  }
+  await snap('calendar-create-'+width);
+ }
  await page.setViewportSize({width:390,height:844});await navigate('/admin/calendar');await page.getByRole('button',{name:'Add event',exact:true}).click();
  const event=page.getByRole('dialog',{name:'New event',exact:true});await event.getByRole('button',{name:'Create place',exact:true}).click();
  const create=page.getByRole('dialog',{name:'Create place',exact:true});await create.getByLabel('Place name',{exact:true}).fill('Bahamas');await create.getByRole('button',{name:'Autofill place',exact:true}).click();
@@ -87,7 +114,18 @@ let browser,page;
  }
  await page.setViewportSize({width:820,height:1180});const person=profiles().find(p=>p.title==='Worldwide person');await navigate('/admin/people/'+person.id+'/edit?tab=properties');
  await page.getByRole('button',{name:'Add occupation',exact:true}).click();await page.getByRole('combobox',{name:'Job 1 organization',exact:true}).click();await page.getByRole('button',{name:'Create organization',exact:true}).click();
- const inline=page.getByRole('dialog',{name:'New organization',exact:true});await inline.getByRole('textbox',{name:'Organization name',exact:true}).fill('Worldwide employer');await inline.getByRole('button',{name:'Find a place worldwide',exact:true}).click();
+ const inline=page.getByRole('dialog',{name:'New organization',exact:true});
+ const employerName=inline.getByRole('textbox',{name:'Organization name',exact:true});
+ await employerName.fill('Worldwide employer');
+ await inline.getByRole('button',{name:'Add organization picture',exact:true}).click();
+ const picture=page.getByRole('dialog',{name:'Worldwide employer',exact:true});
+ await expect(picture).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(picture).toHaveCount(0);
+ await expect(inline).toBeVisible();
+ await expect(employerName).toHaveValue('Worldwide employer');
+ await expect(inline.getByText('Discard this organization draft?')).toHaveCount(0);
+ await inline.getByRole('button',{name:'Find a place worldwide',exact:true}).click();
  const nested=page.getByRole('dialog',{name:'Find a place',exact:true});await nested.getByRole('textbox',{name:'Place name',exact:true}).fill('Tokyo');await nested.getByRole('button',{name:'Autofill place',exact:true}).click();await page.getByRole('dialog',{name:'Matching places',exact:true}).getByRole('button',{name:/^Tokyo /}).click();await snap('inline-organization-place');await nested.getByRole('button',{name:'Use saved place',exact:true}).click();await expect(nested).toHaveCount(0);
  await inline.getByRole('button',{name:'Save organization',exact:true}).click();await expect(inline).toHaveCount(0);await expect.poll(()=>profiles().some(p=>p.title==='Worldwide employer')).toBeTruthy();assert.equal(profiles().find(p=>p.title==='Worldwide employer').profile.locations[0].placeId,state().places.find(p=>p.name==='Tokyo').id);assert.equal(state().places.length,3);
  assert.deepEqual(errors,[]);console.log('PASS local WebKit: Map create/edit, worldwide lookup, explicit choice, area labels, cancellation, stale/error recovery, mobile Calendar create/link, coordinate-only preservation, People and Organization create/profile reload, nested employer creation at tablet size, saved-place reuse, auth/CSRF and private responses.');
