@@ -46,6 +46,26 @@ export function transactionInBudget(transaction: FinanceTransactionRecord, budge
   return transaction.direction === "expense" && transaction.entityScope === budget.entityScope && transaction.occurredOn.startsWith(budget.period)
     && (budget.categoryGroup ? financeSpendingGroup(transaction.category) === budget.categoryGroup : transaction.category.toLowerCase() === budget.category.toLowerCase());
 }
+export function overviewCategoryBudget(state: FinanceState, category: string, scopes: string[], from: string, to: string, filters: OverviewFilters) {
+  // A range does not prorate a monthly allowance. Keep budget usage on its saved
+  // month/scope, independent of a merchant search or an account-only chart view.
+  const candidates = state.budgets.filter(b => !b.archivedAt && scopes.includes(b.entityScope)
+    && b.period >= from.slice(0,7) && b.period <= to.slice(0,7) && (!filters.budget || b.id === filters.budget)
+    && (b.categoryGroup ? b.categoryGroup === financeSpendingGroup(category) : b.category.toLowerCase() === category.toLowerCase()));
+  const slots = new Map<string, typeof candidates>();
+  candidates.forEach(b => { const key = `${b.period}:${b.entityScope}`; slots.set(key, [...(slots.get(key) || []), b]); });
+  const budgets: typeof candidates = [];
+  for (const slot of slots.values()) {
+    const exact = slot.filter(b => !b.categoryGroup), choices = exact.length ? exact : slot;
+    if (choices.length !== 1) return { kind: "ambiguous" as const, limit: 0, spent: 0, percent: null, shared: false, periods: [] as string[] };
+    budgets.push(choices[0]);
+  }
+  if (!budgets.length) return { kind: "missing" as const, limit: 0, spent: 0, percent: null, shared: false, periods: [] as string[] };
+  const limit = budgets.reduce((sum,b) => sum + Math.round(b.limit * 100), 0) / 100;
+  const spent = state.transactions.filter(t => !t.archivedAt && (filters.status === "all" || t.status === filters.status) && budgets.some(b => transactionInBudget(t,b)))
+    .reduce((sum,t) => sum + Math.round(t.amount * 100),0) / 100;
+  return { kind: "available" as const, limit, spent, percent: limit > 0 ? spent / limit * 100 : null, shared: budgets.some(b => !!b.categoryGroup), periods: [...new Set(budgets.map(b => b.period))].sort() };
+}
 export function buildFinanceOverview(state: FinanceState, filters: OverviewFilters, query = "") {
   const accounts = state.accounts.filter(a => !a.archivedAt);
   const accountNames = new Map(state.accounts.map(a => [a.id, a.name]));
@@ -77,7 +97,9 @@ export function buildFinanceOverview(state: FinanceState, filters: OverviewFilte
     const item = grouped.get(t.category) || { category: t.category, amount: 0, count: 0 };
     item.amount += cents(t.amount); item.count++; grouped.set(t.category, item);
   });
-  const spendingGroups = [...grouped.values()].map(g => ({ ...g, amount: g.amount / 100 })).sort((a, b) =>
+  const spendingGroups = [...grouped.values()].map(g => ({ ...g, amount: g.amount / 100,
+    budgetUsage: overviewCategoryBudget(state, g.category, [...new Set(transactions.filter(t=>t.direction === "expense" && t.category === g.category).map(t=>t.entityScope))], from, to, filters)
+  })).sort((a, b) =>
     (filters.spendingSort === "name" ? a.category.localeCompare(b.category) : filters.spendingSort === "count" ? b.count - a.count : filters.spendingSort === "amount-asc" ? a.amount - b.amount : b.amount - a.amount) || a.category.localeCompare(b.category));
   // Plot only the observed span: an unobserved month is never presented as zero spending.
   const plotFrom = from > first ? from : first, plotTo = to < latest ? to : latest;

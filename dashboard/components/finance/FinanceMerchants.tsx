@@ -2,7 +2,7 @@
 import {createContext,useContext,useState,useEffect,useRef,type ReactNode} from "react";
 import Link from "next/link";
 import {buildJsonHeadersWithCsrf} from "../../lib/client-csrf";
-import {financeOrganization,financeMerchantLinks,type FinanceMerchantsData} from "../../lib/modules/finance/merchants";
+import {financeOrganization,financeMerchantLinks,financeMerchantMark,type FinanceMerchantsData} from "../../lib/modules/finance/merchants";
 import type {FinanceTransactionRecord} from "../../lib/modules/finance/native-types";
 import type {ObjectLink} from "../../lib/native-objects/links";
 import {PeopleProfileAvatar} from "../people/PeopleProfilePhoto";
@@ -37,7 +37,12 @@ export function FinanceMerchantsProvider({initial,transactions,children}:{initia
  return <Context.Provider value={{organizations,links,setOrganizations,link,unlink}}>{children}</Context.Provider>;
 }
 function useMerchant(kind:Kind,id?:string){const context=useFinanceMerchants();const link=context.links.filter(item=>item.source.objectType===kind&&item.source.objectId===id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];return {context,link,organization:context.organizations.find(item=>item.id===link?.target.objectId)};}
-export default function FinanceMerchantAvatar({kind,id,label}:{kind:Kind;id:string;label:string}){const {organization}=useMerchant(kind,id);return <span className={styles.merchantAvatar}>{organization?<PeopleProfileAvatar organization label={organization.title} initials={organization.title.slice(0,2)} photoUrl={organization.photoUrl} photoUpdatedAt={organization.photoUpdatedAt} compact/>:<UnigentamosIcon role="organization" size={21}/>}</span>;}
+export default function FinanceMerchantAvatar({kind,id,label}:{kind:Kind;id:string;label:string}){
+ const {organization}=useMerchant(kind,id),mark=financeMerchantMark(organization),[failed,setFailed]=useState("");
+ return <span className={styles.merchantAvatar} data-brand-mark={!!mark && failed!==mark || undefined} aria-label={label}>
+  {mark && failed!==mark ? <img src={`/finance-logos/${mark}`} alt="" loading="lazy" decoding="async" onError={()=>setFailed(mark)}/> : organization?<PeopleProfileAvatar organization label={organization.title} initials={organization.title.slice(0,2)} photoUrl={organization.photoUrl} photoUpdatedAt={organization.photoUpdatedAt} compact/>:<UnigentamosIcon role="organization" size={21}/>}
+ </span>;
+}
 export function FinanceOrganizationField({kind,recordId}:{kind:Kind;recordId?:string}){
  const {context,organization}=useMerchant(kind,recordId);const [value,setValue]=useState(organization?.id || ''),[create,setCreate]=useState(false);
  return <div className={styles.organizationField}><span>Organization <small>(optional)</small></span><div><SelectField aria-label="Merchant organization" name="merchantOrganizationId" searchable value={value} onChange={event=>setValue(event.target.value)}><option value="">No organization</option>{context.organizations.map(org=><option key={org.id} value={org.id}>{org.title}</option>)}</SelectField><button type="button" title="Create organization" aria-label="Create organization" onClick={()=>setCreate(true)} data-icon-button="standard"><UnigentamosIcon role="plus" size={18}/></button></div>{create&&<InlineOrganizationDialog existingIds={context.organizations.map(org=>org.id)} existingNames={context.organizations.map(org=>org.title)} returnLabel="Finance draft" onClose={()=>setCreate(false)} onSaved={(record,records)=>{context.setOrganizations(records.filter(item=>item.className==='org'&&!item.archivedAt).map(financeOrganization));setValue(record.id);setCreate(false);}}/>}</div>;
