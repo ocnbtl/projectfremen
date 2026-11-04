@@ -103,8 +103,22 @@ export async function createNativeObjectRelationship(input: {
         target,
         relationship
       }));
-      if (existing) return { value: state, result: { item: existing, created: false }, changed: false };
       const now = new Date().toISOString();
+      // Explicit Finance choices win even if an automatic match was just saved
+      // and the caller has not received that link yet.
+      const merchant = source.module === "finance" && ["transaction", "bill"].includes(source.objectType)
+        && target.module === "people" && target.objectType === "organization" && relationship === "merchant";
+      const links = merchant ? state.links.map(link =>
+        link.id !== existing?.id && link.status === "active" && link.provenance === "inferred"
+          && link.source.module === source.module && link.source.objectType === source.objectType
+          && link.source.objectId === source.objectId && link.relationship === relationship
+          ? markObjectLinkRemoved(link, { removedAt: now, removedBy: actorId }) : link) : state.links;
+      if (existing) {
+        const item = merchant && existing.provenance === "inferred"
+          ? { ...existing, provenance: "manual" as const, updatedAt: now, updatedBy: actorId } : existing;
+        return { value: { ...state, links: links.map(link => link.id === item.id ? item : link) },
+          result: { item, created: false }, changed: item !== existing || links.some((link, i) => link !== state.links[i]) };
+      }
       const item = createObjectLink({
         id: crypto.randomUUID(),
         source,
@@ -117,11 +131,33 @@ export async function createNativeObjectRelationship(input: {
         updatedBy: actorId
       });
       return {
-        value: { ...state, links: [...state.links, item] },
+        value: { ...state, links: [...links, item] },
         result: { item, created: true }
       };
     }
   );
+}
+
+/** Resolve against current links inside the same lock/CAS as the append. History
+ * (including removed links) blocks inference; an explicit choice is never undone. */
+export async function createInferredObjectRelationships(
+  resolve: (links: readonly ObjectLink[]) => Array<{ source: NativeObjectRef; target: NativeObjectRef; relationship: string }>,
+  actorId: string
+): Promise<number> {
+  return mutateJsonFile<NativeObjectLinksState, number>(FILE_NAME, EMPTY_STATE, raw => {
+    const state = normalizedState(raw);
+    const links = [...state.links];
+    for (const candidate of resolve(state.links)) {
+      const source = reference(candidate.source, "source"), target = reference(candidate.target, "target");
+      if (links.some(link => link.source.module === source.module && link.source.objectType === source.objectType
+        && link.source.objectId === source.objectId && link.relationship === candidate.relationship)) continue;
+      const now = new Date().toISOString();
+      links.push(createObjectLink({ id: crypto.randomUUID(), source, target, relationship: candidate.relationship,
+        provenance: "inferred", createdAt: now, createdBy: actorId, updatedAt: now, updatedBy: actorId }));
+    }
+    const count = links.length - state.links.length;
+    return { value: { ...state, links }, result: count, changed: count > 0 };
+  });
 }
 
 export async function removeNativeObjectRelationship(input: {

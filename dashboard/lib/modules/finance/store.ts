@@ -45,6 +45,7 @@ import type { BankAccount, BankTransaction } from "./banking-types";
 import type { CoinbaseSnapshot } from "./coinbase-types";
 import { applyCoinbasePortfolio, unlinkCoinbasePortfolio } from "./coinbase-ledger";
 import { buildFinancePlan, financeSpendingGroup } from "./planning";
+import { linkNewTransactionMerchants } from "./merchant-matching-store";
 
 const FILE_NAME = "finance.json";
 const MAX_AUDIT_EVENTS = 4000;
@@ -344,12 +345,21 @@ export async function applyFinancePlan(rawInput: unknown, options: { actorId?: s
 async function mutateFinanceState<Result>(
   mutate: (state: FinanceState) => Promise<{ state: FinanceState; result: Result; changed?: boolean }>
 ): Promise<Result> {
-  return mutateJsonFile<unknown, Result>(FILE_NAME, createEmptyFinanceState(), async (value) => {
+  const committed = await mutateJsonFile<unknown, { result: Result; state: FinanceState; newIds: Set<string> }>(FILE_NAME, createEmptyFinanceState(), async (value) => {
     const persisted = assertState(value);
     const state = pruneExpiredImportPreviews(persisted);
+    const existingIds = new Set(state.transactions.map(row => row.id));
     const outcome = await mutate(state);
-    return { value: outcome.state, result: outcome.result, changed: state !== persisted || outcome.changed };
+    const newIds = new Set(outcome.state.transactions.filter(row => !existingIds.has(row.id)).map(row => row.id));
+    return { value: outcome.state, result: { result: outcome.result, state: outcome.state, newIds }, changed: state !== persisted || outcome.changed };
   });
+  // The financial commit is already durable. An optional identity-link failure
+  // must never report that commit as failed and encourage duplicate submissions.
+  if (committed.newIds.size) {
+    try { await linkNewTransactionMerchants(committed.state, committed.newIds); }
+    catch { console.warn("Finance merchant auto-link unavailable; financial save completed. Link manually in Finance."); }
+  }
+  return committed.result;
 }
 
 export async function connectFinanceBankAccounts(connectionId: string, institution: string, accounts: BankAccount[], choices: Record<string, string>) {

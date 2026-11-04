@@ -22,6 +22,7 @@
     "test:finance-overview": "node ./scripts/finance-overview-harness.cjs",
     "test:finance-planning": "node ./scripts/finance-planning-harness.cjs",
     "test:finance-banking": "node ./scripts/finance-banking-harness.cjs",
+    "test:finance-merchants": "node ./scripts/finance-merchant-matching-harness.cjs",
     "test:finance-investments": "node ./scripts/finance-investments-harness.cjs",
     "test:finance-coinbase": "node ./scripts/finance-coinbase-harness.cjs",
     "test:people-transfer": "node ./scripts/people-transfer-harness.cjs",

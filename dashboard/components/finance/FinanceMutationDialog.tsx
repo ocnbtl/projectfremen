@@ -395,7 +395,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
       const savedId = String(result.data.item.id);
       try {
         if (organizationId) await merchants.link(kind, savedId, String(result.data.item.merchant || result.data.item.name || "Merchant"), organizationId);
-        else for (const link of merchants.links.filter(item => item.source.objectType === kind && item.source.objectId === savedId)) await merchants.unlink(link.id);
+        else if (operation === "edit") for (const link of merchants.links.filter(item => item.source.objectType === kind && item.source.objectId === savedId)) await merchants.unlink(link.id);
       } catch { message += " The organization link could not be updated. Open the record to try linking it again."; }
     }
     idempotencyKeyRef.current = "";

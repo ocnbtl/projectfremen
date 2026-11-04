@@ -1,8 +1,9 @@
 "use client";
-import {createContext,useContext,useState,type ReactNode} from "react";
+import {createContext,useContext,useState,useEffect,useRef,type ReactNode} from "react";
 import Link from "next/link";
 import {buildJsonHeadersWithCsrf} from "../../lib/client-csrf";
-import {financeOrganization,type FinanceMerchantsData} from "../../lib/modules/finance/merchants";
+import {financeOrganization,financeMerchantLinks,type FinanceMerchantsData} from "../../lib/modules/finance/merchants";
+import type {FinanceTransactionRecord} from "../../lib/modules/finance/native-types";
 import type {ObjectLink} from "../../lib/native-objects/links";
 import {PeopleProfileAvatar} from "../people/PeopleProfilePhoto";
 import InlineOrganizationDialog from "../people/InlineOrganizationDialog";
@@ -12,11 +13,26 @@ import styles from "./FinanceDetails.module.css";
 type Kind="transaction"|"bill";
 const Context=createContext({organizations:[] as FinanceMerchantsData["organizations"],links:[] as ObjectLink[],setOrganizations:(_items:FinanceMerchantsData["organizations"])=>{},link:async(_kind:Kind,_id:string,_label:string,_organization:string)=>{},unlink:async(_id:string)=>{}});
 export const useFinanceMerchants=()=>useContext(Context);
-export function FinanceMerchantsProvider({initial,children}:{initial:FinanceMerchantsData;children:ReactNode}){
+export function FinanceMerchantsProvider({initial,transactions,children}:{initial:FinanceMerchantsData;transactions:FinanceTransactionRecord[];children:ReactNode}){
  const [organizations,setOrganizations]=useState(initial.organizations),[links,setLinks]=useState(initial.links);
- async function unlink(id:string){const response=await fetch('/api/native-links',{method:'DELETE',headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({id,reason:'Changed merchant organization in Finance'})});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'Could not unlink organization');setLinks(current=>current.filter(item=>item.id!==id));}
- async function link(kind:Kind,id:string,label:string,organizationId:string){const org=organizations.find(item=>item.id===organizationId);if(!org)throw new Error('Choose an available organization');const existing=links.filter(item=>item.source.objectType===kind&&item.source.objectId===id);if(existing.length===1&&existing[0].target.objectId===org.id)return;
- const response=await fetch('/api/native-links',{method:'POST',headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({source:{module:'finance',objectType:kind,objectId:id,label,route:`/admin/finance/${kind==='bill'?'bills':'transactions'}?selected=${encodeURIComponent(id)}`},target:{module:'people',objectType:'organization',objectId:org.id,label:org.title,route:'/admin/people/'+encodeURIComponent(org.id)},relationship:'merchant'})});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'Could not link organization');setLinks(current=>[...current.filter(item=>item.id!==data.item.id),data.item]);for(const old of existing.filter(item=>item.target.objectId!==org.id))await unlink(old.id);
+ const knownIds=useRef(new Set(transactions.map(row=>row.id)));
+ const refreshVersion=useRef(0);
+ useEffect(()=>()=>{refreshVersion.current++;},[]);
+ useEffect(()=>{setOrganizations(initial.organizations);setLinks(initial.links);},[initial]);
+ useEffect(()=>{
+  const added=transactions.some(row=>!knownIds.current.has(row.id));
+  knownIds.current=new Set(transactions.map(row=>row.id));
+  if(!added)return;
+  const version=++refreshVersion.current;
+  // Refresh identities once after an addition/import; no polling or page-load requests.
+  void fetch('/api/native-links',{cache:'no-store'}).then(async response=>{
+   const data=await response.json();if(response.ok&&data.ok&&Array.isArray(data.items)&&version===refreshVersion.current)setLinks(financeMerchantLinks(data.items));
+  }).catch(()=>{/* The financial save succeeded; identities can be reloaded later. */});
+ },[transactions]);
+ async function unlink(id:string){refreshVersion.current++;const response=await fetch('/api/native-links',{method:'DELETE',headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({id,reason:'Changed merchant organization in Finance'})});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'Could not unlink organization');setLinks(current=>current.filter(item=>item.id!==id));}
+ async function link(kind:Kind,id:string,label:string,organizationId:string){const org=organizations.find(item=>item.id===organizationId);if(!org)throw new Error('Choose an available organization');const existing=links.filter(item=>item.source.objectType===kind&&item.source.objectId===id);if(existing.length===1&&existing[0].target.objectId===org.id&&existing[0].provenance==='manual')return;
+ refreshVersion.current++;
+ const response=await fetch('/api/native-links',{method:'POST',headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({source:{module:'finance',objectType:kind,objectId:id,label,route:`/admin/finance/${kind==='bill'?'bills':'transactions'}?selected=${encodeURIComponent(id)}`},target:{module:'people',objectType:'organization',objectId:org.id,label:org.title,route:'/admin/people/'+encodeURIComponent(org.id)},relationship:'merchant'})});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'Could not link organization');setLinks(current=>[...current.filter(item=>item.id!==data.item.id&&!(item.source.objectType===kind&&item.source.objectId===id&&item.provenance==='inferred')),data.item]);for(const old of existing.filter(item=>item.target.objectId!==org.id))await unlink(old.id);
  }
  return <Context.Provider value={{organizations,links,setOrganizations,link,unlink}}>{children}</Context.Provider>;
 }

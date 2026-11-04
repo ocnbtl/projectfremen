@@ -853,7 +853,7 @@ export default function FinanceWorkspace({
   }
 
   return (
-    <FinanceMerchantsProvider initial={initialMerchants}><ModuleShell
+    <FinanceMerchantsProvider initial={initialMerchants} transactions={financeState.transactions}><ModuleShell
       detailOpen={inspectorOpen || showContext}
       onBack={closeInspector}
       module="finance"
