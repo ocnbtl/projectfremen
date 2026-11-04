@@ -4779,7 +4779,7 @@ export default function PeopleWorkspace({
                 </div>
               </section>
             ) : detailMode === "workspace" ? (
-              <PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving}/>
+              <PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} projectRecords={projectsState.projects} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving}/>
             ) : (
               <section className="people-overview-grid">
                 <section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">

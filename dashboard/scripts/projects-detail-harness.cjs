@@ -21,10 +21,41 @@ let browser,page;
  page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route(/^https:\/\//,r=>r.abort());
  await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/admin/projects');await page.getByRole('searchbox').fill('Community garden');await page.getByRole('button',{name:'Open Community garden',exact:true}).click();
  const photoButton=()=>page.getByRole('button',{name:/profile picture for Community garden/});await photoButton().click();
- const image=await sharp({create:{width:700,height:500,channels:3,background:'#527e51'}}).png().toBuffer();
- await page.locator('.people-photo-dialog input[type=file]').first().setInputFiles({name:'garden.png',mimeType:'image/png',buffer:image});await page.getByRole('button',{name:'Save picture',exact:true}).click();await page.locator('.people-photo-dialog').waitFor({state:'hidden'});
+ // The two end caps of this wide, padded logo disappear under the old square crop.
+ const image=await sharp(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="840" height="360"><rect width="840" height="360" fill="#fff"/><path fill="#e51a19" d="M46 106h170v148H46z"/><path fill="#225ec6" d="M216 106h408v148H216z"/><path fill="#18b451" d="M624 106h170v148H624z"/></svg>')).png().toBuffer();
+ await page.locator('.people-photo-dialog input[type=file]').first().setInputFiles({name:'garden.png',mimeType:'image/png',buffer:image});await page.getByRole('button',{name:'Remove solid background'}).click();await page.getByRole('button',{name:'Restore original background'}).waitFor();await page.getByRole('button',{name:'Save picture',exact:true}).click();await page.locator('.people-photo-dialog').waitFor({state:'hidden'});
  await expect.poll(async()=>Boolean((await read()).photoUpdatedAt)).toBe(true);
  const firstImage=await context.request.get(base+photoPath);assert.equal(firstImage.status(),200);assert.equal((await context.request.get(base+photoPath,{headers:{'if-none-match':firstImage.headers().etag}})).status(),304);
+ const backgroundAlpha=async response=>{const {data,info}=await sharp(await response.body()).ensureAlpha().raw().toBuffer({resolveWithObject:true});return data[(Math.floor(info.height/2)*info.width+2)*4+3];};
+ assert.equal(await backgroundAlpha(firstImage),0,'pasted matte becomes transparent');
+ const preservedSource=(await(await context.request.get(base+photoPath+'?edit=1')).json()).source;
+ const legacy=(await post({family:'projects',input:{name:'Legacy wide mark',description:'Previous upload format'}})).item;
+ const oldPath=base+'/api/projects/photos/'+legacy.id;
+ const oldUpload=await context.request.post(oldPath,{headers,multipart:{source:{name:'legacy.png',mimeType:'image/png',buffer:image},crop:JSON.stringify({zoom:1,panX:0,panY:0,outputSize:512})}});assert(oldUpload.ok(),await oldUpload.text());
+ const oldDisplay=await context.request.get(oldPath);
+ const {data:legacyPixels,info:legacySize}=await sharp(await oldDisplay.body()).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+ const cap=x=>Array.from(legacyPixels.subarray((256*legacySize.width+x)*4,(256*legacySize.width+x)*4+4));
+ assert(cap(55)[0]>180&&cap(55)[1]<60&&cap(457)[1]>140&&cap(457)[0]<55,'previously pasted default logo recovers both ends');
+ assert.equal((await(await context.request.get(oldPath+'?edit=1')).json()).crop.fit,'contain');
+ assert.equal((await context.request.get(oldPath,{headers:{'if-none-match':oldDisplay.headers().etag}})).status(),304);
+ const checkLogo=async frame=>{
+  const img=frame.locator('img');await expect.poll(()=>img.evaluate(el=>el.complete&&el.naturalWidth>0)).toBe(true);
+  const painted=await img.evaluate((el)=>{const result=[];for(let n=el;n;n=n.parentElement){const s=getComputedStyle(n);result.push([s.backgroundColor,s.backgroundImage]);if(n.matches('button,.resource-card-picture'))break;}return result;});
+  for(const [color,background] of painted){assert.equal(color,'rgba(0, 0, 0, 0)','logo frame should not paint a disc');assert.equal(background,'none');}
+  const {data:rgb,info}=await sharp(await frame.screenshot({animations:'disabled'})).removeAlpha().raw().toBuffer({resolveWithObject:true});
+  let left=info.width,right=-1;
+  for(let y=0;y<info.height;y++)for(let x=0;x<info.width;x++){const i=(y*info.width+x)*info.channels,[r,g,b]=rgb.subarray(i,i+3);if(r>160&&g<65&&b<65)left=Math.min(left,x);if(g>115&&r<65&&b<115)right=Math.max(right,x);}
+  assert((right-left)/info.width>.78,'both ends should fill the slot without clipping');
+  assert(Math.abs(left-(info.width-1-right))<info.width*.1,'mark should be horizontally centered');
+ };
+ for(const width of [390,1440]){
+  await page.setViewportSize({width,height:950});await page.goto(base+'/admin/projects');await page.getByRole('searchbox').fill('Community garden');
+  const row=page.getByRole('listitem',{name:'Community garden',exact:true});await checkLogo(row.locator('.resource-card-picture'));
+  await row.click();await page.mouse.move(0,0);await checkLogo(photoButton());
+ }
+ await photoButton().click();await page.getByRole('button',{name:/Adjust crop/}).click();await page.getByRole('button',{name:'Restore original background'}).click();await page.getByRole('button',{name:'Remove solid background'}).waitFor();await page.getByRole('button',{name:'Save picture',exact:true}).click();await page.locator('.people-photo-dialog').waitFor({state:'hidden'});
+ assert.equal(await backgroundAlpha(await context.request.get(base+photoPath)),255,'original backdrop is restorable');
+ assert.equal((await(await context.request.get(base+photoPath+'?edit=1')).json()).source,preservedSource,'original source is unchanged');
  await photoButton().click();await page.getByRole('button',{name:/Adjust crop/}).click();await page.locator('.people-photo-editor').waitFor();const zoom=page.locator('.people-photo-editor input[type=range]').first();await zoom.fill('1.5');await page.getByRole('button',{name:'Save picture',exact:true}).click();await page.locator('.people-photo-dialog').waitFor({state:'hidden'});
  const edit=(await(await context.request.get(base+photoPath+'?edit=1')).json());assert.equal(edit.crop.zoom,1.5);assert(edit.source.startsWith('data:image/'));
  const stale=await context.request.patch(base+photoPath,{headers,data:{crop:{zoom:1,panX:0,panY:0,outputSize:512},expectedUpdatedAt:'2000-01-01T00:00:00Z'}});assert.equal(stale.status(),409);

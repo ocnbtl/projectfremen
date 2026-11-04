@@ -3273,7 +3273,7 @@ export default function ProjectsWorkspace({
         else setInspectorOpen(false);
       }} aria-label="Close open Projects panel" />}
 
-      {photoItem && <PeopleProfilePhotoDialog open personId={photoItem.project.id} personName={photoItem.project.name} hasPhoto={Boolean(photoItem.project.photoUpdatedAt)} photoEndpoint={`/api/projects/photos/${encodeURIComponent(photoItem.project.id)}`} cropDescription="Drag to reposition and adjust the zoom. This crop appears on your project and its directory card." onClose={() => setPhotoProjectId(null)} onSaved={photo => saveProjectPhoto(photoItem, photo.updatedAt)} onRemoved={() => saveProjectPhoto(photoItem, "")} />}
+      {photoItem && <PeopleProfilePhotoDialog open projectLogo personId={photoItem.project.id} personName={photoItem.project.name} hasPhoto={Boolean(photoItem.project.photoUpdatedAt)} photoEndpoint={`/api/projects/photos/${encodeURIComponent(photoItem.project.id)}`} cropDescription="Drag to reposition or adjust the zoom. This crop appears wherever the project is linked." onClose={() => setPhotoProjectId(null)} onSaved={photo => saveProjectPhoto(photoItem, photo.updatedAt)} onRemoved={() => saveProjectPhoto(photoItem, "")} />}
       <ConfirmationSheet
         open={discardOpen}
         onOpenChange={setDiscardOpen}

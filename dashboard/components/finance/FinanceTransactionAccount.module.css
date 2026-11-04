@@ -12,11 +12,22 @@
 .balance {display:grid;gap:2px;margin-top:12px;padding:12px;border-radius:10px;background:#edf6f0;}
 .balance strong {font-size:21px;font-weight:600;}
 .panel ul {list-style:none;padding:0;margin:0;display:grid;gap:8px;}
-.panel li {display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:8px;}
-.panel li>span:first-child {width:32px;height:32px;}
-.panel li>span:nth-child(2) {display:grid;}
+.activity {display:grid;grid-template-columns:32px minmax(0,1fr) auto 15px;align-items:center;gap:7px;width:100%;min-height:46px;padding:5px 4px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:start;cursor:pointer;}
+.activity>span:first-child {width:32px;height:32px;}
+.activity>span:nth-child(2) {display:grid;}
+.activity>svg {color:#50685d;}
+.back {display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 6px;margin-inline-start:-6px;border:0;border-radius:8px;background:transparent;color:#155b3c;font:600 13px/1.4 var(--font-body,sans-serif);cursor:pointer;}
+.activity:active,.back:active {background:#e2efe7;}
+@media(hover:hover){.activity:hover,.back:hover {background:#edf6f0;}}
+.activity:focus-visible,.back:focus-visible {outline:2px solid #0a5a36;outline-offset:1px;}
+.facts {display:grid;margin:10px 0 0;}
+.facts div {display:grid;grid-template-columns:minmax(62px,.4fr) minmax(0,1fr);gap:8px;padding:7px 0;border-bottom:1px solid #e0e9e3;}
+.facts dt {color:#50685d;}
+.facts dd {margin:0;text-align:end;overflow-wrap:anywhere;}
+.memo p {white-space:pre-wrap;overflow-wrap:anywhere;}
 .panel li b {font:550 13px/1.4 var(--font-body,sans-serif);}
 .panel .full {display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;margin-top:14px;border-radius:9px;background:#0a5a36;color:white;font-weight:600;text-decoration:none;}
 .panel .full:hover {background:#084b2d;}
 @media(pointer:coarse){.trigger.trigger{min-height:36px;}}
 @media(prefers-reduced-motion:no-preference){.panel[data-state=open]{animation:appear .16s ease-out;}@keyframes appear{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}}
+@media(prefers-reduced-motion:no-preference){.detail {animation:appear .14s ease-out;}}

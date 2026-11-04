@@ -21,6 +21,22 @@ const edits=await Promise.allSettled([cropPeopleProfilePhoto(id,{...centered,zoo
 assert.equal(edits.filter(x=>x.status==='fulfilled').length,1,'stale parallel edit rejected');
 for(const invalid of [{...centered,zoom:Infinity},{...centered,panX:2},{...centered,outputSize:999},{...centered,zoom:'2'}])await assert.rejects(()=>cropPeopleProfilePhoto(id,invalid,reset.updatedAt),/Invalid picture crop/);
 const transparent=await sharp({create:{width:100,height:100,channels:4,background:{r:0,g:0,b:0,alpha:0}}}).png().toBuffer();
+const logoId='project-00000000-0000-4000-8000-000000000002';
+for (const tall of [false,true]) {
+  const source=tall ? await sharp(original).rotate(90).png().toBuffer() : original;
+  const fitted=await cropPeopleProfilePhoto(logoId,{...centered,fit:'contain'},undefined,{mimeType:'image/png',bytes:source});
+  assert.equal(fitted.source.bytesBase64,source.toString('base64'));
+  assert.equal(fitted.crop.fit,'contain');
+  const {data,info}=await sharp(Buffer.from(fitted.bytesBase64,'base64')).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+  const pixel=(x,y)=>Array.from(data.subarray((y*info.width+x)*4,(y*info.width+x)*4+4));
+  assert.equal(pixel(0,0)[3],0,'letterbox is transparent');
+  assert.ok((tall?pixel(256,0):pixel(0,256))[0]>240,'first end reaches frame edge');
+  assert.ok((tall?pixel(256,511):pixel(511,256))[2]>240,'opposite end reaches frame edge');
+  const zoomed=await cropPeopleProfilePhoto(logoId,{...centered,fit:'contain',zoom:2,...(tall?{panY:-1}:{panX:-1})},fitted.updatedAt);
+  const colors=await sharp(Buffer.from(zoomed.bytesBase64,'base64')).stats();
+  assert.ok(colors.channels[0].mean>248 && colors.channels[2].mean<8,'saved crop follows the same pan as the preview');
+}
+await assert.rejects(()=>cropPeopleProfilePhoto(id,{...centered,fit:'contain'},reset.updatedAt),/Invalid picture crop/);
 const replacement=await cropPeopleProfilePhoto(id,centered,undefined,{mimeType:'image/png',bytes:transparent});
 assert.equal(replacement.source.bytesBase64,transparent.toString('base64'));assert.equal((await sharp(Buffer.from(replacement.bytesBase64,'base64')).stats()).isOpaque,false);
 await removePeopleProfilePhoto(id);assert.equal(await readPeopleProfilePhoto(id),null);

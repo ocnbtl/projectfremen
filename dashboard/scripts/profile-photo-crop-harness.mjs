@@ -30,4 +30,18 @@ for (const [sourceWidth, sourceHeight] of [[1200, 1200], [2400, 1200], [1200, 24
     near(Math.abs(reversed.y - crop.y), crop.side * .01);
   }
 }
-console.log("Photo crop: square, portrait, landscape, pointer movement, focal zoom, edge clamping and reversal passed.");
+for (const [sourceWidth, sourceHeight] of [[1200, 400], [400, 1200]]) {
+  const fit = { sourceWidth, sourceHeight, fit: "contain", zoom: 1, panX: 0, panY: 0 };
+  const whole = photoCrop(fit);
+  near(whole.side, 1200);
+  near(whole.x, (sourceWidth - 1200) / 2);
+  near(whole.y, (sourceHeight - 1200) / 2);
+  const zoomed = zoomPhotoCrop(fit, 2, .25, .75);
+  const crop = photoCrop(zoomed);
+  near(whole.x + .25 * whole.side, crop.x + .25 * crop.side);
+  near(whole.y + .75 * whole.side, crop.y + .75 * crop.side);
+  const moved = photoCrop(movePhotoCrop(zoomed, .1, -.1));
+  near(moved.x, crop.x - crop.side * .1);
+  near(moved.y, crop.y + crop.side * .1);
+}
+console.log("Photo crop: square, portrait, landscape, whole-logo fit, pointer movement, focal zoom, edge clamping and reversal passed.");

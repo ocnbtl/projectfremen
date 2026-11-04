@@ -84,10 +84,41 @@ const ready=new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()
  const action=preview.getByRole('link',{name:'View full account'});await expect(action).toHaveAttribute('href','/admin/finance/accounts?selected='+acct.id);
  const bounds=await action.boundingBox();assert(bounds.x>=0&&bounds.x+bounds.width<=390&&bounds.height>=44,'Account action fits phone');
  await mobile.screenshot({path:path.join(output,'transaction-account-preview-phone.png')});
+ const previewRequests=[];
+ const watchPreview=r=>{if(new URL(r.url()).pathname.startsWith('/api/'))previewRequests.push(r.method()+' '+new URL(r.url()).pathname);};
+ mobile.on('request',watchPreview);
+ for(const [index,activity] of recent.entries()){
+   const button=preview.locator('li').nth(index).getByRole('button');
+   await button.scrollIntoViewIfNeeded();
+   const previewScroll=await preview.evaluate(el=>el.scrollTop);
+   if(index===1){await button.focus();await mobile.keyboard.press('Enter');}
+   else await button.tap();
+   const transactionPreview=mobile.getByRole('dialog',{name:activity.merchant,exact:true});
+   const back=transactionPreview.getByRole('button',{name:'Back to account',exact:true});
+   await expect(back).toBeFocused();
+   await expect(back.locator('svg')).toHaveAttribute('data-icon-role','back');
+   const signed=(activity.direction==='expense'?'-':'+')+activity.amount.toLocaleString('en-US',{style:'currency',currency:'USD'});
+   for(const value of [signed,activity.category,activity.memo,acct.name,activity.status==='cleared'?'Posted':'Pending'])await expect(transactionPreview).toContainText(value);
+   assert.equal(mobile.url(),beforeURL,'Transaction detail preserves route and selected record');
+   if(index===0)await mobile.screenshot({path:path.join(output,'transaction-account-activity-phone.png'),animations:'disabled'});
+   if(index===1)await mobile.keyboard.press('Escape');
+   else await back.tap();
+   await expect(preview).toBeVisible();await expect(button).toBeFocused();
+   assert(Math.abs(await preview.evaluate(el=>el.scrollTop)-previewScroll)<=2,'Back preserves account activity scroll');
+ }
+ mobile.off('request',watchPreview);assert.deepEqual(previewRequests,[],'Preview navigation uses loaded records');
  await preview.getByRole('button',{name:'Close account preview'}).tap();await expect(preview).toBeHidden();assert.equal(mobile.url(),beforeURL);await expect(mobile.getByRole('searchbox').first()).toHaveValue('Google');
  await expect(trigger).toBeFocused();assert(Math.abs(beforeY-await trigger.evaluate(el=>el.getBoundingClientRect().top))<=2,'Closing preview preserves transaction scroll');
  await row.getByRole('button',{name:/^Inspect /}).tap();const detail=mobile.locator('#finance-inspector');
- await detail.getByRole('button',{name:'Preview account: '+acct.name}).last().tap();await expect(preview).toBeVisible();await mobile.keyboard.press('Escape');await expect(preview).toBeHidden();await expect(detail).toBeVisible();
+ const inspectorTrigger=detail.getByRole('button',{name:'Preview account: '+acct.name}).last();
+ await mobile.emulateMedia({reducedMotion:'reduce'});
+ await inspectorTrigger.tap();await expect(preview).toBeVisible();
+ await preview.locator('li').last().getByRole('button').tap();
+ const nested=mobile.getByRole('dialog',{name:recent[2].merchant,exact:true});
+ await expect(nested.getByRole('button',{name:'Back to account'})).toBeFocused();
+ assert.equal(await nested.locator('dl').evaluate(list=>getComputedStyle(list.parentElement).animationName),'none','Reduced-motion detail is immediate');
+ await mobile.keyboard.press('Escape');await expect(preview.locator('li').last().getByRole('button')).toBeFocused();
+ await mobile.keyboard.press('Escape');await expect(preview).toBeHidden();await expect(detail).toBeVisible();await expect(inspectorTrigger).toBeFocused();
  await detail.getByRole('button',{name:'Preview account: '+acct.name}).last().tap();await action.tap();await expect(mobile.locator('#finance-inspector').getByRole('heading',{name:acct.name,exact:true})).toBeVisible();assert.equal(new URL(mobile.url()).searchParams.get('selected'),acct.id);
  await phone.close();globalThis.qaPage=page;
  assert.deepEqual(errors.filter(e=>!e.includes('ResizeObserver loop')),[]);assert.deepEqual(writes,[]);assert.equal(fs.readFileSync(path.join(data,'finance.json'),'utf8'),before,'Financial data unchanged');console.log('PASS overview, budgets, transparent official marks, no-logo fallback, recent scroll/alignment, shared custom date editor, sorting, drilldown/return, 320/390/820/1440/3440 widths, reduced motion and empty state; no Finance writes.');

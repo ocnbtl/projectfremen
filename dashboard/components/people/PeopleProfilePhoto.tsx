@@ -7,6 +7,7 @@ import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { organizationLogoStyle } from "./organization-logo";
 import { movePhotoCrop, photoCrop, zoomPhotoCrop } from "../../lib/modules/people/photo-crop";
+import { clearLogoMatte } from "../../lib/modules/projects/logo-background";
 
 type PhotoMetadata = {
   url: string;
@@ -29,6 +30,8 @@ type PhotoEditorDraft = {
   panX: number;
   panY: number;
   outputSize: 256 | 512 | 1024;
+  fit?: "contain" | "cover";
+  clearMatte?: true;
   savedVersion?: string;
 };
 
@@ -146,6 +149,24 @@ function csrfHeadersWithoutJson(): Record<string, string> {
   return headers;
 }
 
+async function logoPreview(source: Blob, clear?: true) {
+  if (!clear) return source;
+  const bitmap = await createImageBitmap(source);
+  try {
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not preview the logo.");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    if (!clearLogoMatte(image.data, canvas.width, canvas.height)) throw new Error("No solid background found. Your picture is unchanged.");
+    ctx.putImageData(image, 0, 0);
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error("Could not preview the logo.")), "image/png"));
+  } finally { bitmap.close(); }
+}
+
 export default function PeopleProfilePhotoDialog({
   open,
   personId,
@@ -157,6 +178,7 @@ export default function PeopleProfilePhotoDialog({
   onRemoved,
   onPrepared,
   photoEndpoint,
+  projectLogo = false,
   cropDescription = "Drag to reposition and adjust the zoom. Your saved crop is used across People, Calendar, and Map."
 }: {
   open: boolean;
@@ -169,6 +191,7 @@ export default function PeopleProfilePhotoDialog({
   onRemoved: () => Promise<boolean>;
   onPrepared?: (dataUrl: string) => void;
   photoEndpoint?: string;
+  projectLogo?: boolean;
   cropDescription?: string;
 }) {
   const endpoint = photoEndpoint || `/api/people/photos/${encodeURIComponent(personId)}`;
@@ -233,7 +256,7 @@ export default function PeopleProfilePhotoDialog({
     onClose();
   }
 
-  async function beginEditing(source: Blob, initial?: { zoom: number; panX: number; panY: number; outputSize: PhotoEditorDraft["outputSize"]; savedVersion?: string }) {
+  async function beginEditing(source: Blob, initial?: Pick<PhotoEditorDraft, "zoom" | "panX" | "panY" | "outputSize" | "fit" | "clearMatte" | "savedVersion">) {
     if (saving) return;
     setError("");
     if (!source.type.startsWith("image/")) {
@@ -246,18 +269,38 @@ export default function PeopleProfilePhotoDialog({
     }
     try {
       const version = ++loadVersionRef.current;
+      if (projectLogo && !initial?.savedVersion) source = await preparePhotoSource(source);
+      const preview = await logoPreview(source, initial?.clearMatte);
       const bitmap = await createImageBitmap(source);
       const sourceWidth = bitmap.width;
       const sourceHeight = bitmap.height;
       bitmap.close();
       if (version !== loadVersionRef.current) return;
       releasePreview();
-      const previewUrl = URL.createObjectURL(source);
+      const previewUrl = URL.createObjectURL(preview);
       previewUrlRef.current = previewUrl;
-      setPhotoDraft({ source, previewUrl, sourceWidth, sourceHeight, zoom: 1, panX: 0, panY: 0, outputSize: 512, ...initial });
+      setPhotoDraft({ source, previewUrl, sourceWidth, sourceHeight, zoom: 1, panX: 0, panY: 0, outputSize: 512, fit: projectLogo ? "contain" : undefined, ...initial });
     } catch {
       setError("This browser could not open that picture.");
     }
+  }
+
+  async function toggleLogoBackground() {
+    if (!photoDraft || !projectLogo || loading || saving) return;
+    const version = ++loadVersionRef.current;
+    const clearMatte = photoDraft.clearMatte ? undefined : true;
+    setLoading(true);
+    setError("");
+    try {
+      const blob = await logoPreview(photoDraft.source, clearMatte);
+      if (loadVersionRef.current !== version) return;
+      releasePreview();
+      const previewUrl = URL.createObjectURL(blob);
+      previewUrlRef.current = previewUrl;
+      setPhotoDraft(d => d ? { ...d, clearMatte, previewUrl } : d);
+    } catch (e) {
+      if (version === loadVersionRef.current) setError(e instanceof Error ? e.message : "Could not preview the logo.");
+    } finally { if (version === loadVersionRef.current) setLoading(false); }
   }
 
   async function editCurrentPhoto() {
@@ -300,9 +343,9 @@ export default function PeopleProfilePhotoDialog({
         return;
       }
       const formData = new FormData();
-      const crop = { zoom: photoDraft.zoom, panX: photoDraft.panX, panY: photoDraft.panY, outputSize: photoDraft.outputSize };
+      const crop = { zoom: photoDraft.zoom, panX: photoDraft.panX, panY: photoDraft.panY, outputSize: photoDraft.outputSize, fit: photoDraft.fit, clearMatte: photoDraft.clearMatte };
       if (!photoDraft.savedVersion) {
-        formData.append("source", await preparePhotoSource(photoDraft.source), "profile-source.webp");
+        formData.append("source", projectLogo ? photoDraft.source : await preparePhotoSource(photoDraft.source), "profile-source.webp");
         formData.append("crop", JSON.stringify(crop));
       }
       const response = await fetch(endpoint, {
@@ -393,6 +436,7 @@ export default function PeopleProfilePhotoDialog({
           }
         }}
         onPaste={(event) => {
+          if (loading || saving) return;
           const image = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"))?.getAsFile();
           if (image) {
             event.preventDefault();
@@ -475,6 +519,7 @@ export default function PeopleProfilePhotoDialog({
             />
             <span className="people-photo-crop-grid" aria-hidden="true" />
           </div>
+          {projectLogo && <div className="people-photo-editor-meta"><button type="button" aria-pressed={!!photoDraft.clearMatte} disabled={saving || loading} onClick={() => void toggleLogoBackground()}>{photoDraft.clearMatte ? "Restore original background" : "Remove solid background"}</button></div>}
           <fieldset className="people-photo-editor-controls" disabled={saving}>
             <label>
               <span>Zoom</span>
@@ -488,7 +533,7 @@ export default function PeopleProfilePhotoDialog({
             <label><span>Vertical crop</span><input aria-label="Vertical crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panY} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panY: Number(event.target.value) } : current)} /></label>
             <label><span>Resize output</span><SelectField aria-label="Resize output" value={photoDraft.outputSize} onChange={(event) => setPhotoDraft((current) => current ? { ...current, outputSize: Number(event.target.value) as PhotoEditorDraft["outputSize"] } : current)}><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></SelectField></label>
           </fieldset>
-          <div className="people-photo-editor-meta"><span>{photoDraft.sourceWidth} × {photoDraft.sourceHeight} source</span><button type="button" disabled={saving} onClick={() => setPhotoDraft((current) => current ? { ...current, zoom: 1, panX: 0, panY: 0 } : current)}>Center crop</button></div>
+          <div className="people-photo-editor-meta"><span>{photoDraft.sourceWidth} × {photoDraft.sourceHeight} source</span><button type="button" disabled={saving} onClick={() => setPhotoDraft((current) => current ? { ...current, zoom: 1, panX: 0, panY: 0, fit: projectLogo ? "contain" : undefined } : current)}>{projectLogo ? "Fit whole logo" : "Center crop"}</button></div>
         </section>}
         <input
           ref={uploadInputRef}
@@ -517,8 +562,8 @@ export default function PeopleProfilePhotoDialog({
         {saving && <p className="people-photo-status" role="status">Preparing and saving picture…</p>}
         {photoDraft ? (
           <footer className="people-photo-editor-actions">
-            <button type="button" onClick={() => { releasePreview(); setPhotoDraft(null); }} disabled={saving}>Choose another</button>
-            <button type="button" className="is-primary" onClick={() => void uploadEditedPhoto()} disabled={saving}>{saving ? "Preparing…" : onPrepared ? "Use picture" : "Save picture"}</button>
+            <button type="button" onClick={() => { loadVersionRef.current++; releasePreview(); setPhotoDraft(null); }} disabled={saving || loading}>Choose another</button>
+            <button type="button" className="is-primary" onClick={() => void uploadEditedPhoto()} disabled={saving || loading}>{saving ? "Preparing…" : onPrepared ? "Use picture" : "Save picture"}</button>
           </footer>
         ) : hasPhoto && (
           <footer>

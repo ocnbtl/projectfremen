@@ -12,11 +12,14 @@ import { objectTargetIcon } from "./PeopleObjectPicker";
 import SearchField from "../ui/SearchField";
 import styles from "./PeopleLinksPanel.module.css";
 import { createNativeObjectRef } from "../../lib/native-objects/routes";
+import type { Project } from "../../lib/modules/projects/types";
+import { projectLinkPreview } from "../../lib/modules/projects/link-preview";
+import { EventObjectIdentity } from "../planning/EventObjects";
 
 const groups = [ ["people","People","person"], ["organizations","Organizations","organization"], ["projects","Projects","module-projects"], ["resources","Resources","resource"], ["notes","Notes","module-notes"], ["other","Other linked work","object"] ] as const;
-export default function PeopleLinksPanel({person,people,targets,links,edges,projects,error,onOpenPerson,onRemove,busy}: {
+export default function PeopleLinksPanel({person,people,targets,links,edges,projects,projectRecords,error,onOpenPerson,onRemove,busy}: {
   person: PersonalRecord; people: PersonalRecord[]; targets: NativeObjectRef[]; links: ObjectLink[]; edges: ProfileRecordEdge[];
-  projects: {projectRef: NativeObjectRef; roles: string[]}[]; error?: string; onOpenPerson:(record:PersonalRecord)=>void; onRemove:(link:ObjectLink)=>void; busy:boolean;
+  projects: {projectRef: NativeObjectRef; roles: string[]}[]; projectRecords: Project[]; error?: string; onOpenPerson:(record:PersonalRecord)=>void; onRemove:(link:ObjectLink)=>void; busy:boolean;
 }) {
   const [query,setQuery] = useState("");
   const related = useRelatedRecords("people",person.className === "org" ? "organization" : "person",person.id);
@@ -33,7 +36,8 @@ export default function PeopleLinksPanel({person,people,targets,links,edges,proj
     {!related.loaded && !related.error && <p role="status">Loading connected schedules and places…</p>}
     <div className={styles.groups}>{groups.map(([id,label,icon])=>{const items=visible.filter(item=>category(item.ref)===id);if(!items.length)return null;return <section key={id} aria-label={`Linked ${label.toLowerCase()}`}><h4><UnigentamosIcon role={icon} size={18}/>{label}<span>{items.length}</span></h4><div className={styles.cards}>{items.map(item=>{
       const record=item.ref.module === "people" ? people.find(record=>record.id===item.ref.objectId) : undefined;
-      const content=<>{record ? <PeopleProfileAvatar organization={record.className==="org"} label={record.title} initials={record.title.split(/\s+/).map(s=>s[0]).slice(0,2).join("")} photoUrl={record.profile?.photoUrl} photoUpdatedAt={record.profile?.photoUpdatedAt} compact/> : <UnigentamosIcon role={objectTargetIcon(item.ref)} size={22}/>}<span><strong>{item.ref.label}</strong><small>{item.details.join(" · ")}</small></span></>;
+      const project = item.ref.module === "projects" ? projectRecords.find(project => project.id === item.ref.objectId) : undefined;
+      const content=<>{record ? <PeopleProfileAvatar organization={record.className==="org"} label={record.title} initials={record.title.split(/\s+/).map(s=>s[0]).slice(0,2).join("")} photoUrl={record.profile?.photoUrl} photoUpdatedAt={record.profile?.photoUpdatedAt} compact/> : project?.photoUpdatedAt ? <EventObjectIdentity record={{...item.ref, preview: projectLinkPreview(project)}}/> : <UnigentamosIcon role={objectTargetIcon(item.ref)} size={22}/>}<span><strong>{item.ref.label}</strong><small>{item.details.join(" · ")}</small></span></>;
       return <article key={profileConnectionKey(item.ref)}>{record ? <button type="button" onClick={()=>onOpenPerson(record)}>{content}</button> : <Link prefetch={false} href={item.ref.route}>{content}</Link>}{item.linkIds.length===1 && <button type="button" className={styles.unlink} disabled={busy} aria-label={`Remove direct link to ${item.ref.label}`} title="Remove direct link; profile and other connections are kept" onClick={()=>{const link=links.find(link=>link.id===item.linkIds[0]);if(link)onRemove(link);}}><UnigentamosIcon role="close" size={16}/></button>}</article>;
     })}</div></section>;})}</div>
     {!visible.length && <p>{query ? "No links match your search." : "No linked objects yet."}</p>}

@@ -4,27 +4,38 @@ export type PhotoCropState = {
   zoom: number;
   panX: number;
   panY: number;
+  fit?: "contain" | "cover";
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-/** The same source-pixel rectangle drives both the preview and JPEG export. */
+function cropSpace(state: PhotoCropState) {
+  // A project mark can occupy a transparent square with its full aspect ratio.
+  const side = Math.max(state.sourceWidth, state.sourceHeight);
+  return state.fit === "contain"
+    ? { width: side, height: side, padX: (side - state.sourceWidth) / 2, padY: (side - state.sourceHeight) / 2 }
+    : { width: state.sourceWidth, height: state.sourceHeight, padX: 0, padY: 0 };
+}
+
+/** Visible square expressed in source pixels, including any transparent margins. */
 export function photoCrop(state: PhotoCropState) {
-  const side = Math.min(state.sourceWidth, state.sourceHeight) / state.zoom;
+  const { width, height, padX, padY } = cropSpace(state);
+  const side = Math.min(width, height) / state.zoom;
   return {
     side,
-    x: (state.panX + 1) / 2 * (state.sourceWidth - side),
-    y: (state.panY + 1) / 2 * (state.sourceHeight - side)
+    x: (state.panX + 1) / 2 * (width - side) - padX,
+    y: (state.panY + 1) / 2 * (height - side) - padY
   };
 }
 
 function position<T extends PhotoCropState>(state: T, x: number, y: number): T {
   const { side } = photoCrop(state);
-  const rangeX = state.sourceWidth - side;
-  const rangeY = state.sourceHeight - side;
+  const { width, height, padX, padY } = cropSpace(state);
+  const rangeX = width - side;
+  const rangeY = height - side;
   return { ...state,
-    panX: rangeX > 0 ? clamp(x / rangeX * 2 - 1, -1, 1) : 0,
-    panY: rangeY > 0 ? clamp(y / rangeY * 2 - 1, -1, 1) : 0
+    panX: rangeX > 0 ? clamp((x + padX) / rangeX * 2 - 1, -1, 1) : 0,
+    panY: rangeY > 0 ? clamp((y + padY) / rangeY * 2 - 1, -1, 1) : 0
   };
 }
 

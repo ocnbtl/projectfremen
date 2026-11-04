@@ -22,7 +22,7 @@ export function EventObjectIdentity({ record }: { record: PreviewRef }) {
   const source = linkedImageSource(record.preview);
   const [failed, setFailed] = useState("");
   const icon = record.module === "map" ? "location" : record.objectType === "organization" ? "organization" : record.module === "personal_ops" ? "module-personal" : "module-" + record.module;
-  return <span className={styles.visual} data-location={!source && record.module === "map" || undefined} data-organization={record.objectType === "organization" || undefined}>
+  return <span className={styles.visual} data-project-logo={record.module === "projects" && Boolean(source) && failed !== source || undefined} data-location={!source && record.module === "map" || undefined} data-organization={record.objectType === "organization" || undefined}>
     {source && failed !== source ? <img src={source} alt="" loading="lazy" data-organization-logo={record.objectType === "organization" || undefined} style={record.objectType === "organization" ? organizationLogoStyle : undefined} referrerPolicy="no-referrer" onError={() => setFailed(source)} /> : <UnigentamosIcon role={icon} size={14} />}
   </span>;
 }

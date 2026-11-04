@@ -1,8 +1,9 @@
 import { deleteJsonFile, mutateJsonFile, readJsonFile, writeJsonFile } from "../../file-store";
 import sharp from "sharp";
 import { photoCrop } from "./photo-crop";
+import { clearLogoMatte } from "../projects/logo-background";
 
-export type SavedPhotoCrop = { zoom: number; panX: number; panY: number; outputSize: number };
+export type SavedPhotoCrop = { zoom: number; panX: number; panY: number; outputSize: number; fit?: "contain" | "cover"; clearMatte?: true };
 
 const MAX_PROFILE_PHOTO_BYTES = 1_500_000;
 const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -100,6 +101,8 @@ export async function cropPeopleProfilePhoto(personId: string, input: unknown, e
   replacement?: { mimeType: string; bytes: Uint8Array }): Promise<StoredPeopleProfilePhoto> {
   const crop = input as SavedPhotoCrop;
   if (!crop || ![crop.zoom, crop.panX, crop.panY, crop.outputSize].every(Number.isFinite)
+    || (crop.fit !== undefined && (!["contain", "cover"].includes(crop.fit) || !personId.startsWith("project-")))
+    || (crop.clearMatte !== undefined && (crop.clearMatte !== true || !personId.startsWith("project-")))
     || crop.zoom < 1 || crop.zoom > 3 || Math.abs(crop.panX) > 1 || Math.abs(crop.panY) > 1
     || ![256, 512, 1024].includes(crop.outputSize)) throw new Error("Invalid picture crop.");
   if (replacement && (!ALLOWED_PROFILE_PHOTO_TYPES.has(replacement.mimeType)
@@ -111,14 +114,32 @@ export async function cropPeopleProfilePhoto(personId: string, input: unknown, e
     }
     const source = replacement ? { mimeType: replacement.mimeType, bytesBase64: Buffer.from(replacement.bytes).toString("base64") }
       : current!.source || { mimeType: current!.mimeType, bytesBase64: current!.bytesBase64 };
-    const normalized = await sharp(Buffer.from(source.bytesBase64, "base64"), { limitInputPixels: 40_000_000 }).rotate().toBuffer({ resolveWithObject: true });
-    const rect = photoCrop({ ...crop, sourceWidth: normalized.info.width, sourceHeight: normalized.info.height });
-    const side = Math.max(1, Math.floor(rect.side));
-    const bytes = await sharp(normalized.data).extract({ left: Math.floor(rect.x), top: Math.floor(rect.y), width: side, height: side })
-      .resize(crop.outputSize, crop.outputSize).webp({ quality: 90 }).toBuffer();
+    let inputImage = sharp(Buffer.from(source.bytesBase64, "base64"), { limitInputPixels: 40_000_000 }).rotate();
+    if (crop.clearMatte) {
+      const { data, info } = await inputImage.resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
+        .toColourspace("srgb").ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      if (!clearLogoMatte(data, info.width, info.height)) throw new Error("This picture has no solid background to remove.");
+      inputImage = sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png();
+    }
+    let bytes: Buffer;
+    if (crop.fit === "contain") {
+      // Render the whole mark onto a bounded transparent square, then apply its chosen zoom and pan.
+      const frame = Math.round(crop.outputSize * crop.zoom);
+      const image = await inputImage.resize(frame, frame, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+      const travel = frame - crop.outputSize;
+      const left = Math.round((crop.panX + 1) / 2 * travel);
+      const top = Math.round((crop.panY + 1) / 2 * travel);
+      bytes = await sharp(image).extract({ left, top, width: crop.outputSize, height: crop.outputSize }).webp({ quality: 90 }).toBuffer();
+    } else {
+      const normalized = await inputImage.toBuffer({ resolveWithObject: true });
+      const rect = photoCrop({ ...crop, sourceWidth: normalized.info.width, sourceHeight: normalized.info.height });
+      const side = Math.max(1, Math.floor(rect.side));
+      bytes = await sharp(normalized.data).extract({ left: Math.floor(rect.x), top: Math.floor(rect.y), width: side, height: side })
+        .resize(crop.outputSize, crop.outputSize).webp({ quality: 90 }).toBuffer();
+    }
     const photo: StoredPeopleProfilePhoto = { personId, mimeType: "image/webp", bytesBase64: bytes.toString("base64"), byteLength: bytes.length,
       updatedAt: new Date(Math.max(Date.now(), Date.parse(current?.updatedAt || "") + 1 || 0)).toISOString(),
-      source, crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY, outputSize: crop.outputSize } };
+      source, crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY, outputSize: crop.outputSize, ...(crop.fit && { fit: crop.fit }), ...(crop.clearMatte && { clearMatte: true }) } };
     return { value: photo, result: photo };
   });
 }

@@ -113,7 +113,7 @@ function RecordIdentity({ record }: { record: PreviewRef }) {
   const [failed, setFailed] = useState("");
   const url = linkedImageSource(record.preview);
   return (
-    <span className="work-record-identity">
+    <span className="work-record-identity" data-project-logo={record.module === "projects" && Boolean(url) && failed !== url || undefined}>
       {url && failed !== url ? (
         <img
           src={url}

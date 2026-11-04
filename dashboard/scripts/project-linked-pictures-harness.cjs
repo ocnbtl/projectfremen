@@ -26,16 +26,33 @@ let browser,page;
  const picker=await(await context.request.get(base+'/api/native-links/previews?id='+project.id)).json();assert.equal(picker.items[0].imageUrl,photoPath);assert.equal(picker.items[0].updatedAt,photo.updatedAt);
  const savedPlace=planning.state.places.find(p=>p.name==='Garden courtyard'),related=await(await context.request.get(base+'/api/planning/related?module=map&type=place&id='+savedPlace.id)).json();assert.equal(related.items.find(x=>x.ref.objectId===project.id).ref.preview.imageUrl,photoPath);
  page=await context.newPage();const errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));await page.route(/^https:\/\//,r=>r.abort());
- const verify=async locator=>{await expect(locator).toBeVisible();await expect(locator).toHaveAttribute('src',photoPath+'?v='+encodeURIComponent(project.photoUpdatedAt));await expect.poll(()=>locator.evaluate(el=>el.complete&&el.naturalWidth===512)).toBe(true);const layout=await locator.evaluate(el=>({fit:getComputedStyle(el).objectFit,w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height}));assert.equal(layout.fit,'cover');assert(Math.abs(layout.w-layout.h)<1,'picture remains square and centered');};
+ const verify=async locator=>{
+  await expect(locator).toBeVisible();
+  await expect(locator).toHaveAttribute('src',photoPath+'?v='+encodeURIComponent(project.photoUpdatedAt));
+  await expect.poll(()=>locator.evaluate(el=>el.complete&&el.naturalWidth===512)).toBe(true);
+  const layout=await locator.evaluate(el=>{
+    const image=getComputedStyle(el),frame=getComputedStyle(el.parentElement),bounds=el.getBoundingClientRect();
+    return {fit:image.objectFit,clip:image.clipPath,radius:frame.borderRadius,background:frame.backgroundColor,width:bounds.width,height:bounds.height};
+  });
+  assert.equal(layout.fit,'contain');
+  assert.equal(layout.clip,'none');
+  assert.equal(layout.radius,'0px');
+  assert.equal(layout.background,'rgba(0, 0, 0, 0)');
+  assert(Math.abs(layout.width-layout.height)<1,'project logo keeps the allocated square');
+ };
  for(const width of [390,820,1440]){
   await page.setViewportSize({width,height:950});await page.goto(base+'/admin/personal');const card=page.locator('article').filter({has:page.getByRole('button',{name:'Open Plant the garden',exact:true})});await verify(card.locator('img[src*="/api/projects/photos/"]'));await page.screenshot({path:path.join(out,'personal-'+width+'.png'),animations:'disabled'});
   await page.goto(base+'/admin/calendar');await page.getByRole('button',{name:'Garden planning',exact:true}).first().click();const event=page.getByRole('dialog',{name:'Garden planning',exact:true});await event.waitFor();await verify(event.locator('img[src*="/api/projects/photos/"]'));await event.getByRole('button',{name:'Preview Garden project',exact:true}).click();const preview=page.getByRole('dialog',{name:'Garden project',exact:true});await verify(preview.locator('img'));await page.screenshot({path:path.join(out,'calendar-preview-'+width+'.png'),animations:'disabled'});await page.keyboard.press('Escape');
   await event.getByRole('button',{name:'Edit event',exact:true}).click();await verify(page.locator('.work-links img[src*="/api/projects/photos/"]'));await page.screenshot({path:path.join(out,'calendar-editor-'+width+'.png'),animations:'disabled'});
   if(width===1440){await page.getByRole('button',{name:'Unlink Garden project',exact:true}).click();await page.locator('.work-object-link-trigger .people-object-picker-trigger').click();await page.getByRole('searchbox',{name:'Search objects',exact:true}).fill('Garden project');const option=page.getByRole('option').filter({hasText:'Garden project'});await verify(option.locator('img'));await option.click();}
-  await page.goto(base+'/admin/people/'+person.id+'?tab=links');await verify(page.locator('[data-project-id="'+project.id+'"] img').first());await page.screenshot({path:path.join(out,'people-linked-project-'+width+'.png'),animations:'disabled'});
+  await page.goto(base+'/admin/people/'+person.id+'?tab=links');
+  const projectLink=page.getByRole('region',{name:'Linked projects',exact:true}).getByRole('link',{name:/Garden project/});
+  await expect(projectLink).toHaveAttribute('href','/admin/projects/'+project.id);
+  await verify(projectLink.locator('img'));
+  await page.screenshot({path:path.join(out,'people-linked-project-'+width+'.png'),animations:'disabled'});
  }
  assert(!requests.some(url=>url.includes('/api/projects/photos/')&&url.includes('edit=')),'linked views never fetch the uncropped source');
  const recrop=await context.request.patch(base+photoPath,{headers,data:{crop:{zoom:2,panX:0.5,panY:0,outputSize:512},expectedUpdatedAt:photo.updatedAt}});assert(recrop.ok(),await recrop.text());await setPhoto((await recrop.json()).photo.updatedAt);await page.goto(base+'/admin/personal');await verify(page.locator('article').filter({has:page.getByRole('button',{name:'Open Plant the garden',exact:true})}).locator('img[src*="/api/projects/photos/"]'));
  await setPhoto('');await page.reload();const card=page.locator('article').filter({has:page.getByRole('button',{name:'Open Plant the garden',exact:true})});await card.waitFor();assert.equal(await card.locator('img[src*="/api/projects/photos/"]').count(),0);await expect(card.getByRole('link',{name:'Garden project',exact:true})).toBeVisible();
- assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({passed:true,widths:[390,820,1440],checks:['same crop and version on Personal cards, Calendar preview and editor','aligned square cover images','updated crop refreshes','missing picture falls back to icon','object picker and Map related-record metadata','no uncropped-source requests or production tests','no page errors']},null,2));console.log('PASS: linked project pictures across local Calendar, Personal and shared metadata.');
+ assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({passed:true,widths:[390,820,1440],checks:['same crop and version on Personal cards, Calendar preview and editor','uncut logos in transparent square frames','updated crop refreshes','missing picture falls back to icon','object picker and Map related-record metadata','no uncropped-source requests or production tests','no page errors']},null,2));console.log('PASS: linked project pictures across local Calendar, Personal and shared metadata.');
 })().catch(async error=>{console.error(error);await page?.screenshot({path:path.join(out,'failure.png'),animations:'disabled'}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});
