@@ -77,7 +77,7 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
         </MorphingDiv>
         <MorphingDiv className={`resource-card-description ${styles.description}`}>{project.description || <span aria-hidden="true">&nbsp;</span>}</MorphingDiv>
         <MorphingDiv className={styles.objectives}>
-          {objectives.length > 0 && <><span className={styles.objectiveLabel}>Objectives</span><ul aria-label="Project objectives preview">{objectives.map((objective,index) => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}><button id={`objective-preview-${project.id}-${index}`} type="button" aria-label={`Edit objective: ${objective.text}`} aria-haspopup="dialog" onPointerDown={event=>event.stopPropagation()} onClick={event=>{
+          {objectives.length > 0 && <><ul aria-label="Project objectives preview">{objectives.map((objective,index) => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}><button id={`objective-preview-${project.id}-${index}`} type="button" aria-label={`Edit objective: ${objective.text}`} aria-haspopup="dialog" onPointerDown={event=>event.stopPropagation()} onClick={event=>{
             event.stopPropagation(); onObjectiveOpen();
             setPreview({project,objective,triggerId:event.currentTarget.id});
           }}><UnigentamosIcon role={objective.completed ? "check" : "goal"} size={13} /><span>{objective.text}</span></button></li>)}</ul></>}

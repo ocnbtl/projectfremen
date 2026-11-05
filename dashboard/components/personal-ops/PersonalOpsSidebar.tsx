@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 
 import ModuleSidebar, {
   type ModuleSidebarItem,
@@ -124,7 +125,8 @@ export default function PersonalOpsSidebar({
   unavailableViews,
   mobileOpen,
   onClose,
-  onHome
+  onHome,
+  status
 }: {
   activeView: PersonalOpsSidebarView;
   filter: string;
@@ -134,6 +136,7 @@ export default function PersonalOpsSidebar({
   mobileOpen: boolean;
   onClose: () => void;
   onHome?: () => void;
+  status?: ReactNode;
 }) {
   const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car", "style-guide", "dog", "health", "meals", "fitness"].includes(activeView);
   const domainItems: ModuleSidebarItem[] = PERSONAL_OPS_DOMAIN_LABELS.map((domain) => {
@@ -223,6 +226,7 @@ export default function PersonalOpsSidebar({
   return (
     <ModuleSidebar
       title="Personal"
+      status={status}
       onHome={onHome}
       description="Daily command, durable records, and personal systems."
       sections={activeView === "command" ? [] : sections}

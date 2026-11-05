@@ -18,7 +18,7 @@ import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-she
 import InspectorRail from "../admin-shell/InspectorRail";
 import ModuleShell from "../admin-shell/ModuleShell";
 import { useClientTimeZone } from "../admin-shell/useClientTimeZone";
-import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleSidebar";
+import ModuleSidebar from "../admin-shell/ModuleSidebar";
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
@@ -1089,6 +1089,11 @@ export default function ProjectsWorkspace({
 
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [view, setView] = useState<ProjectView>(initialUrlState.view);
+  const pillOptions = ["active","planned","attention","blocked"] as const;
+  type ProjectPill = typeof pillOptions[number];
+  const parsePills = () => pillOptions.filter(value => (searchParams.get("views")?.split(",") || [searchParams.get("view")]).includes(value));
+  const [selectedPills,setSelectedPills] = useState<ProjectPill[]>(parsePills);
+  useEffect(()=>setSelectedPills(parsePills()),[searchParams]);
   const [filter, setFilter] = useState<ProjectFilter>(initialUrlState.filter);
   const [sort, setSort] = useState<ProjectSort>(initialUrlState.sort);
   const [query, setQuery] = useState(initialUrlState.query);
@@ -1122,7 +1127,7 @@ export default function ProjectsWorkspace({
     [selectedProjectId, snapshot.projects]
   );
 
-  const directoryKey = JSON.stringify([query,view,filter,sort,grid,compact]);
+  const directoryKey = JSON.stringify([query,view,filter,sort,grid,compact,selectedPills]);
   const [objectiveDirectoryHold,setObjectiveDirectoryHold] = useState<{key:string;ids:string[]}>();
   useEffect(()=>setObjectiveDirectoryHold(current=>current?.key===directoryKey?current:undefined),[directoryKey]);
   const visibleProjects = useMemo(
@@ -1131,10 +1136,10 @@ export default function ProjectsWorkspace({
     () => objectiveDirectoryHold?.key === directoryKey
       ? objectiveDirectoryHold.ids.flatMap(id=>{const item=snapshot.projects.find(row=>row.project.id===id);return item?[item]:[];})
       : sortProjects(
-      snapshot.projects.filter((item) => matchesQuery(item, query) && matchesView(item, view) && matchesFilter(item, filter)),
+      snapshot.projects.filter((item) => matchesQuery(item, query) && (selectedPills.length ? selectedPills.some(pill=>matchesView(item,pill)) : matchesView(item, view)) && matchesFilter(item, filter)),
       sort
     ),
-    [filter, query, snapshot.projects, sort, view, directoryKey, objectiveDirectoryHold]
+    [filter, query, snapshot.projects, sort, view, directoryKey, objectiveDirectoryHold, selectedPills]
   );
 
   const queryScopedProjects = useMemo(
@@ -1189,13 +1194,10 @@ export default function ProjectsWorkspace({
 
   useEffect(() => {
     if (initialDetail || !visibleProjects.length) return;
-    if (visibleProjects.some((item) => item.project.id === selectedProjectId)) {
-      if (!parseProjectsUrlState(searchParams).item) updateUrl({ item: selectedProjectId }, "replace");
-      return;
-    }
-    const nextId = visibleProjects[0].project.id;
-    setSelectedProjectId(nextId);
-    updateUrl({ item: nextId }, "replace");
+    if (visibleProjects.some((item) => item.project.id === selectedProjectId)) return;
+    // Updating a filter should not navigate again with an older URL and undo
+    // a newer pill selection. Only explicit card opens write the selection.
+    setSelectedProjectId(visibleProjects[0].project.id);
   }, [filter, initialDetail, query, selectedProjectId, sort, view, visibleProjects.length]);
 
   useEffect(() => {
@@ -2067,57 +2069,14 @@ export default function ProjectsWorkspace({
   const sourceErrors = Object.entries(snapshot.sourceAvailability)
     .filter((entry): entry is [string, string] => Boolean(entry[1]))
     .map(([source, error]) => `${displayLabel(source)}: ${error}`);
-  const countForView = (candidateView: ProjectView) => queryScopedProjects.filter((item) => matchesView(item, candidateView)).length;
-
-  const sidebarSections: readonly ModuleSidebarSection[] = [
-    {
-      id: "projects",
-      label: "Projects",
-      items: (["all", "active", "planned", "attention", "blocked"] as const).map((itemView) => ({
-        id: itemView,
-        label: VIEW_LABELS[itemView],
-        count: countForView(itemView),
-        active: view === itemView,
-        tone: itemView === "attention" ? "attention" as const : itemView === "blocked" ? "danger" as const : undefined,
-        onSelect: () => selectView(itemView)
-      }))
-    },
-    {
-      id: "smart-views",
-      label: "Smart Views",
-      items: (["due", "needs-review", "linked"] as const).map((itemView) => ({
-        id: itemView,
-        label: VIEW_LABELS[itemView],
-        count: countForView(itemView),
-        active: view === itemView,
-        onSelect: () => selectView(itemView)
-      }))
-    },
-    {
-      id: "data",
-      label: "Data",
-      items: [
-        {
-          id: "archive",
-          label: "Archive",
-          count: countForView("archived"),
-          active: view === "archived",
-          onSelect: () => selectView("archived")
-        },
-        {
-          id: "missing-context",
-          label: "Missing Context",
-          count: queryScopedProjects.filter((item) => !item.project.description || item.project.objectives.length === 0).length,
-          active: filter === "missing-owner",
-          onSelect: () => {
-            setView("all");
-            setFilter("missing-owner");
-            updateUrl({ view: "all", filter: "missing-owner" });
-          }
-        }
-      ]
-    }
-  ];
+  const countForView = (candidateView: ProjectView) => queryScopedProjects.filter((item) => item.project.lifecycle !== "archived" && matchesView(item, candidateView)).length;
+  const projectViewPills = <div className={styles.viewPills} role="group" aria-label="Project views">{pillOptions.map(value=><button type="button" key={value} aria-pressed={selectedPills.includes(value)} onClick={()=>{
+    const next=selectedPills.includes(value)?selectedPills.filter(pill=>pill!==value):[...selectedPills,value];
+    setSelectedPills(next);setView("all");setFilter("all");
+    const params=new URLSearchParams(destinationFor({view:"all",filter:"all"}).split("?")[1]||"");
+    if(next.length)params.set("views",next.join(","));else params.delete("views");
+    window.history.replaceState(null, "", `${pathname}${params.size?`?${params}`:""}`);
+  }}><UnigentamosIcon role={{active:"active",planned:"calendar",attention:"warning",blocked:"no-contact"}[value]} size={15}/>{value === "attention" ? <><span className={styles.fullPillLabel}>Needs attention</span><span className={styles.shortPillLabel}>Attention</span></> : <span>{VIEW_LABELS[value]}</span>}<small>{countForView(value)}</small></button>)}</div>;
 
   function projectQuickActions(item: ProjectDirectoryItem): readonly QuickAction[] {
     const native = item.project.editable;
@@ -3100,7 +3059,7 @@ export default function ProjectsWorkspace({
     <DirectoryPane className={styles.directory} ariaLabel="Projects directory">
       <div className={styles.mainScroll}>
         <WorkspaceHeader title="Projects" count={visibleProjects.length}>
-          <WorkspaceButton className="work-mobile-only" icon="menu" aria-label="Open Projects navigation" onClick={()=>setMobileSidebarOpen(true)}/>
+
           <WorkspaceButton intent="primary" icon="plus" onClick={() => openEditor("project-create")}>Add project</WorkspaceButton>
         </WorkspaceHeader>
         {initialLoadError && <SystemState variant="error" compact title="Some project sources did not load" description={initialLoadError} />}
@@ -3108,8 +3067,8 @@ export default function ProjectsWorkspace({
         <WorkspaceToolbar query={query} onQuery={(value) => { setQuery(value); updateUrl({ query: value }); }} placeholder="Search projects"
           activeFilters={filter === "all" ? 0 : 1}
           filters={<div className={styles.filterRow} aria-label="Project filters">
-            {(["all", "active", "due", "due-month", "needs-review", "blocked", "linked", "missing-owner"] as const).map((value) =>
-              <WorkspaceButton key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); updateUrl({ filter: value }); }}>{FILTER_LABELS[value]}</WorkspaceButton>)}
+            {(["all", "due", "due-month", "needs-review", "archived"] as const).map((value) =>
+              <WorkspaceButton key={value} aria-pressed={filter === value} onClick={() => { setFilter(value);setView(value==="archived"?"archived":"all");setSelectedPills([]);const params=new URLSearchParams(destinationFor({filter:value,view:value==="archived"?"archived":"all"}).split("?")[1]||"");params.delete("views");router.replace(`${pathname}?${params}`,{scroll:false}); }}>{FILTER_LABELS[value]}</WorkspaceButton>)}
           </div>}>
           <SelectField className={styles.selectControl} value={sort} onChange={(event) => { const value = event.target.value as ProjectSort; setSort(value); updateUrl({ sort: value }); }} aria-label="Sort projects">
             {Object.entries(SORT_LABELS).filter(([value]) => value !== "priority").map(([value, label]) => <option value={value} key={value}>{label}</option>)}
@@ -3136,12 +3095,15 @@ export default function ProjectsWorkspace({
           <SystemState
             variant="empty"
             title="No projects match this operating view"
-            description="Clear the search or choose All. Archived projects remain in the Archive view."
+            description="Try another search or clear your filters. Archived projects are available in Filters."
             action={{ label: "Clear view", onSelect: () => {
               setView("all");
               setFilter("all");
               setQuery("");
-              updateUrl({ view: "all", filter: "all", query: "" });
+              setSelectedPills([]);
+              const params = new URLSearchParams(destinationFor({view:"all",filter:"all",query:""}).split("?")[1] || "");
+              params.delete("views");
+              window.history.replaceState(null, "", `${pathname}${params.size ? `?${params}` : ""}`);
             } }}
           />
         )}
@@ -3209,11 +3171,11 @@ export default function ProjectsWorkspace({
         sidebar={<ModuleSidebar
           title="Projects"
           description="Plan work, track milestones, and keep related context together."
-          sections={sidebarSections}
+          sections={[]}
           className={styles.sidebar}
           mobileOpen={mobileSidebarOpen}
           onClose={() => setMobileSidebarOpen(false)}
-          footer={<p className={styles.sidebarFootnote}>Project history keeps your updates. Linked notes, people, and files stay connected to their original records.</p>}
+          status={!initialDetail ? projectViewPills : undefined}
         />}
         inspector={editorInspector || (initialDetail ? completionRail : projectInspector)}
         aiDock={<SharedAIDock
@@ -3231,7 +3193,7 @@ export default function ProjectsWorkspace({
           }}
         />}
       >
-        {initialDetail && <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation" data-icon-button="standard"><UnigentamosIcon role="menu" size={18} /></button>}
+
         {initialDetail ? (
           <div className={styles.mainScroll}>
             {selectedItem ? <>{renderProjectHeader(selectedItem, "h1")}{renderProjectBody(selectedItem)}</> : <SystemState variant="error" title="Project not found" description="The requested project identity is not available in the current native or legacy snapshot." />}

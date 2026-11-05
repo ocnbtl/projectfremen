@@ -1079,7 +1079,9 @@ export default function PersonalOpsWorkspace({
   const urlState = useMemo(() => parsePersonalOpsUrlState(searchParams), [searchParams]);
   const [state, setState] = useState(initialState);
   const selectedTypes = parseHomeTypes(searchParams.get("types"));
-  const period = searchParams.get("period") === "week" || urlState.filter === "week" ? "week" : "today";
+  const urlPeriod = searchParams.get("period") === "week" || urlState.filter === "week" ? "week" : "today";
+  const [period, setPeriod] = useState<"today" | "week">(urlPeriod);
+  useEffect(() => setPeriod(urlPeriod), [urlPeriod]);
   const area = searchParams.get("area") || "";
   const linkedModule = searchParams.get("linked") || "";
   const timing = searchParams.get("timing") || "";
@@ -1089,7 +1091,9 @@ export default function PersonalOpsWorkspace({
     params.delete("selected");
     if (params.get("filter") === "week") params.delete("filter");
     setMobileInspectorOpen(false);
-    router.replace(params.size ? pathname+"?"+params.toString() : pathname,{scroll:false});
+    const destination = params.size ? pathname+"?"+params.toString() : pathname;
+    if (name === "period") window.history.replaceState(null, "", destination);
+    else router.replace(destination, {scroll:false});
   }
   function toggleType(type: PersonalHomeType) {const next=toggleHomeType(selectedTypes,type);setViewParam("types",next.length === PERSONAL_HOME_TYPES.length ? "" : next.join(","));}
   const [directoryView, setDirectoryView] = usePersonalDirectoryView();
@@ -1612,6 +1616,10 @@ export default function PersonalOpsWorkspace({
   return (
     <WorkspaceTopbarProvider><div className={`${styles.shell} work-surface`} data-has-inspector={Boolean(selectedItem)} data-personal-pages data-detail-open={Boolean(selectedItem && mobileInspectorOpen) || undefined}>
       <PersonalOpsSidebar
+        status={initialView === "command" ? <div className={styles.periodToggle} role="group" aria-label="Personal time view" data-period={period}>
+          <span className={styles.periodActive} aria-hidden="true" />
+          {(["today", "week"] as const).map(value => <button type="button" key={value} aria-pressed={period === value} onClick={() => {setPeriod(value);setViewParam("period", value === "today" ? "" : value);}}><span>{value === "today" ? "Today" : "This week"}</span></button>)}
+        </div> : undefined}
         onHome={selectedItem && mobileInspectorOpen ? () => {updateUrl({selected:""});setMobileInspectorOpen(false);} : undefined}
         activeView={initialView}
         filter={urlState.filter}
@@ -1640,7 +1648,7 @@ export default function PersonalOpsWorkspace({
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}
 
-          {initialView === "command" && <><div className={styles.periodToggle} role="group" aria-label="Personal time view">{(["today","week"] as const).map(value=><button type="button" key={value} aria-pressed={period===value} onClick={()=>setViewParam("period",value === "today" ? "" : value)}>{period===value && <motion.span layoutId="personal-period" className={styles.periodActive} transition={reducedMotion ? {duration:0} : {type:"spring",stiffness:420,damping:38}}/>}<span>{value === "today" ? "Today" : "This week"}</span></button>)}</div><PersonalHome state={state} projectGoalCount={legacyGoals.filter(goal=>!goal.done && goal.status!=="cancelled").length} selectedTypes={selectedTypes} onToggleType={toggleType}/></>}
+          {initialView === "command" && <><PersonalHome state={state} projectGoalCount={legacyGoals.filter(goal=>!goal.done && goal.status!=="cancelled").length} selectedTypes={selectedTypes} onToggleType={toggleType}/></>}
           {initialLoadError ? (
             <SystemState variant="error" title="Personal could not load" description={initialLoadError} />
           ) : initialView === "command" && period === "week" ? <PersonalWeekAgenda entries={agendaEntries} includeConnected={selectedTypes.length === PERSONAL_HOME_TYPES.length && !area && !linkedModule && !timing && ["all","week"].includes(urlState.filter)} query={urlState.query} onOpen={id=>{const item=baseItems.find(item=>item.id===id);if(item)selectItem(item);}}/> : scopedItems.length === 0 && routineItems.length === 0 ? (

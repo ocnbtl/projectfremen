@@ -2203,3 +2203,25 @@
   .projectBody .activityList .timelineMeta {grid-column:2;grid-row:2;justify-self:start;font-size:12px;}
   .projectBody .activityActions .iconButton {width:32px;height:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0;}
 }
+
+/* Stable, compact toolbar filters; white until explicitly selected. */
+.viewPills {display:flex;align-items:center;gap:5px;min-width:0;}
+.viewPills button {display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:6px 9px;border:1px solid var(--border);border-radius:10px;background:var(--surface-panel,#fff);color:var(--text-strong);font:500 12px/1.2 var(--font-body);white-space:nowrap;cursor:pointer;transition:background-color 180ms ease,border-color 180ms ease,color 180ms ease;}
+.viewPills button[aria-pressed="true"] {background:var(--module-primary-100);border-color:var(--module-primary-300);color:var(--module-primary-800);}
+.viewPills button:hover {background:var(--module-primary-50);}
+.viewPills button[aria-pressed="true"]:hover {background:var(--module-primary-200);}
+.viewPills button:focus-visible {outline:2px solid var(--module-primary-500);outline-offset:2px;}
+.viewPills small {font-size:10px;opacity:.7;font-variant-numeric:tabular-nums;}
+@media(max-width:900px) {
+ .shell :global(.workspace-nav-status) {min-width:0;flex:1;overflow-x:auto;scrollbar-width:none;}
+ .shell .viewPills button {width:auto;min-width:0;padding:6px;gap:4px;font-size:11px;flex-shrink:0;}
+ .viewPills small {display:none;}
+}
+@media(prefers-reduced-motion:reduce) {.viewPills button {transition:none;}}
+.shortPillLabel {display:none;}
+@media(max-width:600px) {
+ .shell .viewPills {gap:3px;}
+ .shell .viewPills button {padding:6px 5px;font-size:10px;}
+ .viewPills svg,.fullPillLabel {display:none;}
+ .shortPillLabel {display:inline;}
+}
