@@ -1,8 +1,11 @@
 "use client";
-import { DirectoryLayout } from "../ui/DirectoryLayout";
+import ProjectDirectoryCards from "./ProjectDirectoryCards";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "../people/PeopleProfilePhoto";
 import SelectField from "../ui/SelectField";
 import ProjectProperties from "./ProjectProperties";
+import ProjectLinkedItems, { ProjectLinkedItem } from "./ProjectLinkedItems";
+import { PersonalOpsStatusChip, personalOpsToneForState } from "../personal-ops/PersonalOpsPrimitives";
+import { personalStatusLabel } from "../../lib/modules/personal-ops/status-display";
 import { workspaceReturnUrl } from "../admin-shell/useWorkspaceReturn";
 import RelatedRecords from "../planning/RelatedRecords";
 
@@ -19,7 +22,6 @@ import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleS
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
-import DirectoryCard from "../operational/DirectoryCard";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "../operational/DetailTabs";
 import QuickActionBar, { type QuickAction } from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
@@ -86,6 +88,7 @@ import {
   type ProjectView
 } from "../../lib/native-objects/url-state";
 import styles from "./ProjectsWorkspace.module.css";
+import inspectionStyles from "./ProjectInspection.module.css";
 
 type ProjectsWorkspaceProps = {
   initialSnapshot: ProjectsWorkspaceSnapshot;
@@ -302,12 +305,6 @@ function OpenIcon() {
   return <UnigentamosIcon role="open" size={16} />;
 }
 
-const PROJECT_STATUS_ICONS: Record<ProjectLifecycleState, string> = {
-  draft: "edit", idea: "calendar-group-brain", planned: "calendar",
-  developing: "build", active: "active", monitoring: "show",
-  dormant: "dormant", complete: "review", archived: "archive"
-};
-
 function RowActionIcons({
   inspectLabel,
   onInspect,
@@ -317,7 +314,7 @@ function RowActionIcons({
   inspectLabel: string;
   onInspect?: () => void;
   openHref?: string;
-  openLabel: string;
+  openLabel?: string;
 }) {
   return (
     <span className={styles.activityActions}>
@@ -329,7 +326,7 @@ function RowActionIcons({
         title={inspectLabel}
        data-icon-button="compact"><InspectIcon /></button>}
       {openHref ? (
-        <Link className={styles.rowActionIcon} href={openHref} aria-label={openLabel} title={openLabel}><OpenIcon /></Link>
+        <Link prefetch={false} className={styles.rowActionIcon} href={openHref} aria-label={openLabel || "Open linked item"} title={openLabel || "Open linked item"}><OpenIcon /></Link>
       ) : null}
     </span>
   );
@@ -1063,7 +1060,7 @@ export default function ProjectsWorkspace({
   const repository = useMemo(() => createProjectsRepository(), []);
   const reviewsRepository = useMemo(() => createReviewsRepository(), []);
   const initialPeople = useMemo(
-    () => initialPersonalRecords.filter((record) => record.className === "person" || record.className === "org"),
+    () => initialPersonalRecords.filter((record) => !record.archivedAt && (record.className === "person" || record.className === "org")),
     [initialPersonalRecords]
   );
   const {
@@ -2256,21 +2253,18 @@ export default function ProjectsWorkspace({
       ? item.linkedContext.filter((context) => modules.includes(context.ref.module))
       : item.linkedContext;
     if (!rows.length) {
-      return <SystemState variant="empty" compact title="No linked objects in this view" description="Use Link object to store a typed reference. The source object remains in its owner module." />;
+      return <p>No linked objects.</p>;
     }
     return (
-      <ul className={styles.linkList}>
+      <ProjectLinkedItems>
         {rows.map((context, index) => {
           const link = item.links.find((candidate) => candidate.linkState !== "removed" && candidate.source.module === context.ref.module && candidate.source.objectId === context.ref.objectId);
-          return <li key={`${context.ref.module}-${context.ref.objectId}-${context.relationship}-${index}`}>
-            <span className={styles.itemBody}>
-              <strong>{context.ref.label}</strong>
-              <small>{context.summary ? excerpt(context.summary, 110) : displayLabel(context.relationship)}</small>
-            </span>
-            <RowActionIcons inspectLabel={`Inspect ${context.ref.label}`} onInspect={link ? () => selectChild(link.id, context.ref.module === "people" ? "people" : "notes-decisions") : undefined} openHref={context.ref.route} openLabel={`Open ${context.ref.label}`} />
-          </li>;
+          return <ProjectLinkedItem key={`${context.ref.module}-${context.ref.objectId}-${context.relationship}-${index}`}
+            source={context.ref} record={context.ref.module === "people" ? initialPersonalRecords.find(p=>p.id===context.ref.objectId) : undefined}
+            description={context.summary ? excerpt(context.summary, 150) : undefined}
+            actions={<RowActionIcons inspectLabel={`Inspect ${context.ref.label}`} onInspect={link ? () => selectChild(link.id, context.ref.module === "people" ? "people" : "notes-decisions") : undefined} />} />;
         })}
-      </ul>
+      </ProjectLinkedItems>
     );
   }
 
@@ -2293,7 +2287,7 @@ export default function ProjectsWorkspace({
       >
         <div className={styles.panelHeader}>
           <div>
-            <Heading>Reviews</Heading>
+            <Heading><UnigentamosIcon role="module-reviews" size={18}/>Reviews</Heading>
           </div>
           <div className={styles.inlineActions}>
             <Link className={styles.button} href={buildProjectReviewHandoffRoute(target)}><UnigentamosIcon role="link" size={16} />Link review</Link>
@@ -2309,30 +2303,17 @@ export default function ProjectsWorkspace({
           />
         )}
         {contexts.length ? (
-          <ul className={styles.reviewCoverageList}>
+          <ProjectLinkedItems>
             {contexts.map((context) => {
               const repairLink = context.links.find((link) => link.state === "stale" || link.state === "broken");
               return (
-                <li key={context.reviewRef.objectId}>
-                  <span className={styles.itemBody}>
-                    <strong>{context.title}</strong>
-                    <small>
-                      {displayLabel(context.cadence)} · {displayLabel(context.lifecycle)} · {context.blockerCount} completion blocker{context.blockerCount === 1 ? "" : "s"}
-                    </small>
-                  </span>
-                  <span className={styles.inlineActions}>
-                    <span className={styles.rowState} data-tone={context.linkState === "linked" ? "green" : context.linkState === "broken" ? "red" : "amber"}>
-                      {displayLabel(context.linkState)}
-                    </span>
-                    {context.current && <span className={styles.relationshipChip} data-tone="blue">Current</span>}
-                    {repairLink
-                      ? <Link className={styles.textLink} href={`${context.reviewRef.route}?tab=overview&item=${encodeURIComponent(repairLink.id)}`}>Repair in Reviews</Link>
-                      : <Link className={styles.textLink} href={context.reviewRef.route}>Open ReviewRun</Link>}
-                  </span>
-                </li>
+                <ProjectLinkedItem key={context.reviewRef.objectId} source={context.reviewRef}
+                  description={[displayLabel(context.cadence),displayLabel(context.lifecycle),context.blockerCount ? `${context.blockerCount} incomplete item${context.blockerCount===1?"":"s"}` : ""].filter(Boolean).join(" · ")}
+                  status={context.current ? <span>Current</span> : undefined}
+                  actions={repairLink ? <Link prefetch={false} className={styles.button} href={`${context.reviewRef.route}?tab=overview&item=${encodeURIComponent(repairLink.id)}`}><UnigentamosIcon role="edit" size={15}/>Review link</Link> : undefined}/>
               );
             })}
-          </ul>
+          </ProjectLinkedItems>
         ) : (
           <p>No linked reviews.</p>
         )}
@@ -2416,7 +2397,7 @@ export default function ProjectsWorkspace({
       <div className={styles.overviewGrid}>
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
-            <h2>Notes</h2>
+            <h2><UnigentamosIcon role="notes" size={18}/>Notes</h2>
             <span className={styles.inlineActions}>
               <Link className={styles.button} href={nativeCreateHref("notes", item.project)}><UnigentamosIcon role="plus" size={16} />New note</Link>
               <button type="button" className={styles.button} onClick={() => openEditor("link-create", item, undefined, { linkScope: "note", sourceModule: "notes", sourceObjectType: "note", relationship: "source_material" })} disabled={readOnly}><UnigentamosIcon role="link" size={16} />Link note</button>
@@ -2426,107 +2407,64 @@ export default function ProjectsWorkspace({
         </section>
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
-            <h2>Decisions</h2>
+            <h2><UnigentamosIcon role="decision" size={18}/>Decisions</h2>
             <span className={styles.inlineActions}><Link className={styles.button} href={personalOpsCreateHref("decisions", item.project)}><UnigentamosIcon role="plus" size={16} />Add decision</Link></span>
           </div>
-          <LinkedDecisionsPanel showRefresh={false} source={projectDecisionSource(item.project)} decisions={decisions} loading={decisionsLoading} error={decisionsError} onRefresh={() => void refreshDecisions()} emptyLabel="No linked decisions." className={styles.embeddedPanel} compact showHeader={false} showBoundary={false} showSummary={false} showDecisionDetails title="Project decisions" />
+          {decisionsError && <p role="alert">{decisionsError} <button type="button" className={styles.button} onClick={()=>void refreshDecisions()}>Retry</button></p>}
+          {getLinkedDecisions(decisions,projectDecisionSource(item.project)).length ? <ProjectLinkedItems>
+            {getLinkedDecisions(decisions,projectDecisionSource(item.project)).map(decision=><ProjectLinkedItem key={decision.id}
+              source={createNativeObjectRef({module:"personal_ops",objectType:"decision",objectId:decision.id,label:decision.title})}
+              description={decision.finalDecision || decision.question || undefined}
+              status={<PersonalOpsStatusChip tone={personalOpsToneForState(decision.decisionState)}>{personalStatusLabel(decision.decisionState)}</PersonalOpsStatusChip>}
+              actions={<RowActionIcons inspectLabel={`Inspect ${decision.title}`} onInspect={()=>selectChild(`decision-${decision.id}`,"notes-decisions")}/>}/>)}
+          </ProjectLinkedItems> : <p>{decisionsLoading ? "Loading decisions…" : "No linked decisions."}</p>}
         </section>
       </div>
     );
   }
 
   function renderPeople(item: ProjectDirectoryItem) {
-    const people = item.links.filter((link) => link.source.module === "people" && link.linkState !== "removed");
-    return (
-      <div className={styles.overviewGrid}>
-        <section className={styles.panel} data-wide="true" data-project-people={item.project.id}>
-          <div className={styles.panelHeader}>
-            <h2>People</h2>
-            <span className={styles.inlineActions}>
-              <button
-                type="button"
-                className={styles.button}
-                onClick={() => openEditor("link-create", item, undefined, {
-                  sourceModule: "people",
-                  sourceObjectType: "person",
-                  linkScope: "people",
-                  relationship: "project_person"
-                })}
-                disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)}
-                title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}
-              ><UnigentamosIcon role="link" size={16} />Link person</button>
-            </span>
-          </div>
-          {people.length ? (
-            <ul className={styles.peopleList}>
-              {people.map((link) => (
-                <li key={link.id}>
-                  <span className={styles.personAvatar} aria-hidden="true">{initials(link.source.label)}</span>
-                  <span className={styles.itemBody}>
-                    <span className={styles.personHeading}>
-                      <strong>{link.source.label}</strong>
-                      <span className={styles.relationshipChip} data-tone="blue">{link.role || "Contributor"}</span>
-                    </span>
-                    {link.projectSpecificNote && <span className={styles.personDescription}>{link.projectSpecificNote}</span>}
-                  </span>
-                  <RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} onInspect={() => selectChild(link.id, "people")} openHref={link.source.route} openLabel={`Open ${link.source.label}`} />
-                </li>
-              ))}
-            </ul>
-          ) : <p>No linked people.</p>}
-        </section>
-      </div>
-    );
+    const readOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
+    return <>{(["person", "organization"] as const).map(type => {
+      const people = item.links.filter(link => link.source.module === "people" && link.source.objectType === type && link.linkState !== "removed");
+      const label = type === "person" ? "People" : "Organizations";
+      return <section className={styles.panel} key={type} aria-label={"Linked " + label.toLowerCase()} data-project-people={type === "person" ? item.project.id : undefined}>
+        <div className={styles.panelHeader}><h2><UnigentamosIcon role={type === "person" ? "module-people" : "organization"} size={18}/>{label}</h2>
+          <button type="button" className={styles.button} disabled={readOnly}
+            onClick={() => openEditor("link-create", item, undefined, {sourceModule:"people",sourceObjectType:type,linkScope:type === "person" ? "module-people" : "organization",relationship:"project_person"})}>
+            <UnigentamosIcon role="link" size={16}/>Link {type}</button>
+        </div>
+        {people.length ? <ProjectLinkedItems>{people.map(link => <ProjectLinkedItem key={link.id} source={link.source}
+          record={initialPersonalRecords.find(record => record.id === link.source.objectId)} unavailable={linkSourceIsUnsafe(link)}
+          description={link.projectSpecificNote} status={link.role ? <span>{link.role}</span> : undefined}
+          actions={<RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} onInspect={()=>selectChild(link.id, "people")}/>}/>)}</ProjectLinkedItems>
+          : <p>No linked {label.toLowerCase()}.</p>}
+      </section>;
+    })}</>;
   }
 
   function renderFilesLinks(item: ProjectDirectoryItem) {
-    const objectLinks = item.links.filter((link) => link.source.module !== "people" && link.source.module !== "notes" && !(link.source.module === "personal_ops" && link.source.objectType === "decision"));
+    const objectLinks = item.links.filter(link => link.source.module !== "people" && link.source.module !== "notes" && link.source.module !== "reviews" && !(link.source.module === "personal_ops" && link.source.objectType === "decision"));
     const readOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
-    return (
-      <div className={styles.overviewGrid}>
-        <section className={styles.panel} data-wide="true">
-          <div className={styles.panelHeader}>
-            <h2>Files & resources</h2>
-            <button type="button" className={styles.button} onClick={() => openEditor("link-create", item, undefined, { linkScope: "object", sourceModule: "media" })} disabled={readOnly}><UnigentamosIcon role="link" size={16} />Link object</button>
-          </div>
-          {objectLinks.length ? (
-            <ul className={styles.linkList}>
-              {objectLinks.map((link) => (
-                <li key={link.id} aria-current={selectedChildId === link.id || undefined} data-link-state={link.linkState}>
-                  <span className={styles.itemBody}>
-                    <strong>{link.source.label}</strong>
-                    {link.healthNote && <span>{displayLabel(link.linkState)}: {link.healthNote}</span>}
-                    {link.lastRepair && <span>Last repaired {formatDate(link.lastRepair.repairedAt)}: {link.lastRepair.reason}</span>}
-                    <small>{link.projectSpecificNote || "No project description yet."}</small>
-                  </span>
-                  <span className={styles.rowState} data-tone={stateTone(link.linkState)}>{displayLabel(link.linkState)}</span>
-                  <span className={styles.inlineActions}>
-                    <RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} onInspect={() => selectChild(link.id, "files-links")} openHref={linkSourceIsUnsafe(link) ? undefined : link.source.route} openLabel={`Open ${link.source.label}`} />
-                    {linkNeedsRepair(link) ? (
-                      <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("link-repair", item, link)}>Repair</button>
-                    ) : null}
-                    {link.linkState === "removed" ? (
-                      <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={item.project.lifecycle === "complete" ? "Completed projects are read-only; reopen behavior is intentionally unavailable." : item.project.lifecycle === "archived" ? "Restore the project before restoring its links." : undefined} onClick={() => {
-                        setConfirmationReason("");
-                        setConfirmation({ kind: "link-restore", projectId: item.project.id, objectId: link.id });
-                      }}>Restore</button>
-                    ) : (
-                      <button type="button" className={styles.button} data-danger="true" disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => {
-                        setConfirmationReason("");
-                        setConfirmation({ kind: "link-remove", projectId: item.project.id, objectId: link.id });
-                      }}>Remove link</button>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : <p>No linked files.</p>}
-        </section>
-        {renderReviewCoverage(item)}
-      </div>
-    );
+    const renderLink = (link: ProjectLink) => <ProjectLinkedItem key={link.id} source={link.source}
+      unavailable={linkSourceIsUnsafe(link) || link.linkState === "removed"}
+      description={link.healthNote || link.projectSpecificNote}
+      status={link.linkState !== "active" ? <span className={styles.rowState} data-tone={stateTone(link.linkState)}>{displayLabel(link.linkState)}</span> : undefined}
+      actions={<><RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} onInspect={()=>selectChild(link.id, "files-links")}/>
+        {linkNeedsRepair(link) && <button type="button" className={styles.button} disabled={readOnly} onClick={()=>openEditor("link-repair",item,link)}><UnigentamosIcon role="edit" size={15}/>Repair</button>}
+        <button type="button" className={styles.iconButton} disabled={readOnly}
+          aria-label={`${link.linkState === "removed" ? "Restore" : "Remove"} ${link.source.label} link`}
+          onClick={()=>{setConfirmationReason("");setConfirmation({kind:link.linkState === "removed" ? "link-restore" : "link-remove", projectId:item.project.id,objectId:link.id});}}>
+          <UnigentamosIcon role={link.linkState === "removed" ? "discard-changes" : "delete"} size={16}/></button>
+      </>}/>;
+    const active = objectLinks.filter(link=>link.linkState !== "removed"), removed = objectLinks.filter(link=>link.linkState === "removed");
+    return <section className={styles.panel}>
+      <div className={styles.panelHeader}><h2><UnigentamosIcon role="module-resources" size={18}/>Files &amp; resources</h2>
+        <button type="button" className={styles.button} disabled={readOnly} onClick={()=>openEditor("link-create",item,undefined,{linkScope:"object",sourceModule:"media"})}><UnigentamosIcon role="link" size={16}/>Link object</button></div>
+      {active.length ? <ProjectLinkedItems>{active.map(renderLink)}</ProjectLinkedItems> : <p>No linked files or resources.</p>}
+      {!!removed.length && <details className={styles.removedLinks}><summary>Removed links <span>{removed.length}</span></summary><ProjectLinkedItems>{removed.map(renderLink)}</ProjectLinkedItems></details>}
+    </section>;
   }
-
   function renderProperties(item: ProjectDirectoryItem) {
     return <ProjectProperties key={item.project.id} project={{ ...item.project, updatedAt: item.project.updatedAt || "" }} readOnly={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} busy={mutationBusy} onSave={async (patch, expectedUpdatedAt) => {
       if (mutationBusy || !item.project.editable) return false;
@@ -2570,12 +2508,29 @@ export default function ProjectsWorkspace({
       ? getLinkedDecisions(decisions, blockerDecisionSource).length > 0
       : false;
     const headingId = `project-selected-child-${selectedChildId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-    const parentReadOnly = ["complete", "archived"].includes(item.project.lifecycle);
+    const parentReadOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
     const parentReadOnlyReason = item.project.lifecycle === "complete"
-      ? "Completed projects are read-only; reopen behavior is intentionally unavailable."
+      ? "Completed projects are read-only."
       : item.project.lifecycle === "archived"
-        ? "Restore the project before changing its child objects."
-        : undefined;
+        ? "Restore this project to make changes."
+        : !item.project.editable ? "This project is read-only." : undefined;
+    const inspectionType = milestone ? "Milestone" : blocker ? "Blocker" : link ? "Linked object" : selectedDecision ? "Decision" : interaction ? "Update" : "Activity";
+    const inspectionIcon = milestone ? "goal" : blocker ? "warning" : link ? "link" : selectedDecision ? "decision" : interaction ? "interaction" : "timeline";
+    const inspectionTitle = milestone?.title || blocker?.title || link?.source.label || timelineEvent?.title || selectedDecision?.title || "Unavailable item";
+    const inspectionSummary = timelineEvent && !timelineEvent.isManual && timelineEvent.eventType === "project_updated"
+      ? "Project details were updated."
+      : timelineEvent && !timelineEvent.isManual && timelineEvent.eventType === "project_created"
+        ? "This project was created."
+        : timelineEvent?.summary;
+    const removalReason = timelineEvent?.eventType === "link_removed"
+      ? snapshot.nativeState.auditEvents.find((audit) => audit.object.objectId === timelineEvent.relatedObjectRef?.objectId && audit.occurredAt === timelineEvent.createdAt)?.after?.removalReason
+      : undefined;
+    const readableChange = (value: string, label: string) => {
+      if (["Due date", "Completion target", "Occurred"].includes(label) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        return label === "Occurred" ? formatTimestamp(value) : formatDate(value);
+      }
+      return ["Status", "State", "Severity", "Event type", "Link state", "Relationship", "Strength", "Review cadence"].includes(label) ? displayLabel(value) : value;
+    };
 
     function clearSelectedChild() {
       setSelectedChildId("");
@@ -2585,37 +2540,46 @@ export default function ProjectsWorkspace({
     return (
       <section
         ref={selectedChildRef}
-        className={styles.selectedChildPanel}
+        className={inspectionStyles.panel}
         tabIndex={-1}
         aria-labelledby={headingId}
         aria-live="polite"
       >
-        <header className={styles.selectedChildHeader}>
-          <div>
-            <span className={styles.eyebrow}>Selected project object</span>
-            <h2 id={headingId}>{milestone?.title || blocker?.title || link?.source.label || timelineEvent?.title || selectedDecision?.title || "Unavailable project object"}</h2>
+        <header className={inspectionStyles.header}>
+          <div className={inspectionStyles.identity}>
+            <UnigentamosIcon role={inspectionIcon} size={20} />
+            <div>
+              <h2 id={headingId}>{inspectionTitle}</h2>
+              <div className={inspectionStyles.meta}>
+                <span>{inspectionType}</span>
+                {timelineEvent && <time dateTime={timelineEvent.occurredAt}>{formatTimestamp(timelineEvent.occurredAt)}</time>}
+                {parentReadOnly && <span title={parentReadOnlyReason}>Read-only</span>}
+              </div>
+            </div>
           </div>
-          <button type="button" className={styles.button} onClick={clearSelectedChild}>Close inspection</button>
+          <button type="button" className={styles.iconButton} onClick={clearSelectedChild} aria-label="Close inspection" title="Close inspection"><UnigentamosIcon role="close" size={18} /></button>
         </header>
 
         {milestone && (
-          <div className={styles.selectedChildBody}>
+          <div className={inspectionStyles.body}>
             <p>{milestone.description || "No milestone description recorded."}</p>
-            <div className={styles.factGrid}>
-              <div className={styles.fact}><span>State</span><strong>{displayLabel(milestone.state)}</strong></div>
-              <div className={styles.fact}><span>Due</span><strong>{formatDate(milestone.dueAt)}</strong></div>
-              <div className={styles.fact}><span>Owner</span><strong>{milestone.owner || "Missing"}</strong></div>
-              <div className={styles.fact} data-mono="true"><span>Milestone ID</span><strong>{milestone.id}</strong></div>
+            <div className={inspectionStyles.facts}>
+              <div className={inspectionStyles.fact}><span>Status</span><strong>{displayLabel(milestone.state)}</strong></div>
+              <div className={inspectionStyles.fact}><span>Due</span><strong>{formatDate(milestone.dueAt, "No due date")}</strong></div>
+              <div className={inspectionStyles.fact}><span>Owner</span><strong>{milestone.owner || "Unassigned"}</strong></div>
             </div>
             <div>
-              <strong>Completion criteria</strong>
-              {milestone.completionCriteria.length ? <ul className={styles.criteriaList}>{milestone.completionCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul> : <p className={styles.notice}>No completion criteria are stored. Completion stays disabled until criteria are added.</p>}
+              <h3 className={inspectionStyles.sectionHeading}>Completion criteria</h3>
+              {milestone.completionCriteria.length ? <ul className={styles.criteriaList}>{milestone.completionCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul> : <p className={styles.notice}>Add completion criteria before marking this milestone complete.</p>}
             </div>
-            <div className={styles.inlineActions} aria-label="Milestone owner actions">
-              <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}>Create follow-up</Link>
-              {!hasMilestoneDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}>File decision</Link>}
-              {milestone.linkedRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>Open {ref.label}</Link>)}
+            <div className={inspectionStyles.actions} aria-label="Milestone owner actions">
+              <Link className={styles.button} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}><UnigentamosIcon role="follow-up" size={16} />Create follow-up</Link>
+              {!hasMilestoneDecisionOwner && <Link className={styles.button} href={personalOpsCreateHref("decisions", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}><UnigentamosIcon role="decision" size={16} />File decision</Link>}
+              {milestone.linkedRefs.map((ref) => <Link className={styles.button} href={ref.route} key={`${ref.module}-${ref.objectId}`}><UnigentamosIcon role="open" size={16} />Open {ref.label}</Link>)}
             </div>
+            <details className={inspectionStyles.disclosure}>
+              <summary>Follow-through &amp; review<UnigentamosIcon role="chevron-down" size={16} /></summary>
+              <div className={inspectionStyles.supporting}>
             <LinkedFollowUpsPanel showRefresh={false}
               source={projectFollowUpSource(item.project, {
                 objectType: "milestone",
@@ -2649,25 +2613,31 @@ export default function ProjectsWorkspace({
               title="Milestone decisions"
             />
             {renderReviewCoverage(item, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, true)}
+              </div>
+            </details>
+            <details className={inspectionStyles.disclosure}><summary>Record details<UnigentamosIcon role="chevron-down" size={16} /></summary><dl className={inspectionStyles.recordDetails}><div><dt>Milestone ID</dt><dd>{milestone.id}</dd></div><div><dt>Created</dt><dd>{formatTimestamp(milestone.createdAt)}</dd></div><div><dt>Last edited</dt><dd>{formatTimestamp(milestone.updatedAt)}</dd></div></dl></details>
           </div>
         )}
 
         {blocker && (
-          <div className={styles.selectedChildBody}>
+          <div className={inspectionStyles.body}>
             <p>{blocker.condition}</p>
-            <div className={styles.factGrid}>
-              <div className={styles.fact}><span>State</span><strong>{displayLabel(blocker.state)}</strong></div>
-              <div className={styles.fact}><span>Severity</span><strong>{displayLabel(blocker.severity)}</strong></div>
-              <div className={styles.fact}><span>Owner</span><strong>{blocker.owner || "Missing"}</strong></div>
-              <div className={styles.fact}><span>Due</span><strong>{formatDate(blocker.dueAt)}</strong></div>
+            <div className={inspectionStyles.facts}>
+              <div className={inspectionStyles.fact}><span>Status</span><strong>{displayLabel(blocker.state)}</strong></div>
+              <div className={inspectionStyles.fact}><span>Severity</span><strong>{displayLabel(blocker.severity)}</strong></div>
+              <div className={inspectionStyles.fact}><span>Owner</span><strong>{blocker.owner || "Unassigned"}</strong></div>
+              <div className={inspectionStyles.fact}><span>Due</span><strong>{formatDate(blocker.dueAt, "No due date")}</strong></div>
             </div>
             {blocker.resolution && <p><strong>Resolution:</strong> {blocker.resolution}</p>}
-            <div className={styles.inlineActions}>
-              {blocker.state === "open" && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve blocker</button>}
-              <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}>Create follow-up</Link>
-              {!hasBlockerDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}>File decision</Link>}
-              {blocker.sourceRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>Open {ref.label}</Link>)}
+            <div className={inspectionStyles.actions}>
+              {blocker.state === "open" && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("blocker-resolve", item, blocker)}><UnigentamosIcon role="check" size={16} />Resolve blocker</button>}
+              <Link className={styles.button} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}><UnigentamosIcon role="follow-up" size={16} />Create follow-up</Link>
+              {!hasBlockerDecisionOwner && <Link className={styles.button} href={personalOpsCreateHref("decisions", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}><UnigentamosIcon role="decision" size={16} />File decision</Link>}
+              {blocker.sourceRefs.map((ref) => <Link className={styles.button} href={ref.route} key={`${ref.module}-${ref.objectId}`}><UnigentamosIcon role="open" size={16} />Open {ref.label}</Link>)}
             </div>
+            <details className={inspectionStyles.disclosure}>
+              <summary>Follow-through &amp; review<UnigentamosIcon role="chevron-down" size={16} /></summary>
+              <div className={inspectionStyles.supporting}>
             <LinkedFollowUpsPanel showRefresh={false}
               source={projectFollowUpSource(item.project, {
                 objectType: "blocker",
@@ -2701,11 +2671,13 @@ export default function ProjectsWorkspace({
               title="Blocker decisions"
             />
             {renderReviewCoverage(item, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, true)}
+              </div>
+            </details>
           </div>
         )}
 
         {link && (
-          <div className={styles.selectedChildBody}>
+          <div className={inspectionStyles.body}>
             {link.healthNote && <div className={styles.boundary}><strong>{displayLabel(link.linkState)} association</strong>{link.healthNote}</div>}
             {link.lastRepair && <div className={styles.boundary}><strong>Last repaired {formatDate(link.lastRepair.repairedAt)}</strong>{link.lastRepair.reason} Previous source: {link.lastRepair.previousSource.label}.</div>}
             <ConnectionInspectionEditor
@@ -2714,7 +2686,7 @@ export default function ProjectsWorkspace({
               busy={mutationBusy}
               onSave={(patch) => saveConnectionInline(item, link, patch)}
             />
-            <div className={styles.inlineActions}>
+            <div className={inspectionStyles.actions}>
               <RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} openHref={linkSourceIsUnsafe(link) ? undefined : link.source.route} openLabel={`Open ${link.source.label}`} />
               {linkNeedsRepair(link) ? (
                 <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-repair", item, link)}>Repair association</button>
@@ -2735,10 +2707,26 @@ export default function ProjectsWorkspace({
         )}
 
         {timelineEvent && (
-          <div className={styles.selectedChildBody}>
-            <p>{timelineEvent.summary}</p>
+          <div className={inspectionStyles.body}>
+            <p>{inspectionSummary}</p>
+            {typeof removalReason === "string" && removalReason && <div className={inspectionStyles.contentSection}><h3>Reason for removal</h3><p>{removalReason}</p></div>}
+            {changeLog.length > 0 && <details className={inspectionStyles.disclosure} open={!interaction}>
+              <summary>{interaction ? "Update history" : "What changed"}<UnigentamosIcon role="chevron-down" size={16} /></summary>
+              <section className={inspectionStyles.changes} aria-label="Change log">
+              <ul>{changeLog.map((change) => <li key={change.id}>
+                <div className={inspectionStyles.changeHeading}><strong>{change.label === "State" ? "Status" : change.label === "Link state" ? "Link status" : change.label === "Occurred" ? "Date and time" : change.label}</strong><time dateTime={change.occurredAt}>{formatTimestamp(change.occurredAt)}</time></div>
+                <div className={inspectionStyles.changeValues}><div><span>Before</span><p>{readableChange(change.before, change.label)}</p></div><UnigentamosIcon role="arrow-right" size={16} /><div><span>After</span><p>{readableChange(change.after, change.label)}</p></div></div>
+              </li>)}</ul>
+              </section>
+            </details>}
+            <div className={inspectionStyles.actions}>
+              {interaction && <button type="button" className={styles.button} disabled={parentReadOnly || mutationBusy} title={parentReadOnlyReason} onClick={() => openEditor("interaction-edit", item, interaction)}><UnigentamosIcon role="edit" size={16} />Edit update</button>}
+              {timelineEvent.eventType.startsWith("link_") && timelineEvent.sourceRef?.route && <Link className={styles.button} href={timelineEvent.sourceRef.route}><UnigentamosIcon role="open" size={16} />Open linked object</Link>}
+            </div>
+            <details className={inspectionStyles.disclosure}>
+              <summary>Event details<UnigentamosIcon role="chevron-down" size={16} /></summary>
             <form
-              className={styles.eventEditor}
+              className={inspectionStyles.eventEditor}
               key={timelineEvent.updatedAt}
               onSubmit={async (submitEvent) => {
                 submitEvent.preventDefault();
@@ -2750,34 +2738,25 @@ export default function ProjectsWorkspace({
               }}
             >
               <label className={styles.field}>Event type<SelectField name="eventType" defaultValue={timelineEvent.eventType} disabled={parentReadOnly || mutationBusy}>{PROJECT_TIMELINE_EVENT_TYPES.map((eventType) => <option value={eventType} key={eventType}>{displayLabel(eventType)}</option>)}</SelectField></label>
-              <label className={styles.field}>Occurred<input name="occurredAt" type="datetime-local" defaultValue={toLocalDateTimeInput(new Date(timelineEvent.occurredAt))} disabled={parentReadOnly || mutationBusy} required /></label>
+              <label className={styles.field}>Date and time<input name="occurredAt" type="datetime-local" defaultValue={toLocalDateTimeInput(new Date(timelineEvent.occurredAt))} disabled={parentReadOnly || mutationBusy} required /></label>
               {!parentReadOnly && <button type="submit" className={styles.button} data-primary="true" disabled={mutationBusy}>{mutationBusy ? "Saving…" : "Save event details"}</button>}
             </form>
-            <div className={styles.changeLog}>
-              <strong>Change log</strong>
-              {changeLog.length ? <ul>{changeLog.map((change) => <li key={change.id}><span>{change.label}</span><span><del>{change.before}</del><span aria-hidden="true"> → </span><ins>{change.after}</ins></span><time>{formatTimestamp(change.occurredAt)}</time></li>)}</ul> : <p>{timelineEvent.summary}</p>}
-            </div>
-            <div className={styles.inlineActions}>
-              {interaction && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("interaction-edit", item, interaction)}>Edit update</button>}
-              <RowActionIcons inspectLabel={`Inspect ${timelineEvent.title}`} openHref={timelineEvent.eventType.startsWith("link_") ? timelineEvent.sourceRef?.route : undefined} openLabel={`Open source for ${timelineEvent.title}`} />
-            </div>
+            </details>
           </div>
         )}
 
         {selectedDecision && (
-          <div className={styles.selectedChildBody}>
-            <div className={styles.decisionInspection}>
-              <span><small aria-label="Question">?</small>{selectedDecision.question || "No question recorded."}</span>
-              <span><small aria-label="Decision">!</small>{selectedDecision.finalDecision || "No decision recorded yet."}</span>
-            </div>
-            <div className={styles.inlineActions}>
-              <RowActionIcons inspectLabel={`Inspect ${selectedDecision.title}`} openHref={decisionOwnerRoute(selectedDecision)} openLabel={`Open ${selectedDecision.title}`} />
+          <div className={inspectionStyles.body}>
+            <div className={inspectionStyles.contentSection}><h3>Question</h3><p>{selectedDecision.question || "No question recorded."}</p></div>
+            <div className={inspectionStyles.contentSection}><h3>Decision</h3><p>{selectedDecision.finalDecision || "No decision recorded yet."}</p></div>
+            <div className={inspectionStyles.actions}>
+              <Link className={styles.button} href={decisionOwnerRoute(selectedDecision)}><UnigentamosIcon role="open" size={16} />Open decision</Link>
             </div>
           </div>
         )}
 
         {!milestone && !blocker && !link && !timelineEvent && !selectedDecision && (
-          <SystemState variant="stale" compact title="Selected object is no longer available" description="The deep-linked child ID remains visible in the URL. Close this inspection to return to the project tab." />
+          <SystemState variant="stale" compact title="This item is no longer available" description="Close this inspection to return to the project." />
         )}
       </section>
     );
@@ -2794,7 +2773,7 @@ export default function ProjectsWorkspace({
         <DetailTabPanel tabsId={tabsId} tabId="overview" active={activeTab === "overview"}>{renderOverview(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="activity" active={visibleProjectTab(activeTab) === "activity"}>{renderTimeline(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="links" active={visibleProjectTab(activeTab) === "links"}>
-          <div className={styles.projectLinks}>{renderPeople(item)}{renderNotesDecisions(item)}{renderFilesLinks(item)}<RelatedRecords module="projects" type="project" id={item.project.id} hideEmpty /></div>
+          <div className={styles.projectLinks}><div className={styles.linkColumn}>{renderPeople(item)}{renderFilesLinks(item)}</div><div className={styles.linkColumn}>{renderNotesDecisions(item)}{renderReviewCoverage(item)}</div><RelatedRecords module="projects" type="project" id={item.project.id} hideEmpty /></div>
         </DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="properties" active={activeTab === "properties"}>{renderProperties(item)}</DetailTabPanel>
       </div>
@@ -2853,7 +2832,7 @@ export default function ProjectsWorkspace({
                 ? "Report association issue"
                 : editor?.kind === "link-repair"
                   ? "Repair source association"
-                  : "Link object";
+                  : editor?.values.linkScope === "organization" ? "Link organization" : editor?.values.linkScope === "people" ? "Link person" : editor?.values.linkScope === "note" ? "Link note" : "Link object";
   const editorDescription = editor?.kind === "legacy-promote"
     ? "Start tracking this project in the current workspace."
     : editor?.kind === "link-create"
@@ -3000,7 +2979,9 @@ export default function ProjectsWorkspace({
       </div>;
     }
     const linkScope = value("linkScope") || (value("sourceModule") === "people" ? "people" : "object");
-    const linkingPeople = linkScope === "people";
+    const linkingPeople = linkScope === "people" || linkScope === "organization";
+    const linkingOrganizations = linkScope === "organization";
+    const peopleOptions = initialPeople.filter(record=>linkingOrganizations ? record.className === "org" : record.className === "person");
     const linkingNote = linkScope === "note";
     const recordOptions = initialPersonalRecords
       .map((record) => ({ record, ref: personalRecordObjectRef(record) }))
@@ -3016,9 +2997,10 @@ export default function ProjectsWorkspace({
     return <div className={styles.formGrid}>
       {linkingPeople ? (
         <label className={styles.field} data-wide="true">
-          People identity
+          {linkingOrganizations ? "Organization" : "Person"}
           <SelectField
-            aria-label="People identity"
+            aria-label={linkingOrganizations ? "Organization" : "Person"}
+            searchable
             value={value("sourceObjectId")}
             onChange={(event) => {
               const person = initialPeople.find((candidate) => candidate.id === event.target.value);
@@ -3031,8 +3013,8 @@ export default function ProjectsWorkspace({
             required
             autoFocus
           >
-            <option value="">Choose an existing People identity</option>
-            {initialPeople.map((person) => <option value={person.id} key={person.id}>{person.profile?.fullName || person.title}</option>)}
+            <option value="">Choose {linkingOrganizations ? "an organization" : "a person"}</option>
+            {peopleOptions.map((person) => <option value={person.id} key={person.id}>{person.profile?.fullName || person.title}</option>)}
           </SelectField>
         </label>
       ) : (
@@ -3130,36 +3112,15 @@ export default function ProjectsWorkspace({
           }}><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="grid">Grid</option></SelectField>
         </WorkspaceToolbar>
         {visibleProjects.length ? (
-          <DirectoryLayout view={grid ? "grid" : compact ? "compact" : "comfortable"} className={`resource-directory ${styles.projectDirectory} ${grid ? "is-grid" : compact ? "is-compact" : ""}`} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
-            {visibleProjects.map((item) => {
-              const milestone = nextMilestone(item);
-              const attention = item.attentionReasons.find(reason => /overdue/i.test(reason)) || item.attentionReasons.find(reason=>!/objectives.*not defined/i.test(reason));
-              const objectCount = new Set(item.linkedContext.map(({ ref }) => `${ref.module}:${ref.objectType}:${ref.objectId}`)).size;
-              const signal = attention || (milestone ? `Next milestone ${formatDate(milestone.dueAt)}` : "");
-              const needsAttention = /overdue|blocker/i.test(attention || "");
-              const cardDate = (value?: string) => value && Number.isFinite(Date.parse(value))
-                ? new Intl.DateTimeFormat("en-US", { timeZone: displayTimeZone, month: "2-digit", day: "2-digit", year: "2-digit" }).format(new Date(value))
-                : "—";
-              const projectMeta = <span className={styles.projectMeta}>
-                <span title={`Created ${formatTimestamp(item.project.createdAt)}`}><UnigentamosIcon role="calendar" size={14} /><span>Created <time dateTime={item.project.createdAt}>{cardDate(item.project.createdAt)}</time></span></span>
-                <span title={`Last edited ${formatTimestamp(item.project.updatedAt)}`}><UnigentamosIcon role="edit" size={14} /><span>Edited <time dateTime={item.project.updatedAt}>{cardDate(item.project.updatedAt)}</time></span></span>
-                <span title="All linked objects, including people"><UnigentamosIcon role="object" size={14} />{objectCount} object{objectCount === 1 ? "" : "s"}</span>
-              </span>;
-              return <DirectoryCard
-                key={item.project.id} id={item.project.id} title={item.project.name}
-                picture={item.project.photoUpdatedAt ? <PeopleProfileAvatar initials={initials(item.project.name)} label={item.project.name} photoUrl={`/api/projects/photos/${encodeURIComponent(item.project.id)}`} photoUpdatedAt={item.project.photoUpdatedAt} /> : <span aria-hidden="true">{initials(item.project.name)}</span>}
-                status={displayLabel(item.project.lifecycle)}
-                statusIcon={PROJECT_STATUS_ICONS[item.project.lifecycle]}
-                tag={displayLabel(item.project.lifecycle)}
-                description={item.project.objective || item.project.description || <span aria-hidden="true">&nbsp;</span>}
-                metadata={projectMeta}
-                signal={<span className={styles.projectSignal} data-attention={needsAttention || undefined} title={item.attentionReasons.filter(reason=>!/objectives.*not defined/i.test(reason)).join(" ") || signal}>{signal && <><UnigentamosIcon role={needsAttention ? "warning" : attention ? "information" : "calendar"} size={14} /><span>{signal.replace(/\.$/, "")}</span></>}</span>}
-                selected={selectedProjectId === item.project.id}
-                onSelect={() => selectProject(item)}
-                actions={<button type="button" onClick={() => void toggleStar(item)} disabled={!item.project.editable || mutationBusy || ["complete", "archived"].includes(item.project.lifecycle)} aria-label={item.project.starred ? "Remove star" : "Star project"} aria-pressed={item.project.starred} data-active={item.project.starred || undefined}><UnigentamosIcon role="star" size={16} /></button>}
-              />;
-            })}
-          </DirectoryLayout>
+          <ProjectDirectoryCards
+            items={visibleProjects}
+            view={grid ? "grid" : compact ? "compact" : "comfortable"}
+            selectedId={selectedProjectId}
+            busy={mutationBusy}
+            timeZone={displayTimeZone}
+            onSelect={selectProject}
+            onToggleStar={item => void toggleStar(item)}
+          />
         ) : (
           <SystemState
             variant="empty"

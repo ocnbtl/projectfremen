@@ -24,3 +24,15 @@ Directory coverage, local spelling, nearby branches, former addresses and
 businesses outside the search neighborhood can affect results. Suggestions
 remain explicit even when the two sources disagree. No scheduled crawling,
 paid service, or migration of saved places is required.
+
+When exact-name, numbered venue suggestions have equal name/address/locality
+relevance, the Overture [place confidence](https://docs.overturemaps.org/schema/reference/places/place/)
+can break the tie. This estimates whether a place exists; it does **not** verify
+its street, show independent source agreement, or authorize automatic selection.
+An absent score is neutral. Explicit street/locality matches take precedence,
+and conflicting addresses remain separate choices. Confidence is lookup-only
+metadata and is not copied into saved places.
+
+The offline benchmark supports `--conflict-holdout` for four additional venues
+selected from operator pages before inspecting their provider responses. Run
+without `--sample` to replay the captured data without network requests.

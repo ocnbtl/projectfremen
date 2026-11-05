@@ -166,6 +166,8 @@ function matchesInTile(indexed: TileIndex, x: number, y: number, query: string, 
         ? "address" as const : "approximate" as const,
       sourceLabel: "Overture Maps", attributionUrl: "https://docs.overturemaps.org/attribution/#places",
       sourceUrl: `https://explore.overturemaps.org/?feature=places.place.${id}`,
+      ...(typeof props.confidence === "number" && Number.isFinite(props.confidence) && props.confidence >= 0 && props.confidence <= 1
+        ? { providerConfidence: props.confidence } : {}),
     };
     const deltaLon = Math.abs(longitude - center.longitude);
     const distance = Math.hypot(latitude - center.latitude, Math.min(deltaLon, 360 - deltaLon) * Math.cos(center.latitude * Math.PI / 180));

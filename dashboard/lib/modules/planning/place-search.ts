@@ -1,6 +1,6 @@
 import { ADDRESS_COUNTRIES, formatPlaceAddress, splitPastedAddress, type AddressParts } from "./place-address";
 import { addressFieldKey, conflictingVenueAddress, numberedStreet, placeWords as words, postalKey, sameNumberedVenue, streetKey } from "./place-match";
-export type PlaceSearchResult = { name: string; address: string; latitude: number; longitude: number; countryCode?: string; addressParts?: AddressParts; kind?: string; precision?: "address" | "area" | "approximate"; sourceUrl?: string; sourceLabel?: string; attributionUrl?: string };
+export type PlaceSearchResult = { name: string; address: string; latitude: number; longitude: number; countryCode?: string; addressParts?: AddressParts; kind?: string; precision?: "address" | "area" | "approximate"; sourceUrl?: string; sourceLabel?: string; attributionUrl?: string; providerConfidence?: number };
 export type CoordinateSearchOptions = { name?: string; countryCode?: string; addressParts?: AddressParts };
 export function placeFromSearch(match: PlaceSearchResult) {
   return { name: match.name, address: match.address, countryCode: match.countryCode || "", addressParts: match.addressParts || { street: "", city: "", region: "", postalCode: "", district: "" }, latitude: match.latitude, longitude: match.longitude,
@@ -72,7 +72,19 @@ function sameSuggestion(a: PlaceSearchResult, b: PlaceSearchResult) {
 
 /** Rank for display. An unqualified worldwide search has no draft locality. */
 export function rankPlaceSuggestions(query: string, candidates: PlaceSearchResult[], context: CoordinateSearchOptions = {}): PlaceSearchResult[] {
-  const sorted = candidates.filter(usablePoint).map(row => ({ row, score: relevance(query, row, context) })).sort((a, b) => b.score - a.score);
+  const requestedName = words(context.name || query.split(",")[0]);
+  const confidence = (row: PlaceSearchResult) => {
+    // Overture estimates whether a place exists, not address correctness. Use
+    // it only to break equal relevance for an exact named, numbered venue.
+    // Missing confidence is neutral; it is not evidence that a venue is bad.
+    // Do not count directory records as independent corroborating sources.
+    const value = row.providerConfidence;
+    return row.precision === "address" && words(row.name) === requestedName &&
+      /^https:\/\/explore\.overturemaps\.org\/\?feature=places\.place\.[0-9a-f-]+$/i.test(row.sourceUrl || "") &&
+      typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1 ? value : .5;
+  };
+  const sorted = candidates.filter(usablePoint).map(row => ({ row, score: relevance(query, row, context), confidence: confidence(row) }))
+    .sort((a, b) => b.score - a.score || b.confidence - a.confidence);
   const groups: PlaceSearchResult[][] = [];
   for (const { row } of sorted) {
     // A shared cross-provider candidate must not bridge two distinct branches.

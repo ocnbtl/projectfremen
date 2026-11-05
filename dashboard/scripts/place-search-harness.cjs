@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), ts = require('typescript');
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename);
 const { splitPastedAddress, formatPlaceAddress } = require('../lib/modules/planning/place-address.ts');
-const { searchPlaceCoordinates, searchFullPlace, parsePlaceSearch, rankPlaceSuggestions, canAutofillCoordinates } = require('../lib/modules/planning/place-search.ts');
+const { searchPlaceCoordinates, searchFullPlace, parsePlaceSearch, rankPlaceSuggestions, canAutofillCoordinates, placeFromSearch } = require('../lib/modules/planning/place-search.ts');
 (async () => {
   const parts = { street: '3087 Terminal Dr', city: 'Hebron', region: 'KY', postalCode: '41048', district: '' };
   for (const address of ['3087 Terminal Dr, Hebron, KY 41048', '3087 Terminal Dr Hebron, KY 41048', '3087 Terminal Dr Hebron KY 41048', '3087 Terminal Dr, Hebron, Kentucky 41048, USA', '3087 Terminal Dr\nHebron, KY 41048\nUnited States', '3087 Terminal Dr, Hebron, KY, 41048']) {
@@ -74,6 +74,21 @@ const { searchPlaceCoordinates, searchFullPlace, parsePlaceSearch, rankPlaceSugg
   assert.equal(rankPlaceSuggestions('North Cafe', candidates, { name: 'North Cafe', countryCode: 'US', addressParts: parts })[0], venue);
   assert.equal(rankPlaceSuggestions('3087 Terminal Drive, Hebron', [neighboringBranch, venue])[0], venue);
   assert.equal(rankPlaceSuggestions('North Cafe', candidates).length, 4, 'Nearby reports of one venue merge while tenants and branches stay distinct');
+  const directoryBranch = { ...neighboringBranch, providerConfidence: .97,
+    sourceUrl: 'https://explore.overturemaps.org/?feature=places.place.8b01262a-8209-4012-8879-1125bfcb09b3' };
+  assert.deepEqual(rankPlaceSuggestions('North Cafe', [venue, directoryBranch]), [directoryBranch, venue], 'Confidence only resolves equal-relevance named venue choices, retaining conflicts');
+  assert.equal(rankPlaceSuggestions('North Cafe', [directoryBranch, venue], { name: 'North Cafe', countryCode: 'US', addressParts: parts })[0], venue, 'Explicit street wins against a high-confidence neighboring branch');
+  const confidentDistant = { ...directoryBranch, ...distantBranch, sourceUrl: directoryBranch.sourceUrl };
+  assert.equal(rankPlaceSuggestions('North Cafe, Hebron', [confidentDistant, venue])[0], venue, 'Explicit locality wins over directory confidence');
+  const confidentTenant = { ...directoryBranch, name: 'South Coffee' };
+  assert.equal(rankPlaceSuggestions('North Cafe', [confidentTenant, venue])[0], venue, 'Exact name wins over directory confidence');
+  for (const providerConfidence of [undefined, NaN, Infinity, -.1, 1.1, '1']) {
+    const invalidConfidence = { ...directoryBranch, providerConfidence };
+    assert.equal(rankPlaceSuggestions('North Cafe', [venue, invalidConfidence])[0], venue, 'Missing or invalid confidence is neutral');
+  }
+  assert.equal(rankPlaceSuggestions('North Cafe', [venue, { ...directoryBranch, sourceUrl: 'https://example.org/places/untrusted' }])[0], venue, 'Unrecognized source cannot claim Overture confidence');
+  assert.equal(canAutofillCoordinates([directoryBranch], address, { name: 'North Cafe', countryCode: 'US', addressParts: parts }), false, 'Confidence never verifies a conflicting address');
+  assert(!Object.hasOwn(placeFromSearch(directoryBranch), 'providerConfidence'), 'Lookup confidence is not saved-place data');
   const secondCounter = { ...venue, sourceUrl: 'https://www.openstreetmap.org/node/11' };
   assert.equal(rankPlaceSuggestions('North Cafe', [localBranch, venue, secondCounter]).length, 2, 'One cross-source candidate must not bridge two separate source records');
   assert.equal(rankPlaceSuggestions('North Cafe', [venue, { ...localBranch, latitude: 40 }]).length, 2, 'Conflicting coordinates stay reviewable');

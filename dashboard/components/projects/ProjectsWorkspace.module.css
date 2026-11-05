@@ -2124,7 +2124,7 @@
 .projectLinks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; padding-top: 12px; }
 .projectLinks > .overviewGrid { display: contents; }
 .projectBody .projectLinks .panel { grid-column: auto; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-bg); }
-.projectLinks > :last-child { grid-column: 1 / -1; }
+.projectLinks > :last-child:not(.linkColumn) { grid-column: 1 / -1; }
 .projectLinks :global(.system-state) { padding: 14px; border: 0; background: var(--panel-bg-subtle); border-radius: 9px; }
 .projectLinks :global(.system-state__title) { font-size: 14px; }
 .projectLinks :global(.system-state__description) { font-size: 13px; }
@@ -2170,6 +2170,31 @@
 .objectivesPanel .objectiveList input {margin:0!important;}
 
 .projectLinks .embeddedPanel p {padding:0;border:0;border-radius:0;background:none;margin:8px 0;}
+
+/* Linked records share one compact rhythm, without empty cells between sections. */
+.projectBody .projectLinks {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;padding-top:16px;}
+.linkColumn {display:grid;gap:16px;min-width:0;}
+.linkColumn > .overviewGrid {display:contents;}
+.projectBody .projectLinks .panel {margin:0;padding:16px;}
+.projectLinks .panelHeader {align-items:center;margin-bottom:12px;gap:10px;}
+.projectLinks .panelHeader :is(h2,h3) {display:flex;align-items:center;gap:8px;font-size:15px;font-weight:550;line-height:1.4;margin:0;}
+.projectLinks .panelHeader :is(h2,h3) svg {color:var(--module-icon);flex:none;}
+.projectLinks .panel > p {margin:0;font-size:13px;line-height:1.5;}
+.projectLinks .iconButton {display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;min-height:30px;padding:0;flex:none;}
+.projectLinks .iconButton svg {width:16px;height:16px;}
+.removedLinks {margin-top:12px;}
+.removedLinks summary {cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);padding:6px 0;}
+.removedLinks summary span {padding:2px 6px;border-radius:6px;background:var(--module-primary-50);}
+.removedLinks[open] summary {margin-bottom:8px;}
+.formPanel {max-width:880px;width:100%;margin:16px auto;border:1px solid var(--border);border-radius:14px;overflow:visible;--action-primary:var(--module-action);--action-primary-hover:var(--module-action-hover);--action-primary-contrast:var(--module-action-contrast);}
+.formHeader {border:0;padding:18px 20px 8px;align-items:center;}
+.formHeader h2 {font-size:18px;font-weight:550;}
+.formHeader p {font-size:13px;line-height:1.5;}
+.formBody {padding:12px 20px;}
+.formFooter {border:0;padding:12px 20px 18px;}
+.formPanel .button[data-primary=true] {background:var(--module-action);border-color:var(--module-action);color:var(--module-action-contrast);}
+.formPanel .iconButton {width:34px;height:34px;min-width:34px;min-height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;}
+@media(max-width:760px) {.projectBody .projectLinks {grid-template-columns:minmax(0,1fr);gap:12px;}.linkColumn{gap:12px;}.projectBody .projectLinks .panel{padding:14px;}}
 
 @media(max-width:760px) {
   .projectBody .activityList li {grid-template-columns:9px minmax(0,1fr) auto;}

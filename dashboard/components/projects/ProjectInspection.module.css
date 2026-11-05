@@ -1,0 +1,81 @@
+.panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-bg-subtle);
+  scroll-margin-top: calc(var(--app-content-offset, 64px) + 16px);
+}
+
+.panel:focus-visible,
+.disclosure > summary:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 3px;
+}
+
+.header, .identity, .meta, .actions, .changeHeading {
+  display: flex;
+  gap: 12px;
+}
+
+.header { align-items: flex-start; justify-content: space-between; }
+.identity { min-width: 0; align-items: flex-start; }
+.identity > svg { flex: 0 0 auto; margin-top: 3px; color: var(--text-muted); }
+.identity > div { min-width: 0; }
+.header h2 { margin: 0; color: var(--text-strong); overflow-wrap: anywhere; font: 600 18px/1.4 var(--font-heading); }
+.meta { flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.meta time, .changeHeading time { font-variant-numeric: tabular-nums; }
+.body { display: grid; gap: 16px; min-width: 0; }
+.body p { margin: 0; color: var(--text); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.facts { display: flex; flex-wrap: wrap; gap: 12px 32px; }
+.fact { display: grid; align-content: start; gap: 4px; min-width: 76px; }
+.fact > span { color: var(--text-muted); font-size: 12px; }
+.fact > strong { color: var(--text-strong); font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.contentSection { display: grid; gap: 6px; }
+.sectionHeading, .contentSection h3, .changes h3 { margin: 0; color: var(--text-strong); font: 600 13px/1.5 var(--font-body); }
+.actions { flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions:empty { display: none; }
+.actions > a, .actions > button { max-width: 100%; }
+.disclosure { min-width: 0; border-top: 1px solid var(--border); }
+.disclosure > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; color: var(--text-muted); cursor: pointer; list-style: none; font: 550 13px/1.5 var(--font-body); }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary:hover { color: var(--text-strong); }
+.disclosure > summary > svg { flex-shrink: 0; transition: transform 160ms ease-out; }
+.disclosure[open] > summary > svg { transform: rotate(180deg); }
+.supporting { display: grid; gap: 12px; padding-top: 8px; }
+.recordDetails { display: grid; gap: 8px; margin: 4px 0 0; font-size: 12px; }
+.recordDetails > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; }
+.recordDetails dt { color: var(--text-muted); }
+.recordDetails dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.changes { display: grid; gap: 8px; min-width: 0; }
+.changes ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.changes li { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--border); }
+.changeHeading { flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; font-size: 12px; }
+.changeHeading strong { color: var(--text-strong); font-weight: 600; }
+.changeHeading time { color: var(--text-muted); }
+.changeValues { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); gap: 12px; align-items: start; }
+.changeValues > div { min-width: 0; }
+.changeValues > div > span { display: block; margin-bottom: 3px; color: var(--text-muted); font-size: 11px; }
+.changeValues > svg { margin-top: 21px; color: var(--text-muted); }
+.eventEditor { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; align-items: end; padding-top: 8px; }
+.eventEditor > button { justify-self: start; }
+
+@media (max-width: 600px) {
+  .panel { padding: 14px; gap: 14px; }
+  .header h2 { font-size: 16px; }
+  .identity { gap: 8px; }
+  .body { gap: 14px; }
+  .facts { gap: 12px 24px; }
+  .fact { flex: 1 0 calc(50% - 24px); }
+  .changeValues { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .changeValues > svg { display: none; }
+  .eventEditor { grid-template-columns: minmax(0, 1fr); }
+  .disclosure > summary { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure > summary > svg { transition: none; }
+}

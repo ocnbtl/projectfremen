@@ -1,0 +1,26 @@
+[
+  {
+    "query": "Northside Yacht Club, Cincinnati",
+    "names": ["Northside Yacht Club"],
+    "street": "4231 Spring Grove Avenue", "cities": ["Cincinnati"], "country": "US",
+    "source": "https://northsideyachtclub.com/"
+  },
+  {
+    "query": "Southgate House Revival, Newport KY",
+    "names": ["Southgate House Revival", "The Southgate House Revival"],
+    "street": "111 E. 6th St.", "cities": ["Newport"], "country": "US",
+    "source": "https://www.southgatehouse.com/contact/"
+  },
+  {
+    "query": "Iris Book Cafe, Cincinnati",
+    "names": ["Iris Book Cafe", "Iris BookCafe", "Iris BookCafé"],
+    "street": "1331 Main Street", "cities": ["Cincinnati"], "country": "US",
+    "source": "https://irisbookcafe.wordpress.com/about/"
+  },
+  {
+    "query": "Lucky Cat Museum, Cincinnati",
+    "names": ["Lucky Cat Museum", "The Lucky Cat Museum"],
+    "street": "2511 Essex Place #150", "cities": ["Cincinnati"], "country": "US",
+    "source": "https://ruby-wombat-8556.squarespace.com/"
+  }
+]

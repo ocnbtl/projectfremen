@@ -8,7 +8,8 @@ const Module = require('node:module');
 const { createHash } = require('node:crypto');
 const ts = require('typescript');
 const holdout = process.argv.includes('--holdout');
-const cases = holdout ? require('./place-venue-holdout.json') : require('./place-venue-cases.json');
+const conflictHoldout = process.argv.includes('--conflict-holdout');
+const cases = conflictHoldout ? require('./place-venue-conflict-holdout.json') : holdout ? require('./place-venue-holdout.json') : require('./place-venue-cases.json');
 // Keep the original score reproducible. Human review of the frozen holdout found
 // two legitimate name variants that its strict aliases missed. Record a second
 // score, requiring the same published street and locality in either case.
@@ -142,7 +143,9 @@ function words(value = '') {
 function streetKey(value) {
   // A house number can precede or follow the street in different countries.
   return words(value).replace(/\bstreet\b/g, 'st').replace(/\bavenue\b/g, 'ave')
-    .replace(/\bhighway\b/g, 'hwy').split(' ').sort().join(' ');
+    .replace(/\bhighway\b/g, 'hwy').replace(/\bplace\b/g, 'pl')
+    .replace(/\beast\b/g, 'e').replace(/\bwest\b/g, 'w').replace(/\bnorth\b/g, 'n').replace(/\bsouth\b/g, 's')
+    .split(' ').sort().join(' ');
 }
 function checkVenue(test, row) {
   const parts = row.addressParts || {};
@@ -179,7 +182,7 @@ function describe(test, rows) {
     nameAndLocalityRank: checks.findIndex(check => check.namedVenue && check.locality) + 1 || null,
     candidates: rows.map((row, index) => ({
       name: row.name, address: row.address, sourceUrl: row.sourceUrl, latitude: row.latitude,
-      longitude: row.longitude, ...checks[index],
+      longitude: row.longitude, providerConfidence: row.providerConfidence, ...checks[index],
     })),
   };
 }
@@ -232,7 +235,7 @@ async function main() {
     mode: allowSample ? 'bounded public provider sample plus cached responses' : 'offline public response replay',
     scoring: 'Named venue, operator street and house number, locality and country. Separate distance where operator links a map pin. No synthetic candidates.',
     totals, results };
-  const filename = (holdout ? 'holdout-' : '') + (baselineOnly ? 'baseline-' : '') + (structured ? 'structured-' : '') + 'results.json';
+  const filename = (conflictHoldout ? 'conflict-holdout-' : holdout ? 'holdout-' : '') + (baselineOnly ? 'baseline-' : '') + (structured ? 'structured-' : '') + 'results.json';
   fs.writeFileSync(path.join(out, filename), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(totals));
   if (results.length !== cases.length || results.some(result => Object.keys(searches).some(label => result[label].error))) process.exitCode = 1;
