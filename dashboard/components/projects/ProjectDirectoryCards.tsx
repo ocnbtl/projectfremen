@@ -6,6 +6,10 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { ProjectDirectoryItem } from "../../lib/modules/projects/view-model";
 import type { ProjectLifecycleState } from "../../lib/modules/projects/types";
 import styles from "./ProjectDirectoryCards.module.css";
+import { useState } from "react";
+import ProjectObjectivePreview, { type ObjectivePreviewTarget } from "./ProjectObjectivePreview";
+import type { ProjectsUpdateResult } from "../../lib/modules/projects/types";
+import type { PersonalOpsGoal } from "../../lib/modules/personal-ops/types";
 
 const STATUS_ICONS: Record<ProjectLifecycleState, string> = {
   draft: "edit", idea: "calendar-group-brain", planned: "calendar", developing: "build",
@@ -17,18 +21,18 @@ function initials(name: string) {
 }
 
 function objectivePreview(item: ProjectDirectoryItem) {
-  const objectives = item.project.objectives.map(objective => ({ id: objective.id, text: objective.text, completed: Boolean(objective.completedAt) }));
+  const objectives: ObjectivePreviewTarget[] = item.project.objectives.map(objective => ({ id: objective.id, text: objective.text, completed: Boolean(objective.completedAt) }));
   if (!objectives.length && item.project.objective?.trim()) objectives.push({ id: "current-objective", text: item.project.objective, completed: false });
   const seen = new Set(objectives.map(objective => objective.text.trim().toLowerCase()));
   for (const context of item.linkedContext) {
     if (!["objective", "goal"].includes(context.ref.objectType) || !context.ref.label?.trim() || seen.has(context.ref.label.trim().toLowerCase())) continue;
-    objectives.push({ id: `${context.ref.module}:${context.ref.objectId}`, text: context.ref.label, completed: context.legacyStatus === "complete" });
+    objectives.push({ id: `${context.ref.module}:${context.ref.objectId}`, text: context.ref.label, completed: context.legacyStatus === "complete", source: context.ref });
     seen.add(context.ref.label.trim().toLowerCase());
   }
   return objectives.slice(0, 3);
 }
 
-export default function ProjectDirectoryCards({ items, view, selectedId, busy, timeZone, onSelect, onToggleStar }: {
+export default function ProjectDirectoryCards({ items, view, selectedId, busy, timeZone, onSelect, onToggleStar, onObjectiveOpen, onObjectiveSaved, onGoalSaved }: {
   items: ProjectDirectoryItem[];
   view: "comfortable" | "compact" | "grid";
   selectedId?: string;
@@ -36,7 +40,11 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
   timeZone: string;
   onSelect: (item: ProjectDirectoryItem) => void;
   onToggleStar: (item: ProjectDirectoryItem) => void;
+  onObjectiveOpen: () => void;
+  onObjectiveSaved: (result: ProjectsUpdateResult<"projects">) => void;
+  onGoalSaved: (goal: PersonalOpsGoal) => void;
 }) {
+  const [preview, setPreview] = useState<{ project: ProjectDirectoryItem["project"]; objective: ObjectivePreviewTarget; triggerId: string }>();
   const date = (value?: string) => value && Number.isFinite(Date.parse(value))
     ? new Intl.DateTimeFormat("en-US", { timeZone, month: "2-digit", day: "2-digit", year: "2-digit" }).format(new Date(value)) : "—";
   return <DirectoryLayout view={view} className={styles.directory} data-has-objectives={items.some(item => objectivePreview(item).length > 0)} role="list" aria-label="Projects">
@@ -69,9 +77,13 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
         </MorphingDiv>
         <MorphingDiv className={`resource-card-description ${styles.description}`}>{project.description || <span aria-hidden="true">&nbsp;</span>}</MorphingDiv>
         <MorphingDiv className={styles.objectives}>
-          {objectives.length > 0 && <><span className={styles.objectiveLabel}>Objectives</span><ul aria-label="Project objectives preview">{objectives.map(objective => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}><UnigentamosIcon role={objective.completed ? "check" : "goal"} size={13} /><span>{objective.text}</span></li>)}</ul></>}
+          {objectives.length > 0 && <><span className={styles.objectiveLabel}>Objectives</span><ul aria-label="Project objectives preview">{objectives.map((objective,index) => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}><button id={`objective-preview-${project.id}-${index}`} type="button" aria-label={`Edit objective: ${objective.text}`} aria-haspopup="dialog" onPointerDown={event=>event.stopPropagation()} onClick={event=>{
+            event.stopPropagation(); onObjectiveOpen();
+            setPreview({project,objective,triggerId:event.currentTarget.id});
+          }}><UnigentamosIcon role={objective.completed ? "check" : "goal"} size={13} /><span>{objective.text}</span></button></li>)}</ul></>}
         </MorphingDiv>
       </MorphingArticle>;
     })}
+    {preview && <ProjectObjectivePreview key={`${preview.project.id}:${preview.objective.id}`} {...preview} onClose={()=>setPreview(undefined)} onSaved={onObjectiveSaved} onGoalSaved={onGoalSaved} />}
   </DirectoryLayout>;
 }

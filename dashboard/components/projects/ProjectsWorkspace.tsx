@@ -495,6 +495,7 @@ function projectDisplayFromNative(project: Project): ProjectDisplayRecord {
     legacyKey: project.legacySource?.key,
     legacyRoute: project.legacySource?.legacyRoute,
     legacyEntityName: project.legacySource?.entityName,
+    createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     lastActivityAt: project.lastActivityAt
   };
@@ -1121,12 +1122,19 @@ export default function ProjectsWorkspace({
     [selectedProjectId, snapshot.projects]
   );
 
+  const directoryKey = JSON.stringify([query,view,filter,sort,grid,compact]);
+  const [objectiveDirectoryHold,setObjectiveDirectoryHold] = useState<{key:string;ids:string[]}>();
+  useEffect(()=>setObjectiveDirectoryHold(current=>current?.key===directoryKey?current:undefined),[directoryKey]);
   const visibleProjects = useMemo(
-    () => sortProjects(
+    // Inline edits may change a sort value or the very text being searched.
+    // Keep the edited directory stable until an intentional navigation change.
+    () => objectiveDirectoryHold?.key === directoryKey
+      ? objectiveDirectoryHold.ids.flatMap(id=>{const item=snapshot.projects.find(row=>row.project.id===id);return item?[item]:[];})
+      : sortProjects(
       snapshot.projects.filter((item) => matchesQuery(item, query) && matchesView(item, view) && matchesFilter(item, filter)),
       sort
     ),
-    [filter, query, snapshot.projects, sort, view]
+    [filter, query, snapshot.projects, sort, view, directoryKey, objectiveDirectoryHold]
   );
 
   const queryScopedProjects = useMemo(
@@ -3120,6 +3128,9 @@ export default function ProjectsWorkspace({
             timeZone={displayTimeZone}
             onSelect={selectProject}
             onToggleStar={item => void toggleStar(item)}
+            onObjectiveOpen={()=>setObjectiveDirectoryHold({key:directoryKey,ids:visibleProjects.map(item=>item.project.id)})}
+            onObjectiveSaved={applyMutationEnvelope}
+            onGoalSaved={goal=>setSnapshot(current=>({...current,projects:current.projects.map(item=>({...item,linkedContext:item.linkedContext.map(context=>context.ref.module==="personal_ops"&&context.ref.objectId===goal.id?{...context,ref:{...context.ref,label:goal.title},summary:goal.description,legacyStatus:goal.lifecycle,updatedAt:goal.updatedAt}:context)}))}))}
           />
         ) : (
           <SystemState

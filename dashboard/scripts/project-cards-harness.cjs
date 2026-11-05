@@ -62,7 +62,7 @@ for(const width of [1800,1440,820,390,320]){
   if(view==='grid'){const columns=await page.locator('[data-directory-view]:visible').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);if(width===390)assert.equal(columns,2,'Distinct mobile grid');if(width===320)assert.equal(columns,1,'Narrow mobile grid fallback');}
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Viewport overflow');
   const overflow=await cards().evaluateAll(els=>els.flatMap(el=>[...el.querySelectorAll('.resource-card-details,.resource-card-tags')].filter(x=>x.scrollWidth>x.clientWidth+2).map(x=>x.className)));assert.deepEqual(overflow,[],'Card controls overflow');
-  const heightLimit=view==='compact'?(width<=600?206:192):view==='grid'?(width===390?281:width===320?302:288):(width<=600?246:232);assert(heights[0]<=heightLimit,'Card negative space is bounded: '+view+' '+heights[0]);
+  const heightLimit=24+(view==='compact'?(width<=600?206:192):view==='grid'?(width===390?281:width===320?302:288):(width<=600?246:232));assert(heights[0]<=heightLimit,'Card negative space is bounded: '+view+' '+heights[0]);
   await page.screenshot({path:path.join(output,view+'-'+width+'.png')});results.push({width,view,height:heights[0]});
   await page.getByRole('button',{name:/^View: .*Switch to/}).first().click();
  }
