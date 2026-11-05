@@ -1,3 +1,4 @@
+import { deriveProjectHealth } from "./health";
 import { readJsonFile, writeJsonFile } from "../../file-store";
 import {
   createAuditEvent,
@@ -651,36 +652,6 @@ function ensureOperationalProject(project: Project): void {
   }
 }
 
-function deriveProjectHealth(project: Project, state: ProjectsState, now: string): HealthState {
-  if (project.lifecycle === "archived") return "unknown";
-  if (project.lifecycle === "complete") return "healthy";
-
-  const blockers = state.blockers.filter(
-    (blocker) => blocker.projectId === project.id && blocker.state === "open"
-  );
-  if (blockers.some((blocker) => blocker.severity === "high" || blocker.severity === "critical")) {
-    return "blocked";
-  }
-
-  const milestones = state.milestones.filter(
-    (milestone) => milestone.projectId === project.id && milestone.state !== "complete" && milestone.state !== "archived"
-  );
-  const hasOverdueMilestone = milestones.some((milestone) => Date.parse(milestone.dueAt) < Date.parse(now));
-  const hasOverdueObjective = project.objectives.some(
-    (objective) => !objective.completedAt && objective.targetAt && Date.parse(objective.targetAt) < Date.parse(now)
-  );
-  if (
-    blockers.length > 0 ||
-    hasOverdueMilestone ||
-    hasOverdueObjective ||
-    milestones.some((milestone) => milestone.state === "blocked" || milestone.state === "due") ||
-    project.objectives.length === 0
-  ) {
-    return "attention";
-  }
-  return "healthy";
-}
-
 function replaceProject(state: ProjectsState, project: Project): Project[] {
   return state.projects.map((candidate) => (candidate.id === project.id ? project : candidate));
 }
@@ -771,7 +742,7 @@ function buildNativeProject(
     updatedBy: actorId,
     history: [historyEntry("created", now, actorId)]
   };
-  project.health = deriveProjectHealth(project, { ...state, projects: [project, ...state.projects] }, now);
+  project.health = deriveProjectHealth(project, state, now);
   return project;
 }
 
@@ -850,7 +821,7 @@ export async function promoteLegacyProject(
       updatedBy: actorId,
       history: [historyEntry("promoted_from_legacy", now, actorId, definition.key)]
     };
-    project.health = deriveProjectHealth(project, { ...state, projects: [project, ...state.projects] }, now);
+    project.health = deriveProjectHealth(project, state, now);
     const mapping: ProjectsLegacyMapping = {
       id: `project-legacy-mapping-${crypto.randomUUID()}`,
       legacyKey: definition.key,
@@ -924,7 +895,7 @@ function buildMilestone(
     projectId: requiredText(raw.projectId, "projectId", 240),
     title: requiredText(raw.title, "title", 240),
     description: optionalText(raw.description, "description") || "",
-    dueAt: requiredText(optionalDate(raw.dueAt, "dueAt"), "dueAt", 120),
+    dueAt: optionalDate(raw.dueAt, "dueAt") || "",
     state: enumValue(raw.state, ["planned", "open", "active", "due", "blocked"] as const, "planned", "state"),
     owner: optionalText(raw.owner, "owner", 160),
     ownerRef: optionalNativeRef(raw.ownerRef, "ownerRef"),
@@ -1076,7 +1047,7 @@ function createEventDetails(item: ProjectMilestone | ProjectBlocker | ProjectLin
     return {
       eventType: "milestone_created" as const,
       title: "Milestone added",
-      summary: `${item.title} is due ${item.dueAt}.`
+      summary: item.dueAt ? `${item.title} has a target date of ${item.dueAt}.` : `${item.title} was added.`
     };
   }
   if (item.objectType === "blocker") {
@@ -1357,7 +1328,7 @@ function applyProjectPatch(
       next.archiveReason
     )
   ];
-  next.health = deriveProjectHealth(next, { ...state, projects: replaceProject(state, next) }, next.updatedAt);
+  next.health = deriveProjectHealth(next, state, next.updatedAt);
   return next;
 }
 
@@ -1376,7 +1347,7 @@ function applyMilestonePatch(
   }
   if (hasOwn(patch, "title")) next.title = requiredText(patch.title, "title", 240);
   if (hasOwn(patch, "description")) next.description = optionalText(patch.description, "description") || "";
-  if (hasOwn(patch, "dueAt")) next.dueAt = requiredText(optionalDate(patch.dueAt, "dueAt"), "dueAt", 120);
+  if (hasOwn(patch, "dueAt")) next.dueAt = optionalDate(patch.dueAt, "dueAt") || "";
   if (hasOwn(patch, "owner")) next.owner = optionalText(patch.owner, "owner", 160);
   if (hasOwn(patch, "ownerRef")) next.ownerRef = optionalNativeRef(patch.ownerRef, "ownerRef");
   if (hasOwn(patch, "completionCriteria")) {
@@ -1388,12 +1359,6 @@ function applyMilestonePatch(
   if (hasOwn(patch, "linkedRefs")) next.linkedRefs = normalizeNativeRefs(patch.linkedRefs, "linkedRefs");
 
   if (requestedState === "complete" && current.state !== "complete") {
-    if (next.completionCriteria.length === 0) {
-      validation("Add at least one completion criterion before completing the milestone", "completionCriteria");
-    }
-    if (!next.completionNote) {
-      validation("Record a completion note before completing the milestone", "completionNote");
-    }
     next.completedAt = now;
   } else if (current.state === "complete" && requestedState !== "complete") {
     next.completedAt = undefined;
@@ -1700,8 +1665,8 @@ function updateEventDetails(
     const completed = current.state !== "complete" && next.state === "complete";
     return {
       eventType: completed ? ("milestone_completed" as const) : ("milestone_updated" as const),
-      title: completed ? "Milestone completed" : "Milestone updated",
-      summary: completed ? `${next.title} was completed.` : `${next.title} was updated.`
+      title: completed ? "Milestone reached" : "Milestone updated",
+      summary: completed ? `${next.title} was reached.` : `${next.title} was updated.`
     };
   }
   if (next.objectType === "blocker" && current.objectType === "blocker") {

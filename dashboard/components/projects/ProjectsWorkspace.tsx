@@ -8,6 +8,10 @@ import { PersonalOpsStatusChip, personalOpsToneForState } from "../personal-ops/
 import { personalStatusLabel } from "../../lib/modules/personal-ops/status-display";
 import { workspaceReturnUrl } from "../admin-shell/useWorkspaceReturn";
 import RelatedRecords from "../planning/RelatedRecords";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import ProjectDisclosure from "./ProjectDisclosure";
+import { deriveProjectHealth } from "../../lib/modules/projects/health";
+import { milestoneLabel } from "../../lib/modules/projects/milestone-display";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -37,6 +41,8 @@ import {
 } from "../../lib/modules/personal-ops/decision-links";
 import {
   buildFollowUpCreationRoute,
+  getLinkedFollowUps,
+  followUpOwnerRoute,
   type FollowUpSourceRef
 } from "../../lib/modules/personal-ops/follow-up-links";
 import type {
@@ -109,6 +115,7 @@ type EditorKind =
   | "project-edit"
   | "legacy-promote"
   | "milestone-create"
+  | "milestone-edit"
   | "blocker-create"
   | "blocker-resolve"
   | "interaction-create"
@@ -122,6 +129,7 @@ type EditorState = {
   kind: EditorKind;
   projectId?: string;
   objectId?: string;
+  expectedUpdatedAt?: string;
   values: Record<string, string | boolean>;
   objectives?: EditorObjectiveDraft[];
   people?: EditorPersonDraft[];
@@ -347,13 +355,13 @@ function openBlockers(item: ProjectDirectoryItem) {
 }
 
 function nextMilestone(item: ProjectDirectoryItem) {
-  return [...activeMilestones(item)].sort((left, right) => left.dueAt.localeCompare(right.dueAt))[0];
+  return activeMilestones(item).filter((milestone) => milestone.dueAt).sort((left, right) => left.dueAt.localeCompare(right.dueAt))[0];
 }
 
 function hasDueItem(item: ProjectDirectoryItem, days = 7) {
   const limit = Date.now() + days * 24 * 60 * 60 * 1000;
   const dueDates = [
-    ...activeMilestones(item).map((milestone) => milestone.dueAt),
+    ...activeMilestones(item).filter((milestone) => Date.parse(milestone.dueAt) >= Date.now()).map((milestone) => milestone.dueAt),
     ...item.project.objectives.filter((objective) => !objective.completedAt).map((objective) => objective.targetAt)
   ];
   return dueDates.some((dueAt) => {
@@ -633,6 +641,8 @@ function activityTitle(event: ProjectDirectoryItem["timelineEvents"][number]) {
 }
 
 function activityFilterKey(event: ProjectDirectoryItem["timelineEvents"][number]) {
+  if (event.eventType.startsWith("milestone_")) return "milestones";
+  if (event.eventType.startsWith("blocker_")) return "blockers";
   if (event.eventType.startsWith("link_") && event.sourceRef?.module === "people") return "person_linked";
   if (event.eventType.startsWith("link_") && event.sourceRef?.module === "personal_ops" && event.sourceRef.objectType === "decision") return "decision_linked";
   if (event.eventType.startsWith("link_")) return "object_linked";
@@ -646,6 +656,8 @@ function activityFilterLabel(value: string) {
     project_archived: "Project archived",
     project_restored: "Project restored",
     interaction_logged: "Updates",
+    milestones: "Milestones",
+    blockers: "Blockers",
     milestone_created: "Milestones",
     milestone_updated: "Milestones",
     milestone_completed: "Milestones",
@@ -801,7 +813,7 @@ function EditorSurface({
       >
         <header className={styles.formHeader}>
           <div>
-            <h2 id="projects-editor-title">{title}</h2>
+            <h2 id="projects-editor-title">{title.toLowerCase().includes("milestone") && <UnigentamosIcon role="goal" size={20}/>} {title}</h2>
             <p id="projects-editor-description">{description}</p>
           </div>
           <button type="button" className={styles.iconButton} onClick={onRequestClose} disabled={busy} aria-label={`Close ${title}`} data-icon-button="standard">
@@ -1013,16 +1025,11 @@ function recomputeAttention(item: ProjectDirectoryItem): ProjectDirectoryItem {
   if (item.project.objectives.length === 0) reasons.push("Project objectives are not defined.");
   const blockers = openBlockers(item);
   if (blockers.length) reasons.push(`${blockers.length} open project blocker${blockers.length === 1 ? "" : "s"}.`);
-  const overdue = activeMilestones(item).filter((milestone) => {
-    const dueAt = Date.parse(milestone.dueAt);
-    return Number.isFinite(dueAt) && dueAt < Date.now();
-  });
-  if (overdue.length) reasons.push(`${overdue.length} overdue milestone${overdue.length === 1 ? "" : "s"}.`);
   const overdueObjectives = item.project.objectives.filter(
     (objective) => !objective.completedAt && objective.targetAt && Date.parse(objective.targetAt) < Date.now()
   );
   if (overdueObjectives.length) reasons.push(`${overdueObjectives.length} overdue objective${overdueObjectives.length === 1 ? "" : "s"}.`);
-  return { ...item, attentionReasons: reasons };
+  return { ...item, project:{...item.project,health:deriveProjectHealth(item.project,item,new Date().toISOString())}, attentionReasons: reasons };
 }
 
 function nativeLinkContext(links: ProjectLink[]) {
@@ -1088,6 +1095,7 @@ export default function ProjectsWorkspace({
       : initialSnapshot.defaultProjectId);
 
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const reducedMotion = useReducedMotion();
   const [view, setView] = useState<ProjectView>(initialUrlState.view);
   const pillOptions = ["active","planned","attention","blocked"] as const;
   type ProjectPill = typeof pillOptions[number];
@@ -1225,7 +1233,8 @@ export default function ProjectsWorkspace({
   useEffect(() => {
     if (!selectedChildId) return;
     const frame = window.requestAnimationFrame(() => {
-      selectedChildRef.current?.focus({ preventScroll: false });
+      const panel = selectedChildRef.current;
+      if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: false });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeTab, selectedChildId]);
@@ -1334,7 +1343,7 @@ export default function ProjectsWorkspace({
   function openEditor(
     kind: EditorKind,
     item?: ProjectDirectoryItem,
-    object?: ProjectBlocker | ProjectLink | ProjectInteraction,
+    object?: ProjectBlocker | ProjectLink | ProjectInteraction | ProjectMilestone,
     preset: Record<string, string | boolean> = {}
   ) {
     clearFeedback();
@@ -1364,6 +1373,8 @@ export default function ProjectsWorkspace({
       values = { objective: item.project.objective || "" };
     } else if (kind === "milestone-create") {
       values = { title: "", description: "", dueAt: "", owner: "", completionCriteria: "" };
+    } else if (kind === "milestone-edit" && object?.objectType === "milestone") {
+      values = {title:object.title,description:object.description,dueAt:object.dueAt.slice(0,10),owner:object.owner || "",completionCriteria:object.completionCriteria.join("\n"),state:object.state,completionNote:object.completionNote || ""};
     } else if (kind === "blocker-create") {
       values = { title: "", condition: "", severity: "medium", owner: "", dueAt: "" };
     } else if (kind === "blocker-resolve" && object?.objectType === "blocker") {
@@ -1412,7 +1423,7 @@ export default function ProjectsWorkspace({
         repairReason: ""
       };
     }
-    setEditor({ kind, projectId: item?.project.id, objectId: object?.id, values: { ...values, ...preset }, objectives, people });
+    setEditor({ kind, projectId: item?.project.id, objectId: object?.id, expectedUpdatedAt:object?.updatedAt, values: { ...values, ...preset }, objectives, people });
     setInspectorOpen(true);
     setEditorDirty(false);
     setEditorError("");
@@ -1421,11 +1432,12 @@ export default function ProjectsWorkspace({
   function requestCloseEditor() {
     if (mutationBusy) return;
     if (editorDirty) setDiscardOpen(true);
-    else setEditor(null);
+    else closeEditor();
   }
 
   function closeEditor() {
     setEditor(null);
+    if (initialDetail) setInspectorOpen(false);
     setEditorDirty(false);
     setEditorError("");
   }
@@ -1652,24 +1664,29 @@ export default function ProjectsWorkspace({
         }
         applyMutationEnvelope(result.data);
         setNotice(`${result.data.project.name} is now tracked natively. Legacy identity and route provenance were preserved.`);
-      } else if (editor.kind === "milestone-create") {
+      } else if (editor.kind === "milestone-create" || editor.kind === "milestone-edit") {
         const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
         if (!item?.project.editable) {
           setEditorError("Start native tracking before adding project-owned milestones.");
           return;
         }
-        if (!value("title") || !value("dueAt") || !value("completionCriteria")) {
-          setEditorError("Milestone title, due date, and at least one completion criterion are required.");
+        if (!value("title")) {
+          setEditorError("Give this milestone a title.");
           return;
         }
-        const result = await repository.create("milestones", {
-          projectId: item.project.id,
+        const fields = {
           title: value("title"),
           description: value("description"),
           dueAt: value("dueAt"),
-          owner: optional("owner"),
+          owner: value("owner"),
           completionCriteria: value("completionCriteria").split("\n").map((criterion) => criterion.trim()).filter(Boolean)
-        });
+        };
+        if (editor.kind === "milestone-edit" && (!editor.objectId || !editor.expectedUpdatedAt)) {
+          setEditorError("Reopen this milestone to load its latest details."); return;
+        }
+        const result = editor.kind === "milestone-edit" && editor.objectId
+          ? await repository.update("milestones", editor.objectId, {...fields, state:value("state") as ProjectMilestone["state"], completionNote:value("completionNote")}, editor.expectedUpdatedAt!)
+          : await repository.create("milestones", {projectId:item.project.id,...fields});
         if (!result.ok) {
           setEditorError(result.error.message);
           return;
@@ -1678,7 +1695,7 @@ export default function ProjectsWorkspace({
         setActiveTab("timeline");
         setSelectedChildId(result.data.item.id);
         updateUrl({ tab: "timeline", item: initialDetail ? result.data.item.id : item.project.id });
-        setNotice(`Milestone “${result.data.item.title}” was added.`);
+        setNotice(`Milestone “${result.data.item.title}” ${editor.kind === "milestone-edit" ? "updated" : "added"}.`);
       } else if (editor.kind === "blocker-create") {
         const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
         if (!item?.project.editable) {
@@ -2036,11 +2053,11 @@ export default function ProjectsWorkspace({
         if (!milestone) return;
         const result = await repository.update("milestones", milestone.id, {
           state: "complete",
-          completionNote: confirmationReason.trim() || "Completion confirmed from the Projects timeline."
+          ...(confirmationReason.trim() ? {completionNote: confirmationReason.trim()} : {})
         }, milestone.updatedAt);
         if (!result.ok) return setMutationError(result.error.message);
         applyMutationEnvelope(result.data);
-        setNotice(`Milestone “${result.data.item.title}” was completed.`);
+        setNotice(`Milestone “${result.data.item.title}” reached.`);
       } else if (confirmation.kind === "link-remove") {
         const link = item.links.find((candidate) => candidate.id === confirmation.objectId);
         if (!link) return;
@@ -2194,9 +2211,10 @@ export default function ProjectsWorkspace({
 
   function renderActivityList(activity: ProjectActivityItem[], compact = false) {
     return (
-      <ol className={styles.activityList} data-compact={compact || undefined}>
+      <motion.ol layout className={styles.activityList} data-compact={compact || undefined} transition={{duration:reducedMotion ? 0 : .24}}>
+        <AnimatePresence initial={false} mode="popLayout">
         {activity.map((event) => (
-          <li key={event.id} aria-current={selectedChildId === event.id || undefined}>
+          <motion.li layout key={event.id} initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}} transition={{duration:reducedMotion ? 0 : .22,ease:[.22,1,.36,1]}} aria-current={selectedChildId === event.id || undefined}>
             <span className={styles.timelineDot} data-tone={event.tone} aria-hidden="true" />
             <span className={styles.itemBody}>
               <strong>{event.title}</strong>
@@ -2209,9 +2227,10 @@ export default function ProjectsWorkspace({
               openLabel={`Open ${event.title}`}
             />
             <time className={styles.timelineMeta}>{formatTimestamp(event.occurredAt)}</time>
-          </li>
+          </motion.li>
         ))}
-      </ol>
+        </AnimatePresence>
+      </motion.ol>
     );
   }
 
@@ -2315,7 +2334,7 @@ export default function ProjectsWorkspace({
             </section>
             <section className={styles.panel}>
               <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.iconButton} aria-label="Add milestone" disabled={readOnly} onClick={() => openEditor("milestone-create", item)}><UnigentamosIcon role="plus" size={16} /></button></div>
-              {activeMilestones(item).length ? <ul className={styles.projectSummaryList}>{activeMilestones(item).slice(0, 4).map(milestone => <li key={milestone.id}><button type="button" onClick={() => selectChild(milestone.id, "activity")}><strong>{milestone.title}</strong><span>{formatDate(milestone.dueAt)}</span></button></li>)}</ul> : <p>No upcoming milestones.</p>}
+              {activeMilestones(item).length ? <ul className={styles.projectSummaryList}>{activeMilestones(item).slice(0, 4).map(milestone => <li key={milestone.id}><button type="button" onClick={() => selectChild(milestone.id, "activity")}><strong>{milestone.title}</strong><span>{milestone.dueAt ? formatDate(milestone.dueAt) : milestoneLabel(milestone.state)}</span></button></li>)}</ul> : <p>No upcoming milestones.</p>}
               {activeMilestones(item).length > 4 && <button type="button" className={styles.button} onClick={() => selectTab("activity")}>View all milestones</button>}
             </section>
             {blockers.length > 0 && <section className={styles.panel}><div className={styles.panelHeader}><h2>Open blockers</h2><span>{blockers.length}</span></div><ul className={styles.projectSummaryList}>{blockers.map(blocker => <li key={blocker.id}><button type="button" onClick={() => selectChild(blocker.id, "activity")}><strong>{blocker.title}</strong><span>{displayLabel(blocker.severity)}</span></button></li>)}</ul></section>}
@@ -2345,8 +2364,14 @@ export default function ProjectsWorkspace({
         </section>
         <aside className={styles.timelineSide}>
           <section className={styles.panel}>
-            <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.button} onClick={() => openEditor("milestone-create", item)} disabled={readOnly}>Add milestone</button></div>
-            {item.milestones.length ? <ul className={styles.objectList}>{item.milestones.map((milestone) => <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}><span className={styles.itemBody}><strong>{milestone.title}</strong><small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)}</small></span><span className={styles.inlineActions}><RowActionIcons inspectLabel={`Inspect ${milestone.title}`} onInspect={() => selectChild(milestone.id, "timeline")} openLabel={`Open ${milestone.title}`} />{!["complete", "archived"].includes(milestone.state) && <button type="button" className={styles.button} disabled={readOnly || !milestone.completionCriteria.length} onClick={() => { setConfirmationReason(""); setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id }); }}>Complete</button>}</span></li>)}</ul> : <p>No milestones yet.</p>}
+            <div className={styles.panelHeader}><h2><UnigentamosIcon role="goal" size={18}/>Milestones</h2><button type="button" className={styles.button} onClick={() => openEditor("milestone-create", item)} disabled={readOnly}><UnigentamosIcon role="plus" size={15}/>Add milestone</button></div>
+            {item.milestones.length ? <ul className={styles.milestoneList}>{item.milestones.map(milestone=><li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}>
+              <button type="button" className={styles.milestoneOpen} aria-label={`Inspect ${milestone.title}`} onClick={()=>selectChild(milestone.id,"timeline")}><UnigentamosIcon role={milestone.state === "complete" ? "check" : "goal"} size={18}/><strong>{milestone.title}</strong><UnigentamosIcon role="chevron-right" size={15}/></button>
+              <div className={styles.milestoneMeta}><span data-reached={milestone.state === "complete" || undefined}>{milestoneLabel(milestone.state)}</span>{milestone.dueAt && <time dateTime={milestone.dueAt}><UnigentamosIcon role="calendar" size={13}/>{formatDate(milestone.dueAt)}</time>}<div className={styles.milestoneActions}>
+                {milestone.state !== "archived" && <button type="button" className={styles.iconButton} aria-label={`Edit ${milestone.title}`} title="Edit milestone" disabled={readOnly} onClick={()=>openEditor("milestone-edit",item,milestone)}><UnigentamosIcon role="edit" size={16}/></button>}
+                {!["complete","archived"].includes(milestone.state) && <button type="button" className={styles.iconButton} aria-label={`Mark ${milestone.title} reached`} title="Mark reached" disabled={readOnly} onClick={()=>{setConfirmationReason("");setConfirmation({kind:"milestone-complete",projectId:item.project.id,objectId:milestone.id});}}><UnigentamosIcon role="check" size={16}/></button>}
+              </div></div>
+            </li>)}</ul> : <p>No milestones yet.</p>}
           </section>
           <section className={styles.panel}>
             <div className={styles.panelHeader}><h2>Blockers</h2><button type="button" className={styles.button} onClick={() => openEditor("blocker-create", item)} disabled={readOnly}>Add blocker</button></div>
@@ -2364,7 +2389,7 @@ export default function ProjectsWorkspace({
       <div className={styles.overviewGrid}>
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
-            <h2><UnigentamosIcon role="notes" size={18}/>Notes</h2>
+            <h2><UnigentamosIcon role="module-notes" size={18}/>Notes</h2>
             <span className={styles.inlineActions}>
               <Link className={styles.button} href={nativeCreateHref("notes", item.project)}><UnigentamosIcon role="plus" size={16} />New note</Link>
               <button type="button" className={styles.button} onClick={() => openEditor("link-create", item, undefined, { linkScope: "note", sourceModule: "notes", sourceObjectType: "note", relationship: "source_material" })} disabled={readOnly}><UnigentamosIcon role="link" size={16} />Link note</button>
@@ -2468,9 +2493,6 @@ export default function ProjectsWorkspace({
           label: blocker.title
         })
       : undefined;
-    const hasMilestoneDecisionOwner = milestoneDecisionSource
-      ? getLinkedDecisions(decisions, milestoneDecisionSource).length > 0
-      : false;
     const hasBlockerDecisionOwner = blockerDecisionSource
       ? getLinkedDecisions(decisions, blockerDecisionSource).length > 0
       : false;
@@ -2524,68 +2546,44 @@ export default function ProjectsWorkspace({
               </div>
             </div>
           </div>
-          <button type="button" className={styles.iconButton} onClick={clearSelectedChild} aria-label="Close inspection" title="Close inspection"><UnigentamosIcon role="close" size={18} /></button>
+          <div className={inspectionStyles.headerActions}>
+            {milestone && !parentReadOnly && milestone.state !== "archived" && <button type="button" className={styles.iconButton} onClick={()=>openEditor("milestone-edit",item,milestone)} aria-label="Edit milestone" title="Edit milestone"><UnigentamosIcon role="edit" size={18}/></button>}
+            <button type="button" className={styles.iconButton} onClick={clearSelectedChild} aria-label="Close inspection" title="Close inspection"><UnigentamosIcon role="close" size={18} /></button>
+          </div>
         </header>
 
         {milestone && (
           <div className={inspectionStyles.body}>
-            <p>{milestone.description || "No milestone description recorded."}</p>
-            <div className={inspectionStyles.facts}>
-              <div className={inspectionStyles.fact}><span>Status</span><strong>{displayLabel(milestone.state)}</strong></div>
-              <div className={inspectionStyles.fact}><span>Due</span><strong>{formatDate(milestone.dueAt, "No due date")}</strong></div>
-              <div className={inspectionStyles.fact}><span>Owner</span><strong>{milestone.owner || "Unassigned"}</strong></div>
+            <div className={inspectionStyles.milestoneSummary}>
+              <span className={inspectionStyles.progressPill} data-reached={milestone.state === "complete" || undefined}><UnigentamosIcon role={milestone.state === "complete" ? "check" : "goal"} size={16}/>{milestoneLabel(milestone.state)}</span>
+              {milestone.dueAt && <span><UnigentamosIcon role="calendar" size={16}/><span>Target <time dateTime={milestone.dueAt}>{formatDate(milestone.dueAt)}</time></span></span>}
+              {milestone.owner && <span><UnigentamosIcon role="person" size={16}/>{milestone.owner}</span>}
+              {!parentReadOnly && milestone.state !== "archived" && milestone.state !== "complete" && <WorkspaceButton icon="check" intent="primary" disabled={mutationBusy} onClick={()=>{
+                setConfirmationReason("");setConfirmation({kind:"milestone-complete",projectId:item.project.id,objectId:milestone.id});
+              }}>Mark reached</WorkspaceButton>}
             </div>
-            <div>
-              <h3 className={inspectionStyles.sectionHeading}>Completion criteria</h3>
-              {milestone.completionCriteria.length ? <ul className={styles.criteriaList}>{milestone.completionCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul> : <p className={styles.notice}>Add completion criteria before marking this milestone complete.</p>}
-            </div>
-            <div className={inspectionStyles.actions} aria-label="Milestone owner actions">
-              <Link className={styles.button} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}><UnigentamosIcon role="follow-up" size={16} />Create follow-up</Link>
-              {!hasMilestoneDecisionOwner && <Link className={styles.button} href={personalOpsCreateHref("decisions", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}><UnigentamosIcon role="decision" size={16} />File decision</Link>}
-              {milestone.linkedRefs.map((ref) => <Link className={styles.button} href={ref.route} key={`${ref.module}-${ref.objectId}`}><UnigentamosIcon role="open" size={16} />Open {ref.label}</Link>)}
-            </div>
-            <details className={inspectionStyles.disclosure}>
-              <summary>Follow-through &amp; review<UnigentamosIcon role="chevron-down" size={16} /></summary>
-              <div className={inspectionStyles.supporting}>
-            <LinkedFollowUpsPanel showRefresh={false}
-              source={projectFollowUpSource(item.project, {
-                objectType: "milestone",
-                objectId: milestone.id,
-                label: milestone.title
-              })}
-              followUps={followUps}
-              loading={followUpsLoading}
-              error={followUpsError}
-              onRefresh={() => void refreshFollowUps()}
-              createHref={personalOpsCreateHref("follow-ups", item.project, {
-                objectType: "milestone",
-                objectId: milestone.id,
-                label: milestone.title
-              }, { dueAt: milestone.dueAt })}
-              compact
-              title="Milestone follow-through"
-            />
-            <LinkedDecisionsPanel showRefresh={false}
-              source={milestoneDecisionSource!}
-              decisions={decisions}
-              loading={decisionsLoading}
-              error={decisionsError}
-              onRefresh={() => void refreshDecisions()}
-              createHref={personalOpsCreateHref("decisions", item.project, {
-                objectType: "milestone",
-                objectId: milestone.id,
-                label: milestone.title
-              }, { dueAt: milestone.dueAt })}
-              compact
-              title="Milestone decisions"
-            />
-            {renderReviewCoverage(item, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, true)}
+            {milestone.description && <p>{milestone.description}</p>}
+            {milestone.completionCriteria.length > 0 && <div className={inspectionStyles.contentSection}><h3>Success criteria</h3><ul className={styles.criteriaList}>{milestone.completionCriteria.map((criterion,index)=><li key={`${index}-${criterion}`}>{criterion}</li>)}</ul></div>}
+            {milestone.completionNote && <div className={inspectionStyles.contentSection}><h3>Reflection</h3><p>{milestone.completionNote}</p></div>}
+            <ProjectDisclosure title="Linked work" icon="object">
+              <div className={inspectionStyles.milestoneSupporting}>
+                <section>
+                  <header><h3><UnigentamosIcon role="follow-up" size={16}/>Follow-ups</h3><Link prefetch={false} className={styles.button} href={personalOpsCreateHref("follow-ups",item.project,{objectType:"milestone",objectId:milestone.id,label:milestone.title})}><UnigentamosIcon role="plus" size={15}/>Add follow-up</Link></header>
+                  {followUpsError && <p role="alert">{followUpsError} <button type="button" className={styles.button} onClick={()=>void refreshFollowUps()}>Retry</button></p>}
+                  {followUpsLoading ? <p>Loading follow-ups…</p> : getLinkedFollowUps(followUps,projectFollowUpSource(item.project,{objectType:"milestone",objectId:milestone.id,label:milestone.title})).length ? <ul>{getLinkedFollowUps(followUps,projectFollowUpSource(item.project,{objectType:"milestone",objectId:milestone.id,label:milestone.title})).map(followUp=><li key={followUp.id}><Link prefetch={false} href={followUpOwnerRoute(followUp)}><strong>{followUp.title}</strong><span>{personalStatusLabel(followUp.followUpState)}</span></Link></li>)}</ul> : <p>No linked follow-ups.</p>}
+                </section>
+                <section>
+                  <header><h3><UnigentamosIcon role="decision" size={16}/>Decisions</h3><Link prefetch={false} className={styles.button} href={personalOpsCreateHref("decisions",item.project,{objectType:"milestone",objectId:milestone.id,label:milestone.title})}><UnigentamosIcon role="plus" size={15}/>Add decision</Link></header>
+                  {decisionsError && <p role="alert">{decisionsError} <button type="button" className={styles.button} onClick={()=>void refreshDecisions()}>Retry</button></p>}
+                  {decisionsLoading ? <p>Loading decisions…</p> : getLinkedDecisions(decisions,milestoneDecisionSource!).length ? <ul>{getLinkedDecisions(decisions,milestoneDecisionSource!).map(decision=><li key={decision.id}><Link prefetch={false} href={decisionOwnerRoute(decision)}><strong>{decision.title}</strong><span>{personalStatusLabel(decision.decisionState)}</span></Link></li>)}</ul> : <p>No linked decisions.</p>}
+                </section>
+                {renderReviewCoverage(item,{objectType:"milestone",objectId:milestone.id,label:milestone.title},true)}
+                {milestone.linkedRefs.length > 0 && <section><header><h3><UnigentamosIcon role="object" size={16}/>Other links</h3></header><ProjectLinkedItems>{milestone.linkedRefs.map(ref=><ProjectLinkedItem key={`${ref.module}-${ref.objectId}`} source={ref}/>)}</ProjectLinkedItems></section>}
               </div>
-            </details>
-            <details className={inspectionStyles.disclosure}><summary>Record details<UnigentamosIcon role="chevron-down" size={16} /></summary><dl className={inspectionStyles.recordDetails}><div><dt>Milestone ID</dt><dd>{milestone.id}</dd></div><div><dt>Created</dt><dd>{formatTimestamp(milestone.createdAt)}</dd></div><div><dt>Last edited</dt><dd>{formatTimestamp(milestone.updatedAt)}</dd></div></dl></details>
+            </ProjectDisclosure>
+            <ProjectDisclosure title="Record details" icon="information"><dl className={inspectionStyles.recordDetails}><div><dt>Created</dt><dd>{formatTimestamp(milestone.createdAt)}</dd></div><div><dt>Last edited</dt><dd>{formatTimestamp(milestone.updatedAt)}</dd></div>{milestone.completedAt && <div><dt>Reached</dt><dd>{formatTimestamp(milestone.completedAt)}</dd></div>}<div><dt>Record ID</dt><dd>{milestone.id}</dd></div></dl></ProjectDisclosure>
           </div>
         )}
-
         {blocker && (
           <div className={inspectionStyles.body}>
             <p>{blocker.condition}</p>
@@ -2756,7 +2754,7 @@ export default function ProjectsWorkspace({
           <h2>Project progress</h2>
           <ul className={styles.guardList}>
             <li><span>Objectives</span><strong>{item.project.objectives.length}</strong></li>
-            <li><span>Open milestones</span><strong>{incompleteMilestones.length}</strong></li>
+            <li><span>Upcoming milestones</span><strong>{incompleteMilestones.length}</strong></li>
             <li><span>Open blockers</span><strong>{blockers.length}</strong></li>
             <li><span>Linked context</span><strong>{item.linkedContext.length}</strong></li>
           </ul>
@@ -2785,6 +2783,8 @@ export default function ProjectsWorkspace({
         ? "Start project tracking"
         : editor?.kind === "milestone-create"
           ? "Add milestone"
+          : editor?.kind === "milestone-edit"
+            ? "Edit milestone"
           : editor?.kind === "blocker-create"
             ? "Add blocker"
         : editor?.kind === "blocker-resolve"
@@ -2802,6 +2802,8 @@ export default function ProjectsWorkspace({
                   : editor?.values.linkScope === "organization" ? "Link organization" : editor?.values.linkScope === "people" ? "Link person" : editor?.values.linkScope === "note" ? "Link note" : "Link object";
   const editorDescription = editor?.kind === "legacy-promote"
     ? "Start tracking this project in the current workspace."
+    : editor?.kind === "milestone-create" || editor?.kind === "milestone-edit"
+      ? "A moment worth marking in your project’s progress."
     : editor?.kind === "link-create"
       ? "Choose an existing item to connect to this project."
       : editor?.kind === "link-edit"
@@ -2885,13 +2887,21 @@ export default function ProjectsWorkspace({
         </>
       );
     }
-    if (editor.kind === "milestone-create") {
-      return <div className={styles.formGrid}>
-        <label className={styles.field} data-wide="true">Milestone title<input value={value("title")} onChange={(event) => changeEditorValue("title", event.target.value)} required autoFocus /></label>
-        <label className={styles.field} data-wide="true">Description<textarea value={value("description")} onChange={(event) => changeEditorValue("description", event.target.value)} /></label>
-        <label className={styles.field}>Due date<input type="date" value={value("dueAt")} onChange={(event) => changeEditorValue("dueAt", event.target.value)} required /></label>
-        <label className={styles.field}>Owner<input value={value("owner")} onChange={(event) => changeEditorValue("owner", event.target.value)} /></label>
-        <label className={styles.field} data-wide="true">Completion criteria<textarea value={value("completionCriteria")} onChange={(event) => changeEditorValue("completionCriteria", event.target.value)} placeholder="One criterion per line" required /></label>
+    if (editor.kind === "milestone-create" || editor.kind === "milestone-edit") {
+      return <div className={styles.milestoneForm}>
+        <label className={styles.field}><span><UnigentamosIcon role="goal" size={16}/>Milestone title</span><input value={value("title")} onChange={event=>changeEditorValue("title",event.target.value)} placeholder="First customer, launch day, a meaningful result…" required autoFocus maxLength={240}/></label>
+        <div className={styles.formGrid}>
+          <label className={styles.field}><span><UnigentamosIcon role="calendar" size={16}/>Target date <small>(optional)</small></span><input type="date" value={value("dueAt")} onChange={event=>changeEditorValue("dueAt",event.target.value)}/></label>
+          <label className={styles.field}><span><UnigentamosIcon role="person" size={16}/>Owner <small>(optional)</small></span><input value={value("owner")} onChange={event=>changeEditorValue("owner",event.target.value)}/></label>
+        </div>
+        <label className={styles.field}><span>Description <small>(optional)</small></span><textarea rows={3} value={value("description")} onChange={event=>changeEditorValue("description",event.target.value)} placeholder="What makes this moment meaningful?"/></label>
+        {editor.kind === "milestone-edit" && <label className={styles.field}>Progress<SelectField value={value("state")} onChange={event=>changeEditorValue("state",event.target.value)} aria-label="Milestone progress">{(["planned","active","blocked","complete"] as const).map(state=><option key={state} value={state}>{milestoneLabel(state)}</option>)}{["open","due"].includes(value("state")) && <option value={value("state")}>Upcoming</option>}</SelectField></label>}
+        <ProjectDisclosure title="Optional details" icon="notes" defaultOpen={Boolean(value("completionCriteria") || value("completionNote"))}>
+          <div className={styles.milestoneForm}>
+            <label className={styles.field}><span>Success criteria <small>(optional)</small></span><textarea rows={2} value={value("completionCriteria")} onChange={event=>changeEditorValue("completionCriteria",event.target.value)} placeholder="How you’ll recognize this milestone, one item per line"/></label>
+            {editor.kind === "milestone-edit" && <label className={styles.field}><span>Reflection <small>(optional)</small></span><textarea rows={2} value={value("completionNote")} onChange={event=>changeEditorValue("completionNote",event.target.value)} placeholder="What happened or what you learned"/></label>}
+          </div>
+        </ProjectDisclosure>
       </div>;
     }
     if (editor.kind === "blocker-create") {
@@ -3025,11 +3035,11 @@ export default function ProjectsWorkspace({
   const completionIssues = confirmation?.kind === "project-complete" && confirmationTarget
     ? [
         ...(confirmationTarget.project.objectives.length === 0 ? ["Record at least one project objective."] : []),
-        ...activeMilestones(confirmationTarget).map((milestone) => `Complete or archive milestone: ${milestone.title}`),
+
         ...openBlockers(confirmationTarget).map((blocker) => `Resolve, waive, or carry forward blocker: ${blocker.title}`)
       ]
     : [];
-  const confirmationNeedsReason = confirmation?.kind === "project-archive" || confirmation?.kind === "milestone-complete";
+  const confirmationNeedsReason = confirmation?.kind === "project-archive";
   const confirmationTitle = confirmation?.kind === "project-complete"
     ? "Complete this project?"
     : confirmation?.kind === "project-archive"
@@ -3037,7 +3047,7 @@ export default function ProjectsWorkspace({
       : confirmation?.kind === "project-restore"
         ? "Restore this project?"
         : confirmation?.kind === "milestone-complete"
-          ? "Complete this milestone?"
+          ? "Mark this milestone reached?"
           : confirmation?.kind === "link-remove"
             ? "Remove this project link?"
             : "Restore this project link?";
@@ -3050,7 +3060,7 @@ export default function ProjectsWorkspace({
       : confirmation?.kind === "project-restore"
         ? "The project will return to active views. Existing history and references remain unchanged."
         : confirmation?.kind === "milestone-complete"
-          ? "The milestone completion will be recorded on the native project timeline. Linked Personal and Reviews records remain unchanged and keep their own lifecycle."
+          ? "Celebrate the progress. You can add a reflection now or come back to it later."
           : confirmation?.kind === "link-remove"
             ? "Only the Project reference will be removed. The source object remains unchanged in its owner module."
             : "The existing typed reference will return to its state from before removal.";
@@ -3147,7 +3157,7 @@ export default function ProjectsWorkspace({
       <EditorSurface
         open
         title={editorTitle}
-        submitLabel={editor.kind === "project-create" ? "Create project" : "Save changes"}
+        submitLabel={editor.kind === "project-create" ? "Create project" : editor.kind === "milestone-create" ? "Add milestone" : "Save changes"}
         description={editorDescription}
         busy={mutationBusy}
         error={editorError}
@@ -3237,15 +3247,15 @@ export default function ProjectsWorkspace({
           {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
         </>}
         consequences={completionIssues}
-        confirmLabel={confirmation?.kind === "project-archive" ? "Delete project" : confirmation?.kind === "link-remove" ? "Remove link" : confirmation?.kind === "project-restore" || confirmation?.kind === "link-restore" ? "Restore" : "Confirm completion"}
+        confirmLabel={confirmation?.kind === "milestone-complete" ? "Mark reached" : confirmation?.kind === "project-archive" ? "Delete project" : confirmation?.kind === "link-remove" ? "Remove link" : confirmation?.kind === "project-restore" || confirmation?.kind === "link-restore" ? "Restore" : "Confirm completion"}
         tone={confirmation?.kind === "project-archive" || confirmation?.kind === "link-remove" ? "danger" : "default"}
         busy={mutationBusy}
         confirmDisabled={completionIssues.length > 0 || Boolean(confirmationNeedsReason && !confirmationReason.trim())}
         confirmDisabledReason={completionIssues.length ? "Resolve every listed completion gate first." : confirmationNeedsReason && !confirmationReason.trim() ? "A reason is required for this auditable mutation." : undefined}
       >
-        {confirmationNeedsReason && (
+        {(confirmationNeedsReason || confirmation?.kind === "milestone-complete") && (
           <label className={styles.field}>
-            {confirmation?.kind === "project-archive" ? "Deletion reason" : "Completion note"}
+            {confirmation?.kind === "project-archive" ? "Deletion reason" : "Reflection (optional)"}
             <textarea value={confirmationReason} onChange={(event) => setConfirmationReason(event.target.value)} autoFocus={Boolean(confirmationNeedsReason)} />
           </label>
         )}

@@ -53,7 +53,7 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
       const titleId = `project-card-${project.id}-title`;
       const status = project.lifecycle[0].toUpperCase() + project.lifecycle.slice(1);
       const objectCount = new Set(item.linkedContext.map(({ ref }) => `${ref.module}:${ref.objectType}:${ref.objectId}`)).size;
-      const attention = item.attentionReasons.find(reason => /overdue.*milestone/i.test(reason))
+      const attention = item.attentionReasons.find(reason => /overdue.*objective/i.test(reason))
         || item.attentionReasons.find(reason => /overdue/i.test(reason))
         || item.attentionReasons.find(reason => !/objectives.*not defined/i.test(reason));
       const objectives = objectivePreview(item);

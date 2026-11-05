@@ -36,7 +36,8 @@ const createProject=async input=>(await post('/api/projects',{operation:'create'
 const expected={draft:'edit',idea:'calendar-group-brain',planned:'calendar',developing:'build',active:'active',monitoring:'show',dormant:'dormant'};
 const projects=[];
 for(const [i,lifecycle] of Object.keys(expected).entries()) projects.push(await createProject({name:'Card '+lifecycle,description:i%2?'A useful project description with enough detail to fill two lines without changing the height of its neighbors.':'',lifecycle,objectives:i%2?['Deliver a useful outcome with a much longer description to check that wrapping never changes the height of the neighboring cards.','Second project objective','Third project objective','Fourth objective is available in detail'].map(text=>({text})):[]}));
-const target=projects.find(x=>x.lifecycle==='active');
+let target=projects.find(x=>x.lifecycle==='active');
+const overdueResponse=await context.request.patch(base+'/api/projects',{headers,data:{family:'projects',id:target.id,expectedUpdatedAt:target.updatedAt,patch:{objectives:[{text:'Past goal date',targetAt:'2020-01-01'}]}}});assert(overdueResponse.ok(),await overdueResponse.text());target=(await overdueResponse.json()).item;
 const linkedGoalProject=projects.find(x=>x.lifecycle==='draft');
 await post('/api/personal/ops',{family:'goals',input:{title:'Linked goal objective',outcome:'Deliver the linked project outcome',domain:'Personal Admin',lifecycle:'active',sourceRefs:[{module:'projects',objectType:'project',objectId:linkedGoalProject.id,label:linkedGoalProject.name,route:'/admin/projects/'+linkedGoalProject.id}]}});
 await post('/api/projects',{operation:'create',family:'milestones',input:{projectId:target.id,title:'Overdue fixture',dueAt:'2020-01-01',completionCriteria:['Delivery']}});
@@ -53,7 +54,7 @@ for(const width of [1800,1440,820,390,320]){
   await page.waitForTimeout(650);const view=await page.locator('[data-directory-view]:visible').getAttribute('data-directory-view');
   const heights=await cards().evaluateAll(els=>els.map(el=>el.getBoundingClientRect().height));assert(Math.max(...heights)-Math.min(...heights)<2,view+' uneven heights '+heights);
   const active=cards().filter({has:page.getByRole('button',{name:'Open Card active',exact:true})});
-  await expect(active).toContainText('1 overdue milestone');await expect(active).toContainText('Created 08/12/25');await expect(active).toContainText('Edited 10/30/26');await expect(active).toContainText('2 objects');
+  await expect(active).toContainText('1 overdue objective');await expect(active).toContainText('Created 08/12/25');await expect(active).toContainText('Edited 10/30/26');await expect(active).toContainText('2 objects');
   for(const [state,icon] of Object.entries(expected))await expect(cards().filter({has:page.getByRole('button',{name:'Open Card '+state,exact:true})}).locator('.resource-card-status svg')).toHaveAttribute('data-icon-role',icon);
   const geometry=await active.evaluate(el=>{const box=s=>el.querySelector(s).getBoundingClientRect();return {signal:box('.resource-card-signal').y,meta:box('.resource-card-details').y,title:box('.resource-card-title').y,desc:box('.resource-card-description').y,tags:box('.resource-card-tags').toJSON(),picture:box('.resource-card-picture').toJSON(),font:getComputedStyle(el.querySelector('.resource-card-title')).fontSize};});assert(geometry.title<geometry.meta&&geometry.meta<geometry.signal&&geometry.signal<geometry.desc,'Name, dates, warning, description order');assert.equal(geometry.font,view==='grid'&&width>=370&&width<=600?'13px':'15px','People-sized name');
   if(view==='grid')assert(geometry.tags.x>geometry.picture.x&&Math.abs(geometry.tags.y-geometry.picture.y)<2,'Grid control box is top right');

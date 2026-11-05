@@ -397,7 +397,7 @@ export type ProjectMilestoneCreateInput = {
   projectId: string;
   title: string;
   description?: string;
-  dueAt: string;
+  dueAt?: string;
   state?: Exclude<ProjectMilestoneState, "complete" | "archived">;
   owner?: string;
   ownerRef?: NativeObjectRef;

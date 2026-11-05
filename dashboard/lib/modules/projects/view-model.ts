@@ -1,3 +1,4 @@
+import { deriveProjectHealth } from "./health";
 import type { PersonalRecord } from "../../personal-records-store";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import type {
@@ -315,13 +316,6 @@ function attentionReasons(input: {
   const openBlockers = input.blockers.filter((blocker) => blocker.state === "open");
   if (openBlockers.length) reasons.push(`${openBlockers.length} open project blocker${openBlockers.length === 1 ? "" : "s"}.`);
   const now = Date.now();
-  const overdue = input.milestones.filter(
-    (milestone) =>
-      !["complete", "archived"].includes(milestone.state) &&
-      Number.isFinite(Date.parse(milestone.dueAt)) &&
-      Date.parse(milestone.dueAt) < now
-  );
-  if (overdue.length) reasons.push(`${overdue.length} overdue milestone${overdue.length === 1 ? "" : "s"}.`);
   const overdueObjectives = input.project.objectives.filter(
     (objective) => !objective.completedAt && objective.targetAt && Date.parse(objective.targetAt) < now
   );
@@ -337,7 +331,7 @@ export function buildProjectsWorkspaceSnapshot({
 }: BuildProjectsWorkspaceSnapshotInput): ProjectsWorkspaceSnapshot {
   const mappedLegacyKeys = new Set(state.legacyMappings.map((mapping) => mapping.legacyKey));
   const displayProjects: ProjectDisplayRecord[] = [
-    ...state.projects.map(displayFromNative),
+    ...state.projects.map(project => displayFromNative({...project,health:deriveProjectHealth(project,state,new Date().toISOString())})),
     ...LEGACY_PROJECT_DEFINITIONS.filter((project) => !mappedLegacyKeys.has(project.key)).map(
       displayFromLegacy
     )

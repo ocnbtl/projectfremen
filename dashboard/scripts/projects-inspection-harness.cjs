@@ -52,9 +52,9 @@ let browser, page;
       await panel.screenshot({ path: path.join(out, kind + '-' + width + '.png'), animations: 'disabled' });
       if (kind === 'milestone') {
         await expect(panel.getByText('Plants in place', { exact: true })).toBeVisible();
-        await panel.getByText('Follow-through & review', { exact: true }).focus();
+        await panel.getByRole('button', { name: 'Linked work', exact: true }).focus();
         await page.keyboard.press('Enter');
-        await expect(panel.getByText('Milestone decisions', { exact: true })).toBeVisible();
+        await expect(panel.getByRole('heading', { name: 'Decisions', exact: true })).toBeVisible();
         await panel.getByText('Record details', { exact: true }).click();
         await expect(panel.getByText(milestone.id, { exact: true })).toBeVisible();
       }
