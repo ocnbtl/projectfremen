@@ -7,6 +7,7 @@ import type { ProjectDirectoryItem } from "../../lib/modules/projects/view-model
 import type { ProjectLifecycleState } from "../../lib/modules/projects/types";
 import styles from "./ProjectDirectoryCards.module.css";
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import ProjectObjectivePreview, { type ObjectivePreviewTarget } from "./ProjectObjectivePreview";
 import type { ProjectsUpdateResult } from "../../lib/modules/projects/types";
 import type { PersonalOpsGoal } from "../../lib/modules/personal-ops/types";
@@ -32,7 +33,7 @@ function objectivePreview(item: ProjectDirectoryItem) {
   return objectives.slice(0, 3);
 }
 
-export default function ProjectDirectoryCards({ items, view, selectedId, busy, timeZone, onSelect, onToggleStar, onObjectiveOpen, onObjectiveSaved, onGoalSaved }: {
+export default function ProjectDirectoryCards({ items, view, selectedId, busy, timeZone, onSelect, onToggleStar, onObjectiveOpen, onObjectiveSaved, onGoalSaved, onObjectiveToggle, pendingObjective }: {
   items: ProjectDirectoryItem[];
   view: "comfortable" | "compact" | "grid";
   selectedId?: string;
@@ -43,7 +44,10 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
   onObjectiveOpen: () => void;
   onObjectiveSaved: (result: ProjectsUpdateResult<"projects">) => void;
   onGoalSaved: (goal: PersonalOpsGoal) => void;
+  onObjectiveToggle: (item: ProjectDirectoryItem, objective: ObjectivePreviewTarget) => void;
+  pendingObjective: string;
 }) {
+  const reducedMotion = useReducedMotion();
   const [preview, setPreview] = useState<{ project: ProjectDirectoryItem["project"]; objective: ObjectivePreviewTarget; triggerId: string }>();
   const date = (value?: string) => value && Number.isFinite(Date.parse(value))
     ? new Intl.DateTimeFormat("en-US", { timeZone, month: "2-digit", day: "2-digit", year: "2-digit" }).format(new Date(value)) : "—";
@@ -73,14 +77,16 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
           <span title={project.updatedAt || "Edited date not recorded"}><UnigentamosIcon role="edit" size={13} /><span>Edited <time dateTime={project.updatedAt}>{date(project.updatedAt)}</time></span></span>
         </MorphingDiv>
         <MorphingDiv className={`resource-card-signal ${styles.signal}`}>
-          {attention && <span data-attention={/overdue|blocker/i.test(attention) || undefined} title={attention}><UnigentamosIcon role={/overdue|blocker/i.test(attention) ? "warning" : "information"} size={14} /><span>{attention.replace(/\.$/, "")}</span></span>}
+          <AnimatePresence initial={false} mode="wait">{attention && <motion.span key={attention} initial={{opacity:0,y:3}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-3}} transition={{duration:reducedMotion ? 0 : .16}} data-attention={/overdue|blocker/i.test(attention) || undefined} title={attention}><UnigentamosIcon role={/overdue|blocker/i.test(attention) ? "warning" : "information"} size={14} /><span>{attention.replace(/\.$/, "")}</span></motion.span>}</AnimatePresence>
         </MorphingDiv>
         <MorphingDiv className={`resource-card-description ${styles.description}`}>{project.description || <span aria-hidden="true">&nbsp;</span>}</MorphingDiv>
         <MorphingDiv className={styles.objectives}>
-          {objectives.length > 0 && <><ul aria-label="Project objectives preview">{objectives.map((objective,index) => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}><button id={`objective-preview-${project.id}-${index}`} type="button" aria-label={`Edit objective: ${objective.text}`} aria-haspopup="dialog" onPointerDown={event=>event.stopPropagation()} onClick={event=>{
+          {objectives.length > 0 && <><ul aria-label="Project objectives preview">{objectives.map((objective,index) => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}>
+            {objective.id !== "current-objective" && (!objective.source || (objective.source.module === "personal_ops" && objective.source.objectType === "goal")) ? <button className={styles.objectiveToggle} type="button" role="checkbox" aria-checked={objective.completed} aria-label={`${objective.completed ? "Reopen" : "Complete"} objective: ${objective.text}`} title={objective.completed ? "Reopen objective" : "Mark complete"} aria-busy={pendingObjective === `${project.id}:${objective.id}`} disabled={busy || !project.editable || ["complete","archived"].includes(project.lifecycle)} onPointerDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();onObjectiveToggle(item,objective);}}><span className={styles.objectiveCheck}><UnigentamosIcon role="check" size={12}/></span></button> : <UnigentamosIcon role="goal" size={13}/>}
+            <button id={`objective-preview-${project.id}-${index}`} type="button" disabled={pendingObjective.startsWith(`${project.id}:`)} aria-label={`Edit objective: ${objective.text}`} aria-haspopup="dialog" onPointerDown={event=>event.stopPropagation()} onClick={event=>{
             event.stopPropagation(); onObjectiveOpen();
             setPreview({project,objective,triggerId:event.currentTarget.id});
-          }}><UnigentamosIcon role={objective.completed ? "check" : "goal"} size={13} /><span>{objective.text}</span></button></li>)}</ul></>}
+          }}><span>{objective.text}</span></button></li>)}</ul></>}
         </MorphingDiv>
       </MorphingArticle>;
     })}

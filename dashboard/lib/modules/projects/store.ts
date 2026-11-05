@@ -279,7 +279,8 @@ function normalizeObjectives(
   value: unknown,
   field: string,
   now: string,
-  existing: ProjectObjective[] = []
+  existing: ProjectObjective[] = [],
+  readingStored = false
 ): ProjectObjective[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) validation(`${field} must be a list`, field);
@@ -297,13 +298,14 @@ function normalizeObjectives(
       ? optionalDate(candidate.completedAt, `${field}.${index}.completedAt`) || prior?.completedAt || now
       : undefined;
     const targetAt = optionalDate(candidate.targetAt, `${field}.${index}.targetAt`);
+    const unchanged = prior && prior.text === text && prior.targetAt === targetAt && prior.completedAt === completedAt;
     return {
       id,
       text,
       ...(targetAt ? { targetAt } : {}),
       ...(completedAt ? { completedAt } : {}),
       createdAt: prior?.createdAt || optionalDate(candidate.createdAt, `${field}.${index}.createdAt`) || now,
-      updatedAt: now
+      updatedAt: unchanged ? prior.updatedAt : readingStored ? optionalDate(candidate.updatedAt, `${field}.${index}.updatedAt`) || now : now
     };
   });
 }
@@ -533,7 +535,7 @@ function assertState(value: unknown): ProjectsState {
       : legacyObjective
         ? [{ id: `objective-${String(candidate.id || index)}-legacy`, text: legacyObjective }]
         : [];
-    const objectives = normalizeObjectives(objectiveSource, `projects.${index}.objectives`, migrationTime);
+    const objectives = normalizeObjectives(objectiveSource, `projects.${index}.objectives`, migrationTime, [], true);
     const normalizedCandidate = { ...candidate };
     delete normalizedCandidate.area;
     delete normalizedCandidate.owner;

@@ -12,6 +12,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import ProjectDisclosure from "./ProjectDisclosure";
 import { deriveProjectHealth } from "../../lib/modules/projects/health";
 import { milestoneLabel } from "../../lib/modules/projects/milestone-display";
+import type { ObjectivePreviewTarget } from "./ProjectObjectivePreview";
+import { createPersonalOpsRepository } from "../../lib/modules/personal-ops/repository";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -47,6 +49,7 @@ import {
 } from "../../lib/modules/personal-ops/follow-up-links";
 import type {
   PersonalOpsDecision,
+  PersonalOpsGoal,
   PersonalOpsFollowUp
 } from "../../lib/modules/personal-ops/types";
 import { createProjectsRepository } from "../../lib/modules/projects/repository";
@@ -1121,6 +1124,8 @@ export default function ProjectsWorkspace({
   const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [confirmationReason, setConfirmationReason] = useState("");
   const [mutationBusy, setMutationBusy] = useState(false);
+  const objectiveToggleLock = useRef(false);
+  const [pendingObjective, setPendingObjective] = useState("");
   const [notice, setNotice] = useState("");
   const [mutationError, setMutationError] = useState("");
   const [reviewViews, setReviewViews] = useState(initialReviewViews);
@@ -1447,6 +1452,66 @@ export default function ProjectsWorkspace({
       ...current,
       projects: current.projects.map((item) => item.project.id === projectId ? recomputeAttention(transform(item)) : item)
     }));
+  }
+
+  function applyLinkedGoal(goal: PersonalOpsGoal) {
+    setSnapshot(current => ({...current, projects: current.projects.map(item => ({...item, linkedContext: item.linkedContext.map(context =>
+      context.ref.module === "personal_ops" && context.ref.objectId === goal.id
+        ? {...context, ref: {...context.ref, label: goal.title}, summary: goal.description, legacyStatus: goal.lifecycle, updatedAt: goal.updatedAt}
+        : context
+    )}))}));
+  }
+
+  async function toggleCardObjective(item: ProjectDirectoryItem, objective: ObjectivePreviewTarget) {
+    if (mutationBusy || objectiveToggleLock.current || !item.project.editable || !item.project.updatedAt || ["complete", "archived"].includes(item.project.lifecycle)) return;
+    const linkedGoal = objective.source?.module === "personal_ops" && objective.source.objectType === "goal";
+    if (objective.id === "current-objective" || (objective.source && !linkedGoal)) return;
+    const base = item.project;
+    const completed = !objective.completed;
+    objectiveToggleLock.current = true;
+    setMutationBusy(true);
+    setPendingObjective(`${base.id}:${objective.id}`);
+    setObjectiveDirectoryHold({key: directoryKey, ids: visibleProjects.map(row => row.project.id)});
+    clearFeedback();
+    let originalGoal: PersonalOpsGoal | undefined;
+    try {
+      if (linkedGoal && objective.source) {
+        const personal = createPersonalOpsRepository();
+        const loaded = await personal.get("goals", objective.source.objectId);
+        if (!loaded.ok) throw new Error(loaded.error.message);
+        originalGoal = loaded.data;
+        if (originalGoal.archivedAt || originalGoal.lifecycle === "archived") throw new Error("This goal is archived. Restore it in Personal before changing it.");
+        applyLinkedGoal({...originalGoal, lifecycle: completed ? "complete" : "active"});
+        const result = await personal.update("goals", originalGoal.id, {goalState: completed ? "complete" : "active"}, originalGoal.updatedAt);
+        if (!result.ok) throw new Error(result.error.message);
+        applyLinkedGoal(result.data);
+      } else {
+        if (!base.objectives.some(row => row.id === objective.id)) return;
+        updateDirectoryItem(base.id, current => ({...current, project: {...current.project, objectives: current.project.objectives.map(row =>
+          row.id === objective.id ? {...row, completedAt: completed ? new Date().toISOString() : undefined} : row
+        )}}));
+        const result = await repository.update("projects", base.id, {objectives: base.objectives.map(row =>
+          row.id === objective.id ? {id: row.id, text: row.text, targetAt: row.targetAt, completed} : {id: row.id, text: row.text, targetAt: row.targetAt, completedAt: row.completedAt}
+        )}, base.updatedAt!);
+        if (!result.ok) throw new Error(result.error.message);
+        applyMutationEnvelope(result.data);
+      }
+      setNotice(completed ? "Objective completed." : "Objective reopened.");
+    } catch (error) {
+      if (linkedGoal) {
+        if (originalGoal) applyLinkedGoal(originalGoal);
+      } else {
+        updateDirectoryItem(base.id, current => ({...current, project: base}));
+        // Refresh after a rejected write without retrying or overwriting another session.
+        const latest = await repository.get("projects", base.id);
+        if (latest.ok) applyProject(latest.data);
+      }
+      setMutationError(error instanceof Error ? error.message : "Could not save the objective. Please try again.");
+    } finally {
+      objectiveToggleLock.current = false;
+      setMutationBusy(false);
+      setPendingObjective("");
+    }
   }
 
   function applyProject(project: Project) {
@@ -3099,7 +3164,9 @@ export default function ProjectsWorkspace({
             onToggleStar={item => void toggleStar(item)}
             onObjectiveOpen={()=>setObjectiveDirectoryHold({key:directoryKey,ids:visibleProjects.map(item=>item.project.id)})}
             onObjectiveSaved={applyMutationEnvelope}
-            onGoalSaved={goal=>setSnapshot(current=>({...current,projects:current.projects.map(item=>({...item,linkedContext:item.linkedContext.map(context=>context.ref.module==="personal_ops"&&context.ref.objectId===goal.id?{...context,ref:{...context.ref,label:goal.title},summary:goal.description,legacyStatus:goal.lifecycle,updatedAt:goal.updatedAt}:context)}))}))}
+            onGoalSaved={applyLinkedGoal}
+            onObjectiveToggle={toggleCardObjective}
+            pendingObjective={pendingObjective}
           />
         ) : (
           <SystemState

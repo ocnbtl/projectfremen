@@ -32,6 +32,17 @@
 .objectives li button:focus-visible {outline:2px solid var(--module-focus);outline-offset:-2px;}
 .objectives li button > span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .objectives li[data-completed] button > span {text-decoration:line-through;}
+.objectives li {gap:4px;}
+.objectives li .objectiveToggle {flex:0 0 24px;width:24px;height:24px;justify-content:center;}
+.objectiveCheck {display:flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid var(--module-icon);border-radius:50%;box-sizing:border-box;transition:background-color .18s ease,border-color .18s ease;}
+.objectiveCheck svg {opacity:0;transform:scale(.6);transition:opacity .18s ease,transform .18s ease;}
+.objectiveToggle[aria-checked=true] .objectiveCheck {background:var(--module-primary-700);border-color:var(--module-primary-700);}
+.objectiveToggle[aria-checked=true] .objectiveCheck svg {opacity:1;transform:scale(1);color:white;}
+.objectives li button:disabled {cursor:default;}
+.objectiveToggle:disabled:not([aria-busy=true]) {opacity:.55;}
+.objectiveToggle[aria-busy=true] .objectiveCheck {box-shadow:0 0 0 3px var(--module-primary-100);}
+@media(pointer:coarse) {.objectives li .objectiveToggle {flex-basis:28px;width:28px;}}
+@media(prefers-reduced-motion:reduce) {.objectiveCheck,.objectiveCheck svg {transition:none;}}
 .directory[data-directory-view="compact"] .card {grid-template-columns:48px minmax(0,1fr) minmax(130px,30%);height:190px;gap:2px 10px;}
 .directory[data-directory-view="compact"] .picture {width:48px;height:48px;}
 .directory[data-directory-view="compact"] .description {-webkit-line-clamp:2;max-height:44px;}
