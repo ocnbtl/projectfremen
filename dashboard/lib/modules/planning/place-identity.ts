@@ -1,5 +1,6 @@
 import type { Place } from "./types";
 import { formatPlaceAddress, splitPastedAddress } from "./place-address";
+import { sameNumberedVenue } from "./place-match";
 
 /** Conservative identity: preserve apartment numbers, accents, and country/region text. */
 export function addressIdentity(address: string) {
@@ -11,9 +12,19 @@ export function addressIdentity(address: string) {
  * records retain their existing reuse behavior; ambiguous candidates stay explicit. */
 export function reusablePlaces(places: Place[], candidate: Partial<Place>): Place[] {
   const key = (s = "") => s.normalize("NFKC").toLocaleLowerCase("en-US").trim();
+  const sourceId = candidate.lookup?.sourceId;
+  if (sourceId) {
+    const linked = places.filter(place => !place.archivedAt && place.lookup?.sourceId === sourceId);
+    if (linked.length) return linked;
+  }
   return places.filter(place => {
     if (place.archivedAt) return false;
-    if (place.lookup?.sourceId && candidate.lookup?.sourceId) return place.lookup.sourceId === candidate.lookup.sourceId;
+    if (place.lookup?.sourceId && candidate.lookup?.sourceId) {
+      // Different records in one source may be neighboring branches. Across
+      // sources, require the same name, full numbered address and nearby pin.
+      if (place.lookup.sourceId.split("/")[2] === candidate.lookup.sourceId.split("/")[2]) return false;
+      return sameNumberedVenue(place, candidate);
+    }
     if (place.countryCode && candidate.countryCode && place.countryCode !== candidate.countryCode) return false;
     const sameAddress = !!candidate.address?.trim() && addressIdentity(place.address) === addressIdentity(candidate.address);
     if (!place.lookup && !candidate.lookup) return sameAddress;

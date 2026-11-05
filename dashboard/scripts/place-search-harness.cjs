@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), ts = require('typescript');
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename);
 const { splitPastedAddress, formatPlaceAddress } = require('../lib/modules/planning/place-address.ts');
-const { searchPlaceCoordinates, searchFullPlace, parsePlaceSearch } = require('../lib/modules/planning/place-search.ts');
+const { searchPlaceCoordinates, searchFullPlace, parsePlaceSearch, rankPlaceSuggestions, canAutofillCoordinates } = require('../lib/modules/planning/place-search.ts');
 (async () => {
   const parts = { street: '3087 Terminal Dr', city: 'Hebron', region: 'KY', postalCode: '41048', district: '' };
   for (const address of ['3087 Terminal Dr, Hebron, KY 41048', '3087 Terminal Dr Hebron, KY 41048', '3087 Terminal Dr Hebron KY 41048', '3087 Terminal Dr, Hebron, Kentucky 41048, USA', '3087 Terminal Dr\nHebron, KY 41048\nUnited States', '3087 Terminal Dr, Hebron, KY, 41048']) {
@@ -63,6 +63,33 @@ const { searchPlaceCoordinates, searchFullPlace, parsePlaceSearch } = require('.
   await assert.rejects(() => searchFullPlace('a'.repeat(501), globalSearch), /place name/);
   await assert.rejects(() => searchFullPlace('Exumas', async () => { throw Error('Rate limited'); }), /Rate limited/);
   assert.deepEqual(await searchFullPlace('No known match', async () => []), []);
+
+  const venue = { name: 'North Café', address, latitude: 39.05, longitude: -84.65, countryCode: 'US', addressParts: parts, precision: 'address', sourceUrl: 'https://www.openstreetmap.org/node/10' };
+  const localBranch = { ...venue, name: 'North Cafe', address: address.replace('Dr', 'Drive'), addressParts: { ...parts, street: '3087 Terminal Drive' }, latitude: 39.0501, sourceUrl: 'https://example.org/places/a' };
+  const distantBranch = { ...venue, address: '24 Beach Road, Miami, FL 33135', addressParts: { ...parts, street: '24 Beach Road', city: 'Miami', region: 'FL', postalCode: '33135' }, latitude: 25.76, longitude: -80.19, sourceUrl: 'https://example.org/places/b' };
+  const neighboringBranch = { ...localBranch, addressParts: { ...parts, street: '3089 Terminal Dr' }, address: address.replace('3087', '3089'), sourceUrl: 'https://example.org/places/c' };
+  const otherTenant = { ...localBranch, name: 'South Coffee', sourceUrl: 'https://example.org/places/d' };
+  const candidates = [distantBranch, otherTenant, neighboringBranch, venue, localBranch];
+  assert.equal(rankPlaceSuggestions('North Cafe, Miami', candidates)[0], distantBranch);
+  assert.equal(rankPlaceSuggestions('North Cafe', candidates, { name: 'North Cafe', countryCode: 'US', addressParts: parts })[0], venue);
+  assert.equal(rankPlaceSuggestions('3087 Terminal Drive, Hebron', [neighboringBranch, venue])[0], venue);
+  assert.equal(rankPlaceSuggestions('North Cafe', candidates).length, 4, 'Nearby reports of one venue merge while tenants and branches stay distinct');
+  const secondCounter = { ...venue, sourceUrl: 'https://www.openstreetmap.org/node/11' };
+  assert.equal(rankPlaceSuggestions('North Cafe', [localBranch, venue, secondCounter]).length, 2, 'One cross-source candidate must not bridge two separate source records');
+  assert.equal(rankPlaceSuggestions('North Cafe', [venue, { ...localBranch, latitude: 40 }]).length, 2, 'Conflicting coordinates stay reviewable');
+  assert.equal(rankPlaceSuggestions('North Cafe', [venue, { ...localBranch, countryCode: 'CA' }]).length, 2);
+  assert.deepEqual(rankPlaceSuggestions('North Cafe', [{ ...venue, longitude: 181 }, { ...venue, latitude: NaN }]), []);
+  const verified = { name: 'North Cafe', countryCode: 'US', addressParts: parts };
+  assert.equal(canAutofillCoordinates([localBranch], address, verified), true);
+  assert.equal(canAutofillCoordinates([venue, neighboringBranch], address, verified), false);
+  for (const row of [otherTenant, neighboringBranch, distantBranch, { ...venue, latitude: NaN }, { ...venue, countryCode: 'CA' }, { ...venue, precision: 'area' }, { ...venue, precision: 'approximate' }, { ...venue, addressParts: { ...parts, postalCode: '41049' } }]) {
+    assert.equal(canAutofillCoordinates([row], address, verified), false);
+  }
+  assert.equal(canAutofillCoordinates([venue], parts.street, { addressParts: { street: parts.street, city: '', region: '', district: '', postalCode: '' } }), false);
+  const unsupported = parsePlaceSearch({ features: [feature({ name: 'A', housenumber: '10' }), feature({ osm_key: 'amenity' })] }, 'North Cafe');
+  assert.equal(unsupported.length, 1);
+  assert.equal(unsupported[0].precision, 'approximate');
+  console.log('PASS: locality and street ranking, conservative cross-provider deduplication, distinct branches and tenants, and automatic coordinates only on corroborated addresses.');
   console.log('PASS: worldwide full-place lookup, Exumas/Bahamas ranking, international structured addresses, area-center precision, duplicate suggestions, invalid coordinates, bounded inputs and provider errors.');
   console.log('PASS: full-address paste, units, ZIP+4, conservative preservation, named venue priority, country filtering, deduplication, legacy address parsing and partial provider failure.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

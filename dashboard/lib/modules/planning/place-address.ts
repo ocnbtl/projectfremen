@@ -7,6 +7,13 @@ export const addressCountries = Object.entries(ADDRESS_COUNTRIES).sort((a, b) =>
 
 const usRegions = "AL:Alabama|AK:Alaska|AZ:Arizona|AR:Arkansas|CA:California|CO:Colorado|CT:Connecticut|DE:Delaware|DC:District of Columbia|FL:Florida|GA:Georgia|HI:Hawaii|ID:Idaho|IL:Illinois|IN:Indiana|IA:Iowa|KS:Kansas|KY:Kentucky|LA:Louisiana|ME:Maine|MD:Maryland|MA:Massachusetts|MI:Michigan|MN:Minnesota|MS:Mississippi|MO:Missouri|MT:Montana|NE:Nebraska|NV:Nevada|NH:New Hampshire|NJ:New Jersey|NM:New Mexico|NY:New York|NC:North Carolina|ND:North Dakota|OH:Ohio|OK:Oklahoma|OR:Oregon|PA:Pennsylvania|RI:Rhode Island|SC:South Carolina|SD:South Dakota|TN:Tennessee|TX:Texas|UT:Utah|VT:Vermont|VA:Virginia|WA:Washington|WV:West Virginia|WI:Wisconsin|WY:Wyoming|PR:Puerto Rico|VI:Virgin Islands|GU:Guam|AS:American Samoa|MP:Northern Mariana Islands".split("|").map(row => row.split(":"));
 
+/** Match region names and official codes without throwing away country context. */
+export function addressRegionKey(region = "", country?: string) {
+  const normalized = region.trim().normalize("NFKC").toLowerCase();
+  const entry = country === "US" && usRegions.find(([code, name]) => code.toLowerCase() === normalized || name.toLowerCase() === normalized);
+  return entry ? entry[0].toLowerCase() : normalized;
+}
+
 /** Split only recognizable US postal addresses. Ambiguous/international text stays intact. */
 export function splitPastedAddress(text: string, country = "US"): AddressParts | undefined {
   if (country !== "US" || /^https?:\/\//i.test(text.trim())) return;

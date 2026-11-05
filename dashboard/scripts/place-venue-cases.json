@@ -1,0 +1,50 @@
+[
+  {
+    "query": "Camporosso, Fort Mitchell KY",
+    "names": ["Camporosso", "Camporosso Wood Fired Pizzeria"],
+    "street": "2475 Dixie Highway", "cities": ["Fort Mitchell", "Ft Mitchell"], "country": "US",
+    "operatorMapPin": [39.036858, -84.559320],
+    "source": "https://www.camporosso.com/"
+  },
+  {
+    "query": "MOTR Pub Cincinnati",
+    "names": ["MOTR Pub"], "street": "1345 Main Street", "cities": ["Cincinnati"], "country": "US",
+    "source": "https://www.woodwardtheater.com/about-motr-pub"
+  },
+  {
+    "query": "Wave Pool, Cincinnati",
+    "names": ["Wave Pool", "Wave Pool Art Center", "Wave Pool Gallery"],
+    "street": "2940 Colerain Avenue", "cities": ["Cincinnati"], "country": "US",
+    "source": "https://www.wavepoolgallery.org/contact"
+  },
+  {
+    "query": "Roebling Point Books & Coffee, Covington KY",
+    "names": ["Roebling Point Books & Coffee", "Roebling Books & Coffee", "Roebling Books"],
+    "street": "306 Greenup Street", "cities": ["Covington"], "country": "US",
+    "operatorMapPin": [39.0886278, -84.5079301],
+    "source": "https://www.roeblingbooks.com/about"
+  },
+  {
+    "query": "Roebling Point Books & Coffee, Newport KY",
+    "names": ["Roebling Point Books & Coffee", "Roebling Books & Coffee", "Roebling Books"],
+    "street": "601 Overton Street", "cities": ["Newport"], "country": "US",
+    "operatorMapPin": [39.0936993, -84.4893393],
+    "source": "https://www.roeblingbooks.com/about"
+  },
+  {
+    "query": "Tim Wendelboe, Oslo",
+    "names": ["Tim Wendelboe"], "street": "Grüners gate 1", "cities": ["Oslo"], "country": "NO",
+    "source": "https://timwendelboe.no/pages/contact-us"
+  },
+  {
+    "query": "The Book Lounge, Cape Town",
+    "names": ["The Book Lounge", "Book Lounge"], "street": "71 Roeland Street", "cities": ["Cape Town"], "country": "ZA",
+    "operatorMapPin": [-33.9292058, 18.4216261],
+    "source": "https://booklounge.co.za/contact-us/"
+  },
+  {
+    "query": "Aunty Peg's, Collingwood",
+    "names": ["Aunty Peg's"], "street": "200 Wellington Street", "cities": ["Collingwood"], "country": "AU",
+    "source": "https://www.proudmarycoffee.com.au/pages/aunty-pegs"
+  }
+]

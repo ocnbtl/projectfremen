@@ -9,12 +9,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 type CacheItem = { expires: number; value: unknown };
 const cache = new Map<string, CacheItem>();
-export async function publicJson(url: string, ttl = 3600000): Promise<any> {
+export async function publicJson(url: string, ttl = 3600000, signal?: AbortSignal): Promise<any> {
   const previous = cache.get(url);
   if (previous && previous.expires > Date.now()) return previous.value;
   const response = await fetch(url, {
     headers: { Accept: "application/json", "User-Agent": "Unigentamos/1.0" },
-    signal: AbortSignal.timeout(15000),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
   });
   if (!response.ok)
     throw new Error(
@@ -37,11 +37,12 @@ export function validCoordinate(value: unknown, max: number) {
     throw new Error("Invalid map coordinates");
   return n;
 }
-export async function searchPlaces(query: string, countryCode?: string) {
+export async function searchPlaces(query: string, countryCode?: string, signal?: AbortSignal) {
   if (query.trim().length < 2 || query.length > 500)
     throw new Error("Enter between 2 and 500 characters");
   const data = await publicJson(
     `https://photon.komoot.io/api/?${new URLSearchParams({ q: query, limit: "8", lang: "en", ...(countryCode ? { countrycode: countryCode } : {}) })}`,
+    3600000, signal,
   );
   return parsePlaceSearch(data, query);
 }

@@ -3,7 +3,8 @@ import { hasAdminSession } from "../../../lib/admin-session";
 import { isCsrfRequestValid } from "../../../lib/csrf";
 import { privateJsonStream } from "../../../lib/modules/planning/json-stream";
 import { worldRegions } from "../../../lib/modules/planning/world-regions";
-import { searchFullPlace, searchPlaceCoordinates } from "../../../lib/modules/planning/place-search";
+import { searchVenueAutofill } from "../../../lib/modules/planning/place-autofill";
+import { searchOverturePlaces } from "../../../lib/modules/planning/overture-places";
 import { normalizeAddressCountry, normalizeAddressParts } from "../../../lib/modules/planning/place-address";
 import {
   demographics,
@@ -52,12 +53,15 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 20000) throw new Error("Route request is too large");
     const body = JSON.parse(raw);
-    if (body.operation === "place_autofill") return json({ ok: true, data: await searchFullPlace(typeof body.query === "string" ? body.query : "", searchPlaces) });
-    if (body.operation === "geocode") return json({ ok: true, data: await searchPlaceCoordinates(typeof body.address === "string" ? body.address : "", {
-      name: typeof body.name === "string" ? body.name : undefined,
-      countryCode: normalizeAddressCountry(body.countryCode),
-      addressParts: normalizeAddressParts(body.addressParts),
-    }, searchPlaces) });
+    if (body.operation === "place_autofill" || body.operation === "geocode") {
+      const coordinates = body.operation === "geocode", query = coordinates ? body.address : body.query;
+      const firstSourceDeadline = AbortSignal.any([request.signal, AbortSignal.timeout(6500)]);
+      return json({ ok: true, data: await searchVenueAutofill(typeof query === "string" ? query : "", {
+        name: typeof body.name === "string" ? body.name.trim().slice(0,240) : undefined,
+        countryCode: normalizeAddressCountry(body.countryCode),
+        addressParts: normalizeAddressParts(body.addressParts),
+      }, (q, cc) => searchPlaces(q, cc, firstSourceDeadline), searchOverturePlaces, request.signal, coordinates) });
+    }
     return json({
       ok: true,
       data: await routeStops(body.coordinates, body.mode),

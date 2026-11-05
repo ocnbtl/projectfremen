@@ -8,7 +8,7 @@ import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./PlaceLocationFields.module.css";
-import { placeFromSearch, type PlaceSearchResult } from "../../lib/modules/planning/place-search";
+import { canAutofillCoordinates, placeFromSearch, type PlaceSearchResult } from "../../lib/modules/planning/place-search";
 
 export type PlaceLocation = { name?: string; address?: string; latitude?: number; longitude?: number; countryCode?: string; addressParts?: AddressParts; lookup?: import("../../lib/modules/planning/types").Place["lookup"] };
 const extraFlags = new Set(["AQ", "BV", "GS", "HM", "PN", "TF", "UM"]);
@@ -18,6 +18,7 @@ function CountryFlag({ code }: { code: string }) {
 export default function PlaceLocationFields({ value, onChange, compact = false, leading }: { value: PlaceLocation; onChange: (patch: PlaceLocation) => void; compact?: boolean; leading?: ReactNode }) {
   const [matches, setMatches] = useState<PlaceSearchResult[]>([]), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const [lookupMode, setLookupMode] = useState<"place" | "coordinates">("place");
+  const [countryChosen, setCountryChosen] = useState(false);
   const [pastedAddress, setPastedAddress] = useState<{ address: string; country: string }>();
   const request = useRef<AbortController | null>(null), trigger = useRef<HTMLDivElement>(null), placeTrigger = useRef<HTMLDivElement>(null), applying = useRef(false), addressId = useId();
   const address = value.address || "", country = value.countryCode || "";
@@ -71,18 +72,23 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
     try {
       const countryName = value.countryCode ? ADDRESS_COUNTRIES[country]?.name : "";
       const query = countryName && !address.toLowerCase().includes(countryName.toLowerCase()) ? `${address}, ${countryName}` : address;
-      const input = mode === "place" ? { operation: "place_autofill", query: value.name?.trim() || address } : { operation: "geocode", address: query, name: value.name, countryCode: country || undefined, addressParts: parts };
+      // A previous selection may be in a completely different country. Use
+      // fields the user entered for this search, not the old selection's pin.
+      const context = { name: value.name, countryCode: country || undefined, addressParts: parts };
+      const input = mode === "place" ? { operation: "place_autofill", query: value.name?.trim() || address,
+        ...(!value.lookup && (countryChosen || parts.street || parts.city || parts.region || parts.postalCode) ? context : {}) }
+        : { operation: "geocode", address: query, ...context };
       const response = await fetch("/api/map", { method: "POST", headers: buildJsonHeadersWithCsrf(), signal: controller.signal, body: JSON.stringify(input) });
       const body = await response.json(); if (!response.ok || !body.ok) throw new Error(body.error || "Address lookup is unavailable.");
       if (controller.signal.aborted) return;
-      if (body.data.length === 1 && mode === "coordinates") { pinAddress.current = address; onChange({ latitude: body.data[0].latitude, longitude: body.data[0].longitude }); setMessage("Coordinates filled."); }
-      else { setMatches(body.data); setMessage(body.data.length ? "" : "No matches. Add a city or postal code, or enter coordinates."); }
+      if (mode === "coordinates" && canAutofillCoordinates(body.data, address, context)) { pinAddress.current = address; onChange({ latitude: body.data[0].latitude, longitude: body.data[0].longitude }); setMessage("Coordinates filled."); }
+      else { setMatches(body.data); setMessage(body.data.length ? "" : "No matches. Try the business name with its city or street address."); }
     } catch (error) { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Address lookup is unavailable."); }
     finally { if (!controller.signal.aborted) setBusy(false); }
   }
   const choices = <Popover.Content className={styles.matches} align={lookupMode === "place" ? "start" : "end"} sideOffset={8} collisionPadding={12} collisionBoundary={(lookupMode === "place" ? placeTrigger : trigger).current?.closest<HTMLElement>('[role="dialog"]')} aria-label="Matching places" onFocusOutside={e => e.preventDefault()}>
-    <strong>Choose the matching place</strong>{matches.map((match, index) => <button key={match.sourceUrl || index} type="button" onClick={() => selectMatch(match)}><strong>{match.name}</strong><span>{match.address}</span><small>{[match.kind && match.kind.replace(/^./, c => c.toUpperCase()), match.precision === "area" ? "Area center" : "", formatPlaceCoordinates(match.latitude, match.longitude)].filter(Boolean).join(" · ")}</small></button>)}
-    <a className={styles.attribution} href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
+    <strong>Choose the matching place</strong>{matches.map((match, index) => <button key={match.sourceUrl || index} type="button" onClick={() => selectMatch(match)}><strong>{match.name}</strong><span>{match.address || "Street address unavailable"}</span><small>{[match.kind?.replaceAll("_", " ").replace(/^./, c => c.toUpperCase()), match.precision === "area" ? "Area center" : "", match.sourceLabel || "OpenStreetMap", formatPlaceCoordinates(match.latitude, match.longitude)].filter(Boolean).join(" · ")}</small></button>)}
+    <small className={styles.attribution}><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>{" · "}<a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>{matches.some(m => m.sourceLabel === "Overture Maps") && <>{" · "}<a href="https://docs.overturemaps.org/attribution/#places" target="_blank" rel="noreferrer">Overture Maps &amp; contributors</a></>}</small>
   </Popover.Content>;
   const placeLookup = <div className={styles.placeLookup} ref={placeTrigger}><Popover.Root open={lookupMode === "place" && !!matches.length} onOpenChange={open => { if (!open) setMatches([]); }}><Popover.Anchor asChild><Button type="button" icon="search" className={styles.autofill} aria-label="Autofill place" busy={busy && lookupMode === "place"} disabled={busy || (value.name?.trim() || address.trim()).length < 2} onClick={() => void lookup("place")}>Autofill place</Button></Popover.Anchor><Popover.Portal container={placeTrigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}>{choices}</Popover.Portal></Popover.Root><span>Worldwide</span></div>;
   return <div className={`${styles.fields} ${compact ? styles.compact : ""}`}>
@@ -90,6 +96,7 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
     {!compact && placeLookup}
     <div className={styles.addressHeading}><label htmlFor={addressId}><UnigentamosIcon role="location" size={16} />Address</label><SelectField searchable autoFocusSearch={false} className={styles.country} aria-label="Address country" value={country} triggerContent={<span className={styles.countryValue}>{country ? <CountryFlag code={country} /> : <UnigentamosIcon role="travel-kind-country" size={16} />}<span>{country || "Auto"}</span><UnigentamosIcon role="chevron-down" size={14} /></span>} onChange={e => {
       const countryCode = e.target.value;
+      setCountryChosen(true);
       changeAddress(parts, countryCode);
     }}><option value="">Auto · worldwide</option>{addressCountries.map(([code, info]) => <option key={code} value={code}><span className={styles.countryOption}><CountryFlag code={code} />{info.name}</span></option>)}</SelectField></div>
     <input id={addressId} autoComplete="street-address" aria-label="Address" value={parts.street} maxLength={240} placeholder="Street address or paste a full address" onChange={e => updatePart("street", e.target.value)} onPaste={e => {

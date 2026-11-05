@@ -1,0 +1,24 @@
+[
+  {
+    "query": "American Sign Museum, Cincinnati",
+    "names": ["American Sign Museum", "The American Sign Museum"],
+    "street": "1330 Monmouth Avenue", "cities": ["Cincinnati"], "country": "US",
+    "source": "https://www.americansignmuseum.org/visit/"
+  },
+  {
+    "query": "Purple Poulet, Newport KY",
+    "names": ["Purple Poulet", "Purple Poulet Southern Bourbon Bistro"],
+    "street": "846 York Street", "cities": ["Newport"], "country": "US",
+    "source": "https://purplepoulet.com/"
+  },
+  {
+    "query": "Shakespeare and Company, Paris",
+    "names": ["Shakespeare and Company"], "street": "37 rue de la Bûcherie", "cities": ["Paris"], "country": "FR",
+    "source": "https://www.shakespeareandcompany.com/contact-us"
+  },
+  {
+    "query": "Café Myriade, rue Mackay, Montréal",
+    "names": ["Café Myriade"], "street": "1432 rue Mackay", "cities": ["Montréal"], "country": "CA",
+    "source": "https://cafemyriade.com/"
+  }
+]

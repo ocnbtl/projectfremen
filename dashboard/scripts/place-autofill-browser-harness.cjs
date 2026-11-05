@@ -22,7 +22,7 @@ let browser,page;
   if(req.url()===base+'/api/map'&&req.method()==='POST'){
    const body=req.postDataJSON();calls.push(body);
    if(body.operation==='place_autofill'){
-    assert(!body.countryCode,'Full place search must be worldwide');
+    if(body.query==='CVG custom name'){assert.equal(body.addressParts.city,'Hebron');assert.equal(body.countryCode,'US');} else if(body.query==='Exumas')assert(!body.countryCode,'A new name-only search is worldwide');
     if(body.query==='Slow lookup'){delayed=route;return;}
     if(body.query==='Lookup error')return route.fulfill({status:503,json:{ok:false,error:'Lookup temporarily unavailable.'}});
     return route.fulfill({json:{ok:true,data:body.query==='Exumas'?[exuma,{...tokyo,name:'Other match'}]:body.query==='Bahamas'?[bahamas]:body.query==='Tokyo'?[tokyo]:[]}});
@@ -92,7 +92,8 @@ let browser,page;
  await create.getByRole('combobox',{name:'Address country',exact:true}).click();await page.getByRole('option',{name:'Auto · worldwide',exact:true}).click();
  // Fill a US address normally and use coordinate-only action; the custom name stays.
  await create.getByLabel('Address',{exact:true}).fill('3087 Terminal Dr, Hebron, KY 41048');await expect(create.getByRole('combobox',{name:'Address country',exact:true})).toContainText('US');
- await create.getByRole('button',{name:'Autofill coordinates',exact:true}).click();await expect(create.getByLabel('Latitude',{exact:true})).toHaveValue('39.0499');await expect(create.getByLabel('Place name',{exact:true})).toHaveValue('CVG custom name');assert.equal(calls.at(-1).countryCode,'US');assert.equal(state().places.length,2);
+ await create.getByRole('button',{name:'Autofill place',exact:true}).click();await expect(create.getByRole('status')).toContainText('No matches');
+ await create.getByRole('button',{name:'Autofill coordinates',exact:true}).click();const uncertain=page.getByRole('dialog',{name:'Matching places',exact:true});await expect(uncertain).toBeVisible();await expect(create.getByLabel('Latitude',{exact:true})).toHaveValue('');await uncertain.getByRole('button',{name:/Airport fixture/}).click();await expect(create.getByLabel('Latitude',{exact:true})).toHaveValue('39.0499');await expect(create.getByLabel('Place name',{exact:true})).toHaveValue('CVG custom name');assert.equal(calls.at(-1).countryCode,'US');assert.equal(state().places.length,2);
  // Profile creation uses the same editor and reuses the Calendar/Map place IDs.
  const profiles=()=>JSON.parse(fs.readFileSync(path.join(data,'personal-records.json'),'utf8'));
  for(const [kind,width,label] of [['person',1440,'Worldwide person'],['organization',390,'Worldwide organization']]){

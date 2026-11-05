@@ -15,7 +15,8 @@ const nextConfig: NextConfig = {
   // checked-in seed/fallback data instead of tracing an arbitrary writable
   // directory back through the whole repository.
   outputFileTracingIncludes: {
-    "/*": ["./data/**/*"]
+    "/*": ["./data/**/*"],
+    "/api/map": ["./lib/modules/planning/locality-centers.gz"]
   },
   turbopack: {
     root: workspaceRoot
