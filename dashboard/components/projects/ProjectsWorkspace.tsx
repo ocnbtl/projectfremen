@@ -13,6 +13,7 @@ import ProjectDisclosure from "./ProjectDisclosure";
 import { deriveProjectHealth } from "../../lib/modules/projects/health";
 import { milestoneLabel } from "../../lib/modules/projects/milestone-display";
 import type { ObjectivePreviewTarget } from "./ProjectObjectivePreview";
+import ProjectObjectiveUndo from "./ProjectObjectiveUndo";
 import { createPersonalOpsRepository } from "../../lib/modules/personal-ops/repository";
 
 import Link from "next/link";
@@ -127,6 +128,14 @@ type EditorKind =
   | "link-edit"
   | "link-health"
   | "link-repair";
+
+type ObjectiveCompletionUndo = {
+  projectId: string;
+  objective: ObjectivePreviewTarget;
+  completedAt?: string;
+  goalVersion?: string;
+  previousGoalState?: PersonalOpsGoal["goalState"];
+};
 
 type EditorState = {
   kind: EditorKind;
@@ -1126,6 +1135,8 @@ export default function ProjectsWorkspace({
   const [mutationBusy, setMutationBusy] = useState(false);
   const objectiveToggleLock = useRef(false);
   const [pendingObjective, setPendingObjective] = useState("");
+  const [objectiveUndo, setObjectiveUndo] = useState<ObjectiveCompletionUndo>();
+  const [objectiveUndoError, setObjectiveUndoError] = useState("");
   const [notice, setNotice] = useState("");
   const [mutationError, setMutationError] = useState("");
   const [reviewViews, setReviewViews] = useState(initialReviewViews);
@@ -1462,11 +1473,18 @@ export default function ProjectsWorkspace({
     )}))}));
   }
 
-  async function toggleCardObjective(item: ProjectDirectoryItem, objective: ObjectivePreviewTarget) {
+  function dismissObjectiveUndo() {
+    const target = objectiveUndo;
+    setObjectiveUndo(undefined);
+    setObjectiveUndoError("");
+    if (target) requestAnimationFrame(() => document.getElementById(`objective-toggle-${target.projectId}-${target.objective.id}`)?.focus({preventScroll:true}));
+  }
+
+  async function toggleCardObjective(item: ProjectDirectoryItem, objective: ObjectivePreviewTarget, undo?: ObjectiveCompletionUndo) {
     if (mutationBusy || objectiveToggleLock.current || !item.project.editable || !item.project.updatedAt || ["complete", "archived"].includes(item.project.lifecycle)) return;
     const linkedGoal = objective.source?.module === "personal_ops" && objective.source.objectType === "goal";
     if (objective.id === "current-objective" || (objective.source && !linkedGoal)) return;
-    const base = item.project;
+    let base = item.project;
     const completed = !objective.completed;
     objectiveToggleLock.current = true;
     setMutationBusy(true);
@@ -1474,6 +1492,7 @@ export default function ProjectsWorkspace({
     setObjectiveDirectoryHold({key: directoryKey, ids: visibleProjects.map(row => row.project.id)});
     clearFeedback();
     let originalGoal: PersonalOpsGoal | undefined;
+    if (undo) setObjectiveUndoError("");
     try {
       if (linkedGoal && objective.source) {
         const personal = createPersonalOpsRepository();
@@ -1481,11 +1500,26 @@ export default function ProjectsWorkspace({
         if (!loaded.ok) throw new Error(loaded.error.message);
         originalGoal = loaded.data;
         if (originalGoal.archivedAt || originalGoal.lifecycle === "archived") throw new Error("This goal is archived. Restore it in Personal before changing it.");
+        if (undo && (originalGoal.updatedAt !== undo.goalVersion || originalGoal.goalState !== "complete")) throw new Error("This goal has changed since completion. Open its preview to review the latest state.");
+        const goalState = completed ? "complete" : undo?.previousGoalState || "active";
         applyLinkedGoal({...originalGoal, lifecycle: completed ? "complete" : "active"});
-        const result = await personal.update("goals", originalGoal.id, {goalState: completed ? "complete" : "active"}, originalGoal.updatedAt);
+        const result = await personal.update("goals", originalGoal.id, {goalState}, originalGoal.updatedAt);
         if (!result.ok) throw new Error(result.error.message);
         applyLinkedGoal(result.data);
+        if (completed && originalGoal.goalState !== "complete") {
+          setObjectiveUndo({projectId:base.id,objective,goalVersion:result.data.updatedAt,previousGoalState:originalGoal.goalState || "active"});
+          setObjectiveUndoError("");
+        }
       } else {
+        if (undo) {
+          const loaded = await repository.get("projects", base.id);
+          if (!loaded.ok) throw new Error(loaded.error.message);
+          base = projectDisplayFromNative(loaded.data);
+          const latest = base.objectives.find(row => row.id === objective.id);
+          if (!latest?.completedAt || latest.completedAt !== undo.completedAt || ["complete","archived"].includes(base.lifecycle)) {
+            throw new Error("This objective has changed since completion. Open its preview to review the latest state.");
+          }
+        }
         if (!base.objectives.some(row => row.id === objective.id)) return;
         updateDirectoryItem(base.id, current => ({...current, project: {...current.project, objectives: current.project.objectives.map(row =>
           row.id === objective.id ? {...row, completedAt: completed ? new Date().toISOString() : undefined} : row
@@ -1495,8 +1529,17 @@ export default function ProjectsWorkspace({
         )}, base.updatedAt!);
         if (!result.ok) throw new Error(result.error.message);
         applyMutationEnvelope(result.data);
+        if (completed) {
+          setObjectiveUndo({projectId:base.id,objective,completedAt:result.data.project.objectives.find(row=>row.id===objective.id)?.completedAt});
+          setObjectiveUndoError("");
+        }
       }
-      setNotice(completed ? "Objective completed." : "Objective reopened.");
+      if (undo) dismissObjectiveUndo();
+      else if (!completed && objectiveUndo?.projectId === base.id && objectiveUndo.objective.id === objective.id) {
+        setObjectiveUndo(undefined);
+        setObjectiveUndoError("");
+      }
+      setNotice(undo ? "Completion undone." : completed ? "Objective completed." : "Objective reopened.");
     } catch (error) {
       if (linkedGoal) {
         if (originalGoal) applyLinkedGoal(originalGoal);
@@ -1506,7 +1549,9 @@ export default function ProjectsWorkspace({
         const latest = await repository.get("projects", base.id);
         if (latest.ok) applyProject(latest.data);
       }
-      setMutationError(error instanceof Error ? error.message : "Could not save the objective. Please try again.");
+      const message = error instanceof Error ? error.message : "Could not save the objective. Please try again.";
+      if (undo) setObjectiveUndoError(message);
+      else setMutationError(message);
     } finally {
       objectiveToggleLock.current = false;
       setMutationBusy(false);
@@ -3277,6 +3322,16 @@ export default function ProjectsWorkspace({
           </div>
         ) : directory}
       </ModuleShell>
+
+      <ProjectObjectiveUndo objective={objectiveUndo?.objective.text} error={objectiveUndoError} busy={mutationBusy} onDismiss={dismissObjectiveUndo} onUndo={()=>{
+        if (!objectiveUndo) return;
+        const item = snapshot.projects.find(row=>row.project.id === objectiveUndo.projectId);
+        if (!item || !item.project.editable || ["complete","archived"].includes(item.project.lifecycle)) {
+          setObjectiveUndoError("This project is no longer editable. Review its details before making changes.");
+          return;
+        }
+        void toggleCardObjective(item,{...objectiveUndo.objective,completed:true},objectiveUndo);
+      }}/>
 
       {(mobileSidebarOpen || (isInspectorOverlay && inspectorOpen)) && <button type="button" className={styles.scrim} onClick={() => {
         setMobileSidebarOpen(false);

@@ -1,0 +1,14 @@
+.toast {position:fixed;top:calc(var(--app-content-offset,76px) + 88px);right:20px;z-index:1100;display:grid;grid-template-columns:18px minmax(0,1fr) auto 30px;align-items:center;gap:8px 10px;width:max-content;max-width:min(420px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px;border:1px solid var(--module-primary-200);border-radius:12px;background:var(--surface-panel,#fff);box-shadow:0 8px 28px #10202620;color:var(--module-primary-800);}
+.message {display:grid;gap:2px;min-width:0;font:400 12px/1.4 var(--font-body);}
+.message strong {font-size:13px;font-weight:550;color:var(--text-strong);}
+.message span {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--text-muted);}
+.toast button {display:inline-flex;align-items:center;justify-content:center;min-height:32px;border-radius:8px;font:550 13px/1 var(--font-body);cursor:pointer;transition:background-color .18s ease,color .18s ease;}
+.undo {padding:0 10px;border:1px solid var(--module-primary-200);background:var(--module-primary-50);color:var(--module-primary-800);}
+.undo:hover {background:var(--module-primary-100);}
+.dismiss {width:30px;padding:0;border:0;background:transparent;color:var(--text-muted);}
+.dismiss:hover {background:var(--module-primary-50);color:var(--text-strong);}
+.toast button:focus-visible {outline:2px solid var(--module-focus);outline-offset:2px;}
+.toast button:disabled {opacity:.6;cursor:default;}
+.error {grid-column:1/-1;margin:0;font:400 12px/1.5 var(--font-body);color:var(--state-danger-text,#9f2f34);}
+@media(max-width:600px) {.toast {top:calc(var(--app-content-offset,56px) + 120px);right:12px;gap:8px;padding:10px;}}
+@media(prefers-reduced-motion:reduce) {.toast button {transition:none;}}
