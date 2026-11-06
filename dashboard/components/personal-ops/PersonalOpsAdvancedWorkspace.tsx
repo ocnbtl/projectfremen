@@ -1,6 +1,7 @@
 "use client";
 import PersonalRecordOverview from "./PersonalRecordOverview";
-import SearchField from "../ui/SearchField";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
+import ViewCycleButton from "../ui/ViewCycleButton";
 import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
@@ -54,7 +55,6 @@ import {
   PersonalOpsStatusChip,
   PersonalOpsStatusSelect,
   personalOpsToneForState as toneFor,
-  PersonalOpsStatusLine,
   type PersonalOpsMetricItem,
   type PersonalOpsTone
 } from "./PersonalOpsPrimitives";
@@ -1424,34 +1424,10 @@ export default function PersonalOpsAdvancedWorkspace({
       />
 
       <main className={styles.directory} aria-label={`${config.title} ledger`}>
-        <div className={styles.mobileToolbar}>
-          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button>
-          <button type="button" onClick={openCreate}><PersonalOpsIcon name="plus" /> {config.singular}</button>
-        </div>
         <div className={styles.mainScroll}>
-          <header className={styles.pageHeader}>
-            <div>
-              <h1>{config.title}</h1>
-              <p>{config.description}</p>
-            </div>
-            <div className={styles.headerActions}>
-              <label className={styles.visuallyHidden} htmlFor={`personal-ops-${initialView}-search`}>Search {config.title}</label>
-              <SearchField className="personal-ledger-search" id={`personal-ops-${initialView}-search`} value={queryDraft} onChange={(event) => changeQuery(event.target.value)} />
-              <button type="button" className={styles.button} aria-label="Filter" title="Filter" data-icon-button="standard" onClick={() => updateUrl({ filter: urlState.filter === "all" ? initialView === "routines" ? "due-today" : "needs-review" : "all", selected: "" })}><PersonalOpsIcon name="filter" /></button>
-              {initialView === "routines" && <label className={styles.sortControl}>
-                <span className={styles.visuallyHidden}>Sort routines</span>
-                <SelectField className="toolbar-icon-select" triggerContent={<PersonalOpsIcon name="sort" />} title="Sort" value={effectiveSort} onChange={(event) => updateUrl({ sort: event.target.value as PersonalOpsSort, selected: "" })}>
-                  <option value="due">Next run</option>
-                  <option value="title">Title</option>
-                  <option value="updated">Recently updated</option>
-                </SelectField>
-              </label>}
-              <button type="button" className={styles.button} aria-pressed={urlState.compact} onClick={() => updateUrl({ compact: !urlState.compact })}>Compact</button>
-              <button type="button" className={styles.primaryButton} onClick={openCreate}><PersonalOpsIcon name="plus" /> {config.singular}</button>
-              <button
-                type="button"
-                className={styles.button}
-                title={primaryHeaderActionReason}
+          <WorkspaceHeader title={config.title} count={scopedItems.length}>
+            <WorkspaceButton intent="primary" icon="plus" onClick={openCreate}>Add {config.singular.toLowerCase()}</WorkspaceButton>
+            <WorkspaceButton icon="review" title={primaryHeaderActionReason}
                 onClick={() => {
                   if (initialView === "inbox" && selectedNative?.objectType === "capture_item") {
                     setOperation({ kind: "capture-setup", item: selectedNative, decision: true, followUp: true, obligation: false });
@@ -1460,15 +1436,14 @@ export default function PersonalOpsAdvancedWorkspace({
                     if (initialView === "inbox") setNotice("Ready captures are now in scope. Select one to preview native outputs.");
                   }
                 }}
-              >{primaryHeaderAction}</button>
-            </div>
-            <PersonalOpsStatusLine items={[
-              { id: "shown", label: `${scopedItems.length} shown` },
-              { id: "native", label: `${baseItems.filter((item) => !isLegacy(item)).length} native`, tone: "positive" },
-              ...(initialView === "inbox" ? [{ id: "legacy", label: `${legacyCaptures.length} legacy source${legacyCaptures.length === 1 ? "" : "s"}`, tone: "attention" as const }] : []),
-              { id: "audit", label: `${state.auditEvents.length} audit events` }
-            ]} />
-          </header>
+              >{primaryHeaderAction}</WorkspaceButton>
+          </WorkspaceHeader>
+          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search" activeFilters={urlState.filter === "all" ? 0 : 1} filters={<PersonalOpsFilterRail items={filters}/> }>
+            {initialView === "routines" && <SelectField aria-label="Sort routines" value={effectiveSort} onChange={event=>updateUrl({sort:event.target.value as PersonalOpsSort,selected:""})}>
+              <option value="due">Next run</option><option value="title">Title</option><option value="updated">Recently updated</option>
+            </SelectField>}
+            <ViewCycleButton data-toolbar-view options={["comfortable","compact"]} value={urlState.compact ? "compact" : "comfortable"} onChange={view=>updateUrl({compact:view === "compact"})}/>
+          </WorkspaceToolbar>
 
           <div className={styles.boundaryBanner} role="note">
             <strong>Safe operating boundary:</strong>{" "}
@@ -1480,7 +1455,6 @@ export default function PersonalOpsAdvancedWorkspace({
           </div>
 
           <PersonalOpsMetricRail items={metrics} />
-          <PersonalOpsFilterRail items={filters} />
 
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}

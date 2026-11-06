@@ -227,7 +227,7 @@ html[data-active-module] :is(.work-search,.people-primary-search,.finance-global
 .workspace-people-pages .people-classification-tags em { display:inline-flex; align-items:center; gap:4px; white-space:normal; }
 .workspace-people-pages .people-classification-tags svg { flex:none; width:13px; height:13px; }
 .workspace-people-pages .people-classification-tags em[title="Industry"] { color:var(--text-muted); }
-.workspace-people-pages .people-classification-tags em[title="Industry"]::before { content:"·"; color:var(--module-icon); }
+.workspace-people-pages .people-classification-tags em[title="Industry"]::before { content:"Â·"; color:var(--module-icon); }
 /* One stable, keyboard-accessible view control across directories. */
 body button.directory-view-cycle,
 body .workspace-topnav button.directory-view-cycle {
@@ -373,3 +373,44 @@ html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__
 html[data-active-module] .workspace-actions-menu[data-state] .workspace-topnav__actions [hidden] {display:none!important;}
 .workspace-actions-submenu .work-check {display:flex;align-items:center;gap:8px;}
 .workspace-actions-submenu .work-check input {width:18px;height:18px;flex:0 0 18px;margin:0;accent-color:var(--module-icon);}
+
+/* Small action sets stay within reach; larger sets retain the shared menu. */
+.workspace-topnav[data-inline-actions] > .workspace-topnav__actions {display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+.workspace-topnav .workspace-nav-type-pills {display:flex;flex-wrap:nowrap;gap:5px;margin:0;padding:3px;max-width:clamp(180px,25vw,480px);overflow-x:auto;scrollbar-width:thin;}
+.workspace-topnav .workspace-nav-type-pills button {flex:none;width:auto;min-width:0;white-space:nowrap;min-height:34px;}
+.workspace-nav-status:has(.workspace-nav-type-pills) {min-width:0;flex:0 1 auto;}
+html[data-active-module] .workspace-actions-menu [data-nav-create-group] {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;}
+.workspace-actions-menu [data-nav-create-group] > .workspace-action-group-label {grid-column:1/-1;}
+@media(max-width:900px) {
+ .workspace-topnav[data-inline-actions] > .workspace-topnav__actions {order:5;margin-left:auto;}
+ .workspace-topnav[data-inline-actions] .finance-native-action-bar {display:flex;gap:6px;}
+ .workspace-topnav[data-inline-actions] :is(.work-actions,.finance-page-actions,.people-header-actions) {display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;align-items:center;}
+ .workspace-topnav[data-inline-actions] :is(.work-mobile-only,[class*="mobileMenuButton"],.finance-mobile-menu,.people-mobile-nav-trigger) {display:none!important;}
+ .workspace-topnav[data-inline-actions] :is(.work-count,.workspace-action-group-label) {display:none;}
+ .workspace-topnav .workspace-nav-type-pills {max-width:140px;}
+}
+@media(max-width:700px) {
+ .workspace-topnav[data-inline-actions] .workspace-topnav__actions :is(button,a):has(svg) {display:inline-flex;align-items:center;justify-content:center;width:40px;min-width:40px;height:40px;min-height:40px;padding:0;gap:0;font-size:0;}
+ .workspace-topnav[data-inline-actions] .workspace-topnav__actions :is(button,a):has(svg) > span {font-size:0;}
+ .workspace-topnav[data-inline-actions] .workspace-topnav__actions :is(button,a) svg {width:20px;height:20px;flex:none;}
+ .workspace-topnav .workspace-nav-type-pills {max-width:96px;}
+ .workspace-topnav .workspace-nav-type-pills button {width:auto;min-width:max-content;padding:5px 9px;font-size:12px;}
+ .workspace-topnav:has(.workspace-nav-type-pills) .workspace-browse-trigger {max-width:92px;}
+}
+
+.resource-types-trigger {display:none!important;}
+.workspace-nav-type-pills button {padding:6px 10px;border:1px solid var(--module-border,var(--border-soft));border-radius:999px;color:var(--text-strong);background:#fff;font:500 12px/1.4 var(--font-body);transition:background-color 180ms ease,border-color 180ms ease;}
+.workspace-nav-type-pills button[aria-pressed="true"] {background:var(--module-quiet);border-color:var(--module-border);}
+.workspace-nav-type-pills button:focus-visible {outline:2px solid var(--module-focus);outline-offset:2px;}
+.resource-types-menu {z-index:1400;width:min(340px,calc(100vw - 24px));padding:12px;}
+.resource-types-menu > p {margin:0 4px 8px;font:600 13px/1.4 var(--font-body);color:var(--text-strong);}
+.resource-types-menu .workspace-nav-type-pills {display:flex;flex-wrap:wrap;gap:7px;padding:2px;}
+.resource-types-menu .workspace-nav-type-pills > button {width:auto;flex:0 0 auto;min-height:36px;padding:6px 10px;}
+@media(max-width:1100px) {
+ .workspace-topnav .resource-types-wide {display:none;}
+ .workspace-topnav .workspace-nav-status .resource-types-trigger {display:inline-flex!important;width:auto;min-width:0;max-width:none;gap:5px;padding-inline:8px;order:0;}
+ .workspace-topnav .workspace-nav-status:has(.resource-types-trigger) {flex-shrink:0;}
+}
+.workspace-actions-menu [data-nav-create-group] > .workspace-action-group-label,
+.workspace-actions-menu .workspace-space-actions > .workspace-action-group-label {display:none;}
+.workspace-actions-menu .workspace-space-actions {margin-top:6px!important;padding-top:6px!important;}

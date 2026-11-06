@@ -5,7 +5,7 @@ import { workspaceReturnUrl } from "./useWorkspaceReturn";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import { useContext, useEffect, useState, useId, useRef } from "react";
+import { useContext, useEffect, useLayoutEffect, useState, useId, useRef } from "react";
 import { LayoutGroup, motion } from "motion/react";
 import { WorkspaceTopbarContext, WorkspaceHomeContext } from "./WorkspaceTopbar";
 import * as Popover from "@radix-ui/react-popover";
@@ -142,6 +142,39 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
     }
   }, [actionsOpen, actionsExiting]);
   const [compact, setCompact] = useState(false);
+  const [actionCount, setActionCount] = useState(0);
+  useLayoutEffect(() => {
+    const host = bar?.actions;
+    if (!host) return;
+    const automaticNames = new WeakMap<HTMLElement, string>();
+    const automaticTitles = new WeakMap<HTMLElement, string>();
+    const inspect = () => {
+      // Count real actions, not alternate mobile navigation or hidden menu copies.
+      const actions = [...host.querySelectorAll<HTMLElement>("button, a[href]")].filter(action => {
+        for (let node: HTMLElement | null = action; node && node !== host; node = node.parentElement) {
+          if (node.matches('[hidden], .work-mobile-only, [class*="mobileMenuButton"], .finance-mobile-menu, .people-mobile-nav-trigger, .workspace-create-actions, [role="menu"], [role="dialog"]')) return false;
+        }
+        return true;
+      });
+      for (const action of actions) {
+        const label = action.textContent?.trim();
+        if (label && (!action.hasAttribute("aria-label") || action.getAttribute("aria-label") === automaticNames.get(action))) {
+          action.setAttribute("aria-label", label);
+          automaticNames.set(action, label);
+        }
+        if (label && (!action.hasAttribute("title") || action.getAttribute("title") === automaticTitles.get(action))) {
+          action.setAttribute("title", label);
+          automaticTitles.set(action, label);
+        }
+      }
+      setActionCount(actions.length);
+    };
+    inspect();
+    const observer = new MutationObserver(inspect);
+    observer.observe(host, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [bar?.actions]);
+  const collapseActions = compact && actionCount > 3;
   useEffect(() => {
     const host = bar?.actions;
     if (!host || !actionsOpen) return;
@@ -163,7 +196,7 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
   const [openSection, setOpenSection] = useState<string | null>(null);
   const currentSection = sections.flatMap(section => section.items).find(item => item.active);
   const close = () => { if (!keepSelectionOpen) { setOpenSection(null); onClose?.(); } };
-  return <nav id={id} className="workspace-topnav" aria-label={ariaLabel}>
+  return <nav id={id} className="workspace-topnav" data-inline-actions={!collapseActions || undefined} aria-label={ariaLabel}>
     <h1 className="workspace-topnav__title">{onHome || returnHome?<button type="button" className="workspace-home-link" onClick={onHome || returnHome} aria-label={"Return to "+title}>{title}</button>:<Link prefetch={false} className="workspace-home-link" href={home} aria-label={"Return to "+title}>{title}</Link>}</h1>
     {bar && <div className="workspace-topnav__search" ref={bar.setSearch} />}
     {compact && sections.length > 0 && <Popover.Root open={openSection === "compact"} onOpenChange={open => setOpenSection(open ? "compact" : null)}>
@@ -189,6 +222,6 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
     </div>}
     {status && <div className="workspace-nav-status">{status}</div>}
     {footer && !compact && <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label={title + " tools"}><UnigentamosIcon role="sliders" size={18} /><span>Tools</span></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>{footer}</Popover.Content></Popover.Portal></Popover.Root>}
-    {bar && (compact ? <Popover.Root open={actionsOpen} onOpenChange={setActionsOpen}><Popover.Trigger ref={actionsTrigger} className="workspace-nav-trigger workspace-actions-trigger" aria-label={`${title} actions`} title="Actions"><UnigentamosIcon role="plus" size={18} /><span>Actions</span></Popover.Trigger><Popover.Portal forceMount><Popover.Content forceMount ref={actionsMenu} data-exiting={actionsExiting || undefined} inert={!actionsOpen} aria-hidden={!actionsOpen} onOpenAutoFocus={event => event.preventDefault()} onInteractOutside={event => { if ((event.target as HTMLElement)?.closest(".workspace-actions-submenu,[data-actions-submenu]")) event.preventDefault(); }} onEscapeKeyDown={event => { event.preventDefault(); setActionsOpen(false); actionsTrigger.current?.focus({preventScroll:true}); }} onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === "workspace-menu-fold") setActionsExiting(false); }} className="workspace-nav-menu workspace-actions-menu" aria-label={`${title} actions`} align="end" sideOffset={8} collisionPadding={12}><div className="workspace-actions-heading"><UnigentamosIcon role={`module-${module}`} size={18}/><span>{title}</span></div><div className="workspace-topnav__actions" ref={bar.setActions} onClick={event => { const action = (event.target as HTMLElement).closest("button, a"); if (action && !action.hasAttribute("aria-haspopup")) setActionsOpen(false); }} /></Popover.Content></Popover.Portal></Popover.Root> : <div className="workspace-topnav__actions" ref={bar.setActions} />)}
+    {bar && (collapseActions ? <Popover.Root open={actionsOpen} onOpenChange={setActionsOpen}><Popover.Trigger ref={actionsTrigger} className="workspace-nav-trigger workspace-actions-trigger" aria-label={`${title} actions`} title="Actions"><UnigentamosIcon role="plus" size={18} /><span>Actions</span></Popover.Trigger><Popover.Portal forceMount><Popover.Content forceMount ref={actionsMenu} data-exiting={actionsExiting || undefined} inert={!actionsOpen} aria-hidden={!actionsOpen} onOpenAutoFocus={event => event.preventDefault()} onInteractOutside={event => { if ((event.target as HTMLElement)?.closest(".workspace-actions-submenu,[data-actions-submenu]")) event.preventDefault(); }} onEscapeKeyDown={event => { event.preventDefault(); setActionsOpen(false); actionsTrigger.current?.focus({preventScroll:true}); }} onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === "workspace-menu-fold") setActionsExiting(false); }} className="workspace-nav-menu workspace-actions-menu" aria-label={`${title} actions`} align="end" sideOffset={8} collisionPadding={12}><div className="workspace-actions-heading"><UnigentamosIcon role={`module-${module}`} size={18}/><span>{title}</span></div><div className="workspace-topnav__actions" ref={bar.setActions} onClick={event => { const action = (event.target as HTMLElement).closest("button, a"); if (action && !action.hasAttribute("aria-haspopup")) setActionsOpen(false); }} /></Popover.Content></Popover.Portal></Popover.Root> : <div className="workspace-topnav__actions" ref={bar.setActions} />)}
   </nav>;
 }

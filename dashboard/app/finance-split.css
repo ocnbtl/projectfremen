@@ -175,3 +175,17 @@
 .finance-split-workspace > .finance-utility-rail .finance-rail-close { display: grid; place-items: center; }
 .finance-split-workspace .finance-sidebar-utilities { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 2px; }
 .finance-split-workspace .finance-sidebar-utilities > button { width: 100%; min-width: 0; height: 44px; }
+
+/* Separate categories by shape and spacing; reserve color for budget state. */
+.finance-split-workspace .finance-spending-breakdown ol {gap:10px;padding:0 16px 16px;}
+.finance-split-workspace .finance-spending-breakdown li > button {height:100%;padding:14px;border:1px solid var(--border-soft,#d6dfe4);border-radius:14px;background:var(--surface-panel,#fff);transition:background-color 180ms ease,border-color 180ms ease,box-shadow 180ms ease;}
+.finance-split-workspace .finance-spending-breakdown li > button:is(:hover,[aria-pressed="true"]) {background:var(--module-primary-50);border-color:var(--module-border);}
+.finance-split-workspace .finance-spending-breakdown li > button:focus-visible {outline:2px solid var(--module-focus);outline-offset:2px;}
+.finance-split-workspace .finance-spending-breakdown button > span > strong {font-size:14px;line-height:1.4;white-space:normal;}
+.finance-split-workspace .finance-spending-breakdown button > span:nth-child(2) > strong {font-size:17px;font-variant-numeric:tabular-nums;}
+.finance-split-workspace .finance-spending-breakdown button small {margin-left:0;line-height:1.5;}
+@media(max-width:700px) {
+ .finance-split-workspace .finance-spending-breakdown ol {grid-template-columns:minmax(0,1fr);gap:10px;padding:0 12px 12px;}
+ .finance-split-workspace .finance-spending-breakdown li > button {gap:12px;padding:13px;}
+}
+@media(prefers-reduced-motion:reduce) {.finance-split-workspace .finance-spending-breakdown li > button {transition:none;}}

@@ -14,6 +14,7 @@ import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
 import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
+import ResourceTypeNavigation from "./resources/ResourceTypeNavigation";
 import ResourceDirectoryCard from "./resources/ResourceDirectoryCard";
 import ResourceDuplicateReview from "./resources/ResourceDuplicateReview";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
@@ -563,7 +564,7 @@ export default function ResourcesWorkspace({
   const sidebar = (
     <ModuleSidebar
       id="resources-module-sidebar"
-      status={<WorkspaceButton className={`${styles.resourceDuplicateButton} people-duplicates-indicator`} data-warning={duplicateEvidence.groups.length>0 || undefined} disabled={Boolean(initialLoadError)} icon={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={initialLoadError ? "Duplicate check unavailable" : duplicateEvidence.groups.length ? `${duplicateEvidence.groups.length} possible duplicate groups` : "No duplicates to review"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} />}
+      status={<>{view !== "duplicate-urls" && <ResourceTypeNavigation types={resourceKinds.map(id=>({id,label:id==="components"?"Components":TYPE_LABELS[id as ResourceType]}))} selected={selectedTypes} onToggle={toggleResourceType}/>}<WorkspaceButton className={`${styles.resourceDuplicateButton} people-duplicates-indicator`} data-warning={duplicateEvidence.groups.length>0 || undefined} disabled={Boolean(initialLoadError)} icon={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={initialLoadError ? "Duplicate check unavailable" : duplicateEvidence.groups.length ? `${duplicateEvidence.groups.length} possible duplicate groups` : "No duplicates to review"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} /></>}
       title="Resources"
       description="Saved references and useful source material."
       sections={sidebarSections.map(section=>({...section,items:section.items.filter(item=>!item.disabled)})).filter(section=>section.items.length)}
@@ -1090,10 +1091,6 @@ export default function ResourcesWorkspace({
             <ViewCycleButton data-toolbar-view value={density} onChange={next => { setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }} />
           </WorkspaceToolbar>
 
-          {view !== "duplicate-urls" && <div className={styles.resourceTypeFilters} role="group" aria-label="Resource types">
-            <button type="button" aria-pressed={selectedTypes.size===resourceKinds.length} onClick={()=>toggleResourceType()}>All types</button>
-            {resourceKinds.map(type=><button type="button" key={type} aria-pressed={selectedTypes.has(type)} onClick={()=>toggleResourceType(type)}>{type==="components" ? "Components" : TYPE_LABELS[type as ResourceType]}</button>)}
-          </div>}
           {initialLoadError ? (
             <SystemState variant="error" title="Resources could not be loaded" description={initialLoadError} />
           ) : unavailableViewReason ? (

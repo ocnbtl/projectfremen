@@ -1,11 +1,11 @@
 "use client";
-import SearchField from "../ui/SearchField";
+import { WorkspaceHeader, WorkspaceToolbar } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DirectoryPane from "../admin-shell/DirectoryPane";
 import InspectorRail from "../admin-shell/InspectorRail";
 import ModuleShell from "../admin-shell/ModuleShell";
@@ -180,7 +180,6 @@ export default function MediaDuplicatesWorkspace({
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const isInspectorOverlay = false;
 
   const evidence = useMemo(() => buildMediaDuplicateEvidence(initialAssets), [initialAssets]);
@@ -216,7 +215,7 @@ export default function MediaDuplicatesWorkspace({
         (target instanceof HTMLElement && target.isContentEditable)
       ) return;
       event.preventDefault();
-      searchInputRef.current?.focus();
+      document.querySelector<HTMLInputElement>(".workspace-topnav input[type=search]")?.focus();
     };
     document.addEventListener("keydown", focusSearch);
     return () => document.removeEventListener("keydown", focusSearch);
@@ -612,8 +611,6 @@ export default function MediaDuplicatesWorkspace({
     <QuickActionBar
       ariaLabel="Duplicate evidence actions"
       actions={[
-        { id: "duplicates-header-scan", label: "Scan", disabled: true, disabledReason: "Raw bytes, checksums, and perceptual-hash services are not connected." },
-        { id: "duplicates-header-batch", label: "Batch resolve", disabled: true, disabledReason: RESOLUTION_REASON },
         {
           id: "duplicates-header-compare",
           label: "Compare selected",
@@ -684,14 +681,7 @@ export default function MediaDuplicatesWorkspace({
         selectionBar={selectionBar}
       >
         <div className={baseStyles.mainScroll} id="media-duplicates-directory" data-media-duplicates-state={initialLoadError ? "error" : evidence.groups.length ? "ready" : "empty"}>
-          <div className={baseStyles.directoryHeader}>
-            <div>
-              <span className={baseStyles.eyebrow}>Media · Evidence review</span>
-              <h1>Duplicates</h1>
-              <p>Review literal overlap evidence before it can pollute asset history.</p>
-            </div>
-            {headerActions}
-          </div>
+          <WorkspaceHeader title="Duplicates">{headerActions}</WorkspaceHeader>
 
           <div className={styles.capabilityBoundary} role="note">
             <strong>Exact-source evidence only</strong>
@@ -713,9 +703,7 @@ export default function MediaDuplicatesWorkspace({
             ]}
           />
 
-          <SearchField ref={searchInputRef} value={urlState.query} onChange={(event) => updateUrl({ query: event.target.value })} aria-label="Search duplicate evidence" className={baseStyles.search}><kbd>/</kbd></SearchField>
-
-          <div className={baseStyles.chipRow} aria-label="Duplicate evidence filters">
+          <WorkspaceToolbar query={urlState.query} onQuery={value=>updateUrl({query:value})} placeholder="Search" activeFilters={urlState.filter === "all" ? 0 : 1} filters={<div className={baseStyles.chipRow} aria-label="Duplicate evidence filters">
             {FILTERS.map((filter) => (
               <button
                 className={baseStyles.chip}
@@ -730,13 +718,8 @@ export default function MediaDuplicatesWorkspace({
                 {filter.label}
               </button>
             ))}
-          </div>
-
-          <div className={baseStyles.sortRow}>
-            <span><strong>{visibleGroups.length}</strong> exact-source evidence group{visibleGroups.length === 1 ? "" : "s"}</span>
-            <label className={styles.sortControl}>
-
-              <SelectField aria-label="Sort duplicate media" title="Sort" className="toolbar-icon-select" triggerContent={<UnigentamosIcon role="sort" size={20} />}
+          </div>}>
+            <SelectField aria-label="Sort duplicate media" title="Sort" className="toolbar-icon-select" triggerContent={<UnigentamosIcon role="sort" size={20} />}
                 value={urlState.sort}
                 onChange={(event) => updateUrl({ sort: event.target.value as MediaDuplicateSort })}
               >
@@ -744,8 +727,7 @@ export default function MediaDuplicatesWorkspace({
                   <option value={sort} key={sort}>{SORT_LABELS[sort]}</option>
                 ))}
               </SelectField>
-            </label>
-          </div>
+          </WorkspaceToolbar>
 
           {initialLoadError ? (
             <SystemState

@@ -1,5 +1,5 @@
 "use client";
-import SearchField from "../ui/SearchField";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 
@@ -218,7 +218,6 @@ export default function MediaInUseWorkspace({
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const inspectorTriggerRef = useRef<HTMLButtonElement>(null);
   const isInspectorOverlay = false;
 
@@ -255,7 +254,7 @@ export default function MediaInUseWorkspace({
         (target instanceof HTMLElement && target.isContentEditable)
       ) return;
       event.preventDefault();
-      searchInputRef.current?.focus();
+      document.querySelector<HTMLInputElement>(".workspace-topnav input[type=search]")?.focus();
     };
     document.addEventListener("keydown", focusSearch);
     return () => document.removeEventListener("keydown", focusSearch);
@@ -748,23 +747,7 @@ export default function MediaInUseWorkspace({
         selectionBar={selectionBar}
       >
         <div className={baseStyles.mainScroll} data-media-in-use-state={initialLoadError || readFailedCoverage.length ? "partial" : evidence.records.length ? "ready" : "empty"}>
-          <div className={baseStyles.directoryHeader}>
-            <div>
-              <span className={baseStyles.eyebrow}>Media · Reference index</span>
-              <h1>In Use</h1>
-              <p>Inspect target-owned Media references without inventing usage synchronization.</p>
-            </div>
-            <QuickActionBar
-              ariaLabel="Media In Use actions"
-              actions={[
-                { id: "filter", label: "Filter", onSelect: () => searchInputRef.current?.focus() },
-                { id: "batch", label: "Batch review", disabled: true, disabledReason: "Native AssetUsage review and audit are not connected." },
-                { id: "replace", label: "Replace", disabled: true, disabledReason: REPLACEMENT_REASON },
-                { id: "export", label: "Export", disabled: true, disabledReason: "No stable AssetUsage export contract is connected." },
-                { id: "upload", label: "Choose files", href: getModuleViewRoute("media", "upload-queue"), intent: "primary" }
-              ]}
-            />
-          </div>
+          <WorkspaceHeader title="In use"><WorkspaceButton intent="primary" icon="upload" onClick={()=>router.push(getModuleViewRoute("media","upload-queue"))}>Choose files</WorkspaceButton></WorkspaceHeader>
 
           <div className={styles.capabilityBoundary} role="note">
             <strong>Reference evidence, not AssetUsage</strong>
@@ -793,9 +776,7 @@ export default function MediaInUseWorkspace({
             ]}
           />
 
-          <SearchField ref={searchInputRef} value={urlState.query} onChange={(event) => updateScope({ query: event.target.value })} aria-label="Search Media reference evidence" className={baseStyles.search}><kbd>/</kbd></SearchField>
-
-          <div className={baseStyles.chipRow} aria-label="Media reference evidence filters">
+          <WorkspaceToolbar query={urlState.query} onQuery={value=>updateScope({query:value})} placeholder="Search" activeFilters={urlState.filter === "all" ? 0 : 1} filters={<div className={baseStyles.chipRow} aria-label="Media reference evidence filters">
             {FILTERS.map((filter) => (
               <button
                 className={baseStyles.chip}
@@ -809,17 +790,11 @@ export default function MediaInUseWorkspace({
                 {filter.label}
               </button>
             ))}
-          </div>
-
-          <div className={baseStyles.sortRow}>
-            <span><strong>{visibleRecords.length}</strong> Media evidence record{visibleRecords.length === 1 ? "" : "s"}</span>
-            <label className={styles.sortControl}>
-
-              <SelectField aria-label="Sort media usage" title="Sort" className="toolbar-icon-select" triggerContent={<UnigentamosIcon role="sort" size={20} />} value={urlState.sort} onChange={(event) => updateUrl({ sort: event.target.value as MediaInUseSort })}>
+          </div>}>
+            <SelectField aria-label="Sort media usage" title="Sort" className="toolbar-icon-select" triggerContent={<UnigentamosIcon role="sort" size={20} />} value={urlState.sort} onChange={(event) => updateUrl({ sort: event.target.value as MediaInUseSort })}>
                 {(Object.keys(SORT_LABELS) as MediaInUseSort[]).map((sort) => <option value={sort} key={sort}>{SORT_LABELS[sort]}</option>)}
               </SelectField>
-            </label>
-          </div>
+          </WorkspaceToolbar>
 
           {!evidence.records.length ? (
             <SystemState

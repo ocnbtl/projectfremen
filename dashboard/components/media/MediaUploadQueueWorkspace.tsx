@@ -1,5 +1,5 @@
 "use client";
-import SearchField from "../ui/SearchField";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import SelectField from "../ui/SelectField";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -428,22 +428,11 @@ export default function MediaUploadQueueWorkspace() {
 
         <DirectoryPane className={baseStyles.directory} ariaLabel="Local Media intake queue">
           <div className={baseStyles.mainScroll}>
-            <header className={baseStyles.directoryHeader}>
-              <div>
-                <span className={baseStyles.eyebrow}>Media</span>
-                <h1>Upload Queue</h1>
-                <p>{candidates.length} local preview · 0 uploaded · resets on refresh</p>
-              </div>
-              <QuickActionBar
-                ariaLabel="Media local intake actions"
-                actions={[
-                  { id: "filter", label: "Filter", disabled: true, disabledReason: "The implemented local evidence segments below are the available filters." },
-                  { id: "process", label: "Process batch", disabled: true, disabledReason: "No upload, validation, security, or extraction service is connected." },
-                  { id: "import", label: "Import source", disabled: true, disabledReason: "Resource import requires native source and RawFile persistence." },
-                  { id: "choose", label: "+ Choose files", intent: "primary", onSelect: () => inputRef.current?.click() }
-                ]}
-              />
-            </header>
+            <WorkspaceHeader title="Upload queue" count={candidates.length}>
+              <WorkspaceButton intent="primary" icon="upload" onClick={()=>inputRef.current?.click()}>Choose files</WorkspaceButton>
+              <WorkspaceButton icon="check" disabled={!visibleCandidates.length} onClick={selectVisible}>{visibleCandidates.length > 0 && visibleCandidates.every(candidate=>batchSelection.has(candidate.localId)) ? "Clear visible" : "Select visible"}</WorkspaceButton>
+              <WorkspaceButton icon="close" disabled={!candidates.length} onClick={()=>setClearConfirmationOpen(true)}>Clear preview</WorkspaceButton>
+            </WorkspaceHeader>
 
             <MetricStrip
               ariaLabel="Local intake evidence metrics"
@@ -514,12 +503,7 @@ export default function MediaUploadQueueWorkspace() {
 
             <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
 
-            <SearchField value={query} onChange={(event) => {
-                  const next = event.target.value;
-                  setQuery(next);
-                }} aria-label="Search local intake preview" className={baseStyles.search}><kbd>local</kbd></SearchField>
-
-            <div className={baseStyles.chipRow} aria-label="Local intake evidence segments">
+            <WorkspaceToolbar query={query} onQuery={setQuery} placeholder="Search" activeFilters={filter === "all" ? 0 : 1} filters={<div className={baseStyles.chipRow} aria-label="Local intake evidence segments">
               {FILTERS.map((segment) => (
                 <button
                   className={baseStyles.chip}
@@ -536,12 +520,8 @@ export default function MediaUploadQueueWorkspace() {
                   {segment.label} · {filterCounts[segment.id]}
                 </button>
               ))}
-            </div>
-
-            <div className={baseStyles.sortRow}>
-              <label className={baseStyles.field}>
-                Sort
-                <SelectField
+            </div>}>
+              <SelectField aria-label="Sort local files"
                   value={sort}
                   onChange={(event) => {
                     const next = event.target.value as MediaUploadSort;
@@ -553,29 +533,7 @@ export default function MediaUploadQueueWorkspace() {
                     <option value={value} key={value}>{SORT_LABELS[value]}</option>
                   ))}
                 </SelectField>
-              </label>
-              <span>Scope · <strong>{visibleCandidates.length} shown</strong></span>
-              <button
-                className={baseStyles.button}
-                type="button"
-                disabled={!visibleCandidates.length}
-                title={!visibleCandidates.length ? "No visible local rows to select." : undefined}
-                onClick={selectVisible}
-              >
-                {visibleCandidates.length > 0 && visibleCandidates.every((candidate) => batchSelection.has(candidate.localId))
-                  ? "Clear visible"
-                  : "Select visible"}
-              </button>
-              <button
-                className={baseStyles.button}
-                type="button"
-                disabled={!candidates.length}
-                title={!candidates.length ? "The local preview is already empty." : undefined}
-                onClick={() => setClearConfirmationOpen(true)}
-              >
-                Clear preview
-              </button>
-            </div>
+            </WorkspaceToolbar>
 
             {lastRemoved && (
               <div className={styles.undoBar} role="status">

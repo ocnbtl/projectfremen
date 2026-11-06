@@ -117,7 +117,7 @@ function Icon({ name }: { name: string }) {
   const roles: Record<string, string> = {
     Wallet: "wallet", PiggyBank: "piggy-bank", CreditCard: "credit-card", LineChart: "line-chart",
     Banknote: "banknote", Briefcase: "briefcase", Alert: "alert", Trending: "trending",
-    Calendar: "calendar", Filter: "filter", Plus: "plus", Search: "search", Sliders: "sliders",
+    Import: "import", Calendar: "calendar", Filter: "filter", Plus: "plus", Search: "search", Sliders: "sliders",
     Check: "check", Link: "link", Sparkles: "sparkles", Send: "send", X: "close", Chevron: "chevron-down"
   };
   return <UnigentamosIcon role={roles[name] || "wallet"} />;
@@ -211,7 +211,7 @@ function ArchivedFinanceRecords({ state, onRestore }: {
   return <section className="finance-archived-records" aria-label="Archived Finance records">
     <strong>Archived</strong>
     <span>{archived.length} record{archived.length === 1 ? "" : "s"}</span>
-    {archived.map((item) => <button key={`${item.kind}:${item.id}`} type="button" onClick={() => onRestore(item)}>{item.label} · restore</button>)}
+    {archived.map((item) => <button key={`${item.kind}:${item.id}`} type="button" onClick={() => onRestore(item)}>{item.label} Â· restore</button>)}
 
   </section>;
 }
@@ -251,15 +251,15 @@ function NativeActionBar({
 }) {
   const actions: React.ReactNode[] = [];
   if (view === "overview") actions.push(
-    <HeaderAction key="account" icon="Plus" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
-    <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} title={!hasAccounts ? "Add an account first" : undefined} onClick={() => onOperation("transaction")}>Add transaction</HeaderAction>
+    <HeaderAction key="account" icon="Wallet" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
+    <HeaderAction key="transaction" icon="Banknote" primary disabled={!hasAccounts} title={!hasAccounts ? "Add an account first" : undefined} onClick={() => onOperation("transaction")}>Add transaction</HeaderAction>
   );
   if (view === "accounts") actions.push(
-    <HeaderAction key="account" icon="Plus" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
+    <HeaderAction key="account" icon="Wallet" primary onClick={() => onOperation("account")}>Add account</HeaderAction>,
     <HeaderAction key="import" icon="Import" disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
   );
   if (view === "transactions") actions.push(
-    <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("transaction")}>Add transaction</HeaderAction>,
+    <HeaderAction key="transaction" icon="Banknote" primary disabled={!hasAccounts} onClick={() => onOperation("transaction")}>Add transaction</HeaderAction>,
     <HeaderAction key="import" icon="Import" disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
   );
   if (view === "bills") actions.push(
@@ -936,8 +936,8 @@ export default function FinanceWorkspace({
           context={{
             module: "finance",
             object: aiObject,
-            activeTab: `${activeView.label} · ${tab}`,
-            visibleScope: `${accounts.length} accounts · ${transactions.length} transactions · ${bills.length} bills`,
+            activeTab: `${activeView.label} Â· ${tab}`,
+            visibleScope: `${accounts.length} accounts Â· ${transactions.length} transactions Â· ${bills.length} bills`,
             allowedActions: [
               "Explain visible native Finance records",
               "Summarize the selected object without saving",
