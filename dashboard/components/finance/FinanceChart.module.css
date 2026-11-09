@@ -279,3 +279,10 @@
   .filterPanel[data-state], .filterOptions.filterOptions[data-state] { animation: none; }
   .periodToggle, .periodToggle svg:last-child, .tableReveal, .tableReveal[data-open=true], .totalButton { transition: none; }
 }
+
+.rollingMoney{display:inline-block;min-width:7.5ch;font-variant-numeric:tabular-nums;vertical-align:bottom;white-space:nowrap;}
+.rollingMoney>span{display:inline-flex;align-items:baseline;}
+.digitWindow{display:inline-block;width:1ch;height:1.45em;overflow:hidden;vertical-align:bottom;}
+.digitStrip{display:flex;flex-direction:column;transition:transform 260ms cubic-bezier(.22,.8,.2,1);}
+.digitStrip>span{display:block;height:1.45em;line-height:1.45em;flex:none;}
+@media(prefers-reduced-motion:reduce){.digitStrip{transition:none;}}

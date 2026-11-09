@@ -5,3 +5,12 @@
 .review .tabs>button{width:auto!important;flex:0 0 auto;min-width:0;}
 .review .tabs{flex-direction:row;justify-content:flex-start;}
 .groups article{background:var(--surface-panel,#fff);}
+
+.reason{display:grid;gap:7px;background:var(--module-quiet,#fff5fa);border-radius:12px;padding:12px;min-width:0;}
+.reason>span{display:flex;align-items:center;gap:7px;font-size:12px;}.reason svg{flex:none;color:var(--module-icon);}.reason code{font:12px/1.5 var(--font-body);overflow-wrap:anywhere;color:var(--text-strong);}.reason p{font-size:12px;}
+.differences{display:grid;gap:4px;font-size:12px;line-height:1.5;}.differences>span{color:var(--text-muted);}
+.members>.member{display:grid;gap:0;overflow:hidden;transition:background-color 180ms ease,border-color 180ms ease;}
+.member:hover,.member:focus-within{background:var(--module-quiet);border-color:var(--module-border);}.memberHeader{display:flex;align-items:center;gap:4px;min-width:0;}
+.memberHeader .identity{align-self:stretch;width:auto;border-radius:0;background:transparent;box-shadow:none;}.memberHeader .identity:hover{background:transparent;}.memberHeader .archive{display:inline-flex;align-items:center;justify-content:center;padding:0;width:36px;min-width:36px;height:36px;min-height:36px;flex:0 0 36px;margin:0 8px 0 0;box-shadow:none;}.archive:hover{background:var(--surface-panel,#fff);}.archive:focus-visible,.identity:focus-visible{outline:2px solid var(--module-focus);outline-offset:-2px;}
+.comparison{display:grid;gap:10px;margin:0;padding:0 12px 12px;min-width:0;}.comparison>div{display:grid;gap:3px;}.comparison dt{display:flex;gap:8px;align-items:center;font:500 11px/1.4 var(--font-body);color:var(--text-muted);}.comparison dt>span{padding:1px 6px;border-radius:999px;background:var(--module-quiet);color:var(--module-icon);font-size:10px;}.comparison dd{margin:0;font:400 12px/1.5 var(--font-body);color:var(--text-strong);overflow-wrap:anywhere;white-space:pre-wrap;max-height:7.5em;overflow-y:auto;}
+@media(prefers-reduced-motion:reduce){.members>.member{transition:none;}}

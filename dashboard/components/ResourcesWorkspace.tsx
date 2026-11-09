@@ -12,7 +12,7 @@ import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
 import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
 import ModuleShell from "./admin-shell/ModuleShell";
-import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
+import ModuleSidebar from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import ResourceTypeNavigation from "./resources/ResourceTypeNavigation";
 import ResourceDirectoryCard from "./resources/ResourceDirectoryCard";
@@ -525,49 +525,13 @@ export default function ResourcesWorkspace({
     setInspectorOpen(false);
   }
 
-  const sidebarSections: ModuleSidebarSection[] = [
-    {
-      id: "library",
-      label: "Library",
-      items: LIBRARY_VIEWS.map(([id, label]) => ({
-        id,
-        label,
-        count:
-          id === "all"
-            ? resources.length
-            : id === "needs-review"
-              ? reviewQueue.summary.queuedResources
-              : undefined,
-        tone: id === "needs-review" && reviewQueue.summary.queuedResources ? "attention" : undefined,
-        active: view === id && collection === "all",
-        onSelect: () => selectLibraryView(id)
-      }))
-    },
-    {
-      id: "linked-context",
-      label: "Linked Context",
-      items: CONTEXT_ROWS.map(([module, contextView, label]) => ({
-        id: `context-${module}`,
-        label,
-        count: linkedContextEvidence.summary[module].affectedResources,
-        tone:
-          linkedContextEvidence.coverage[module].state === "read_failed"
-            ? "attention"
-            : undefined,
-        active: view === contextView,
-        onSelect: () => selectLibraryView(contextView)
-      }))
-    },
-
-  ];
-
   const sidebar = (
     <ModuleSidebar
       id="resources-module-sidebar"
       status={<>{view !== "duplicate-urls" && <ResourceTypeNavigation types={resourceKinds.map(id=>({id,label:id==="components"?"Components":TYPE_LABELS[id as ResourceType]}))} selected={selectedTypes} onToggle={toggleResourceType}/>}<WorkspaceButton className={`${styles.resourceDuplicateButton} people-duplicates-indicator`} data-warning={duplicateEvidence.groups.length>0 || undefined} disabled={Boolean(initialLoadError)} icon={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={initialLoadError ? "Duplicate check unavailable" : duplicateEvidence.groups.length ? `${duplicateEvidence.groups.length} possible duplicate groups` : "No duplicates to review"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} /></>}
       title="Resources"
       description="Saved references and useful source material."
-      sections={sidebarSections.map(section=>({...section,items:section.items.filter(item=>!item.disabled)})).filter(section=>section.items.length)}
+      sections={[]}
       mobileOpen={mobileSidebarOpen}
       onClose={() => setMobileSidebarOpen(false)}
       className={styles.sidebar}
@@ -1085,6 +1049,7 @@ export default function ResourcesWorkspace({
           <WorkspaceToolbar query={query} onQuery={value=>{setQuery(value);updateUrl({query:value});}} placeholder="Search Resources" activeFilters={collection !== "all" || view !== "all" ? 1 : 0} filters={<>
             <WorkspaceButton aria-pressed={collection === "all" && view === "all"} onClick={()=>{setCollection("all");selectLibraryView("all");}}>All Resources</WorkspaceButton>
             <WorkspaceButton aria-pressed={collection === "all" && view === "needs-review"} onClick={()=>{setCollection("all");selectLibraryView("needs-review");}}>Needs Review</WorkspaceButton>
+            <WorkspaceButton icon="archive" aria-pressed={view === "archived"} onClick={()=>{setCollection("all");selectLibraryView("archived");}}>Archived</WorkspaceButton>
             <WorkspaceButton aria-pressed={collection === "all" && view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView("duplicate-urls");}}>Duplicate URLs</WorkspaceButton>
           </>}>
             <SelectField aria-label="Sort Resources" value={sort} onChange={event=>{const next=event.target.value as typeof sort;setSort(next);updateUrl({sort:next});}}><option value="updated-desc">Recently updated</option><option value="updated-asc">Oldest update</option><option value="title">Alphabetical</option><option value="review">Evidence gaps first</option></SelectField>

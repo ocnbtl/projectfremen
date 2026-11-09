@@ -191,3 +191,6 @@
 .recentRow>button:first-child>span:nth-child(2){display:grid;gap:4px;}
 .recentRow>button:first-child small{font-size:12px;color:var(--text-muted);overflow-wrap:anywhere;}
 .recentRow>:last-child {justify-self:start;margin:0 12px 8px 62px;max-width:calc(100% - 74px);}
+
+.overview :global(.finance-spending-breakdown) :global(.finance-panel-heading){border-bottom:0;box-shadow:none;}
+.overview :global(.finance-focus-queue){position:relative;}
