@@ -85,6 +85,7 @@ export function WorkspaceToolbar({
   filters,
   activeFilters = 0,
   actions,
+  afterView,
 }: {
   query: string;
   onQuery: (value: string) => void;
@@ -93,6 +94,7 @@ export function WorkspaceToolbar({
   filters?: ReactNode;
   activeFilters?: number;
   actions?: ReactNode;
+  afterView?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   const bar = useContext(WorkspaceTopbarContext);
@@ -114,6 +116,7 @@ export function WorkspaceToolbar({
         )}
         {sortChoices.map((child, index) => isValidElement<React.ComponentProps<typeof SelectField>>(child) ? cloneElement(child, { key: index, className: "toolbar-icon-select", title: "Sort", triggerContent: <UnigentamosIcon role="sort" size={20}/> }) : child)}
         {viewChoices.map((child, index) => isValidElement<React.ComponentProps<typeof SelectField>>(child) && child.type === SelectField ? <ViewCycleButton key={index} options={Children.toArray(child.props.children).filter(isValidElement).map(option => (option as React.ReactElement<{value: DirectoryViewMode}>).props.value)} value={child.props.value as DirectoryViewMode} onChange={value => child.props.onChange?.({target:{value},currentTarget:{value}} as React.ChangeEvent<HTMLSelectElement>)} /> : child)}
+        {afterView}
         {actions && <div className="workspace-toolbar-actions">{actions}</div>}
         {bar && otherChoices.length ? <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label="View options"><UnigentamosIcon role="sliders" size={18} /><span>Options</span></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu workspace-view-options" align="end" sideOffset={8} collisionPadding={12}>{otherChoices}</Popover.Content></Popover.Portal></Popover.Root> : otherChoices}
       </div></WorkspaceNavSlot>

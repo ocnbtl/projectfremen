@@ -306,6 +306,9 @@ export default function ResourcesWorkspace({
     const next = new Set(selectedTypes);
     if (!type) resourceKinds.forEach(kind => next.add(kind));
     else if (next.has(type)) next.delete(type); else next.add(type);
+    changeResourceTypes(next);
+  }
+  function changeResourceTypes(next: Set<string>) {
     const params = new URLSearchParams(searchParams.toString());
     if (next.size === resourceKinds.length) params.delete("types"); else params.set("types", [...next].join(",") || "none");
     router.replace(pathname + (params.size ? "?" + params.toString() : ""), {scroll:false});
@@ -528,7 +531,7 @@ export default function ResourcesWorkspace({
   const sidebar = (
     <ModuleSidebar
       id="resources-module-sidebar"
-      status={<>{view !== "duplicate-urls" && <ResourceTypeNavigation types={resourceKinds.map(id=>({id,label:id==="components"?"Components":TYPE_LABELS[id as ResourceType]}))} selected={selectedTypes} onToggle={toggleResourceType}/>}<WorkspaceButton className={`${styles.resourceDuplicateButton} people-duplicates-indicator`} data-warning={duplicateEvidence.groups.length>0 || undefined} disabled={Boolean(initialLoadError)} icon={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={initialLoadError ? "Duplicate check unavailable" : duplicateEvidence.groups.length ? `${duplicateEvidence.groups.length} possible duplicate groups` : "No duplicates to review"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} /></>}
+      status={<><WorkspaceButton className={`${styles.resourceDuplicateButton} people-duplicates-indicator`} data-warning={duplicateEvidence.groups.length>0 || undefined} disabled={Boolean(initialLoadError)} icon={duplicateEvidence.groups.length ? "duplicates-warning" : "duplicates"} aria-label="Check resource duplicates" title={initialLoadError ? "Duplicate check unavailable" : duplicateEvidence.groups.length ? `${duplicateEvidence.groups.length} possible duplicate groups` : "No duplicates to review"} aria-pressed={view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView(view === "duplicate-urls" ? "all" : "duplicate-urls");}} /></>}
       title="Resources"
       description="Saved references and useful source material."
       sections={[]}
@@ -1046,7 +1049,7 @@ export default function ResourcesWorkspace({
             </section>
           )}
 
-          <WorkspaceToolbar query={query} onQuery={value=>{setQuery(value);updateUrl({query:value});}} placeholder="Search Resources" activeFilters={collection !== "all" || view !== "all" ? 1 : 0} filters={<>
+          <WorkspaceToolbar afterView={view !== "duplicate-urls" ? <ResourceTypeNavigation types={resourceKinds.map(id=>({id,label:id==="components"?"Components":TYPE_LABELS[id as ResourceType]}))} selected={selectedTypes} onToggle={toggleResourceType} onClear={()=>changeResourceTypes(new Set())}/> : undefined} query={query} onQuery={value=>{setQuery(value);updateUrl({query:value});}} placeholder="Search Resources" activeFilters={collection !== "all" || view !== "all" ? 1 : 0} filters={<>
             <WorkspaceButton aria-pressed={collection === "all" && view === "all"} onClick={()=>{setCollection("all");selectLibraryView("all");}}>All Resources</WorkspaceButton>
             <WorkspaceButton aria-pressed={collection === "all" && view === "needs-review"} onClick={()=>{setCollection("all");selectLibraryView("needs-review");}}>Needs Review</WorkspaceButton>
             <WorkspaceButton icon="archive" aria-pressed={view === "archived"} onClick={()=>{setCollection("all");selectLibraryView("archived");}}>Archived</WorkspaceButton>
