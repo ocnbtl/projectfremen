@@ -285,13 +285,13 @@ export default function CalendarWorkspace() {
     window.addEventListener("storage", wellnessChanged);
     window.addEventListener("online", refresh);
     window.addEventListener("focus", refresh);
-    window.addEventListener("unigentamos-planning-changed", refresh);
+    window.addEventListener("unigentamos-planning-changed", refresh);window.addEventListener("unigentamos-tasks-restored", refresh);
     return () => {
       clearInterval(timer);
       window.removeEventListener("storage", wellnessChanged);
       window.removeEventListener("online", refresh);
       window.removeEventListener("focus", refresh);
-      window.removeEventListener("unigentamos-planning-changed", refresh);
+      window.removeEventListener("unigentamos-planning-changed", refresh);window.removeEventListener("unigentamos-tasks-restored", refresh);
     };
   }, [refresh, params]);
   useEffect(() => {
@@ -607,6 +607,7 @@ export default function CalendarWorkspace() {
   async function completeTask(item: EventOccurrence) {
     if (busy) return;
     if(item.taskContext){const task=item.taskContext;await action(async()=>{await writeTask({operation:"complete",id:task.id,timeZone:zone,expectedUpdatedAt:task.planUpdatedAt,sourceUpdatedAt:task.sourceUpdatedAt,occurrenceKey:task.floating?"":item.occurrenceKey,completed:!item.completed});},item.completed?"Task reopened":"Task completed");return;}
+    if(item.isTask&&!item.wellnessSource&&!item.petSource){const task=snapshot?.taskItems?.find(t=>t.source?.family==="events"&&t.source.id===item.eventId);if(task){await action(()=>writeTask({operation:"complete",id:task.id,timeZone:zone,expectedUpdatedAt:task.updatedAt,sourceUpdatedAt:task.sourceUpdatedAt,occurrenceKey:task.start?item.occurrenceKey:"",completed:!item.completed}),item.completed?"Task reopened":"Task completed");return;}}
     if (item.wellnessSource) { const source = item.wellnessSource; await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, source.repeating ? {} : { status: item.completed ? "planned" : "completed" }, source.repeating ? { date: item.occurrenceKey.slice(0,10), completed: !item.completed } : undefined); setPreviewOpen(false); }, item.completed ? "Plan reopened" : "Plan completed"); return; }
     if(item.petSource){const source=item.petSource;await action(async()=>{await updatePetCare(source.id,source.updatedAt,{status:item.completed?"planned":"completed"});setPreviewOpen(false);},item.completed?"Care reopened":"Care completed");return;}
     if (!item.completed) {openOutcome(item);return;}
@@ -688,7 +689,7 @@ export default function CalendarWorkspace() {
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <PlaceSync onComplete={refresh} />
-      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center">{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={refresh} day={taskDay} onlyAllDay={Boolean(taskDay)} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
+      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center" className={styles.taskSheet}>{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={refresh} day={taskDay} onlyAllDay={Boolean(taskDay)} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
       <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
         <h1><Link prefetch={false} className="workspace-home-link" href="/admin/calendar">Calendar</Link></h1>
           <SearchField aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} value={query} onChange={e => setQuery(e.target.value)} className={styles.calendarSearch} />

@@ -28,8 +28,8 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
   const regular = monthWeekLayout(days, events.filter(e => e.allDay && !e.isTask), zone, Infinity).segments;
   const taskSegments = monthWeekLayout(days,events.filter(e=>e.allDay&&e.isTask),zone,Infinity).segments;
   const regularLanes=Math.max(0,...regular.map(s=>s.lane+1));
-  const summaries=days.map((day,index)=>{const tasks=taskSegments.filter(s=>s.first<=index&&index<=s.last).map(s=>s.event);const linked=[...new Map(tasks.flatMap(event=>[...eventObjectRefs(event,refs),...(event.taskContext?.peopleIds||[]).flatMap(id=>refs.filter(ref=>ref.module==="people"&&ref.objectId===id))]).filter(ref=>ref.module==="people"||ref.module==="projects").map(ref=>[ref.module+":"+ref.objectId,ref])).values()];linked.sort((a,b)=>Number(b.objectType==="person")-Number(a.objectType==="person"));return {day,tasks,linked};});
-  const segments=regular,lanes=regularLanes+Number(taskSegments.length>0);
+  const summaries=days.map((day,index)=>{const tasks=taskSegments.filter(s=>s.first<=index&&index<=s.last).map(s=>s.event);const linked=[...new Map(tasks.flatMap(event=>[...eventObjectRefs(event,refs),...(event.taskContext?.peopleIds||[]).flatMap(id=>refs.filter(ref=>ref.module==="people"&&ref.objectId===id))]).filter(ref=>ref.module==="people"||ref.module==="projects").map(ref=>[ref.module+":"+ref.objectId,ref])).values()];linked.sort((a,b)=>Number(b.objectType==="person")-Number(a.objectType==="person"));const lane=Math.max(0,...regular.filter(segment=>segment.first<=index&&index<=segment.last).map(segment=>segment.lane+1));return {day,tasks,linked,lane};});
+  const segments=regular,lanes=Math.max(regularLanes,...summaries.filter(s=>s.tasks.length).map(s=>s.lane+1));
   const links = dated.flatMap(item => { const covered = days.flatMap((day, i) => item.start <= day && day < item.end ? [i] : []); return covered.length ? [{ item, first: covered[0], last: covered.at(-1)! }] : []; });
   if (!segments.length && !taskSegments.length && !links.length) return <div className={styles.allDayBand} aria-hidden="true" />;
   return <motion.div layout transition={{ layout: layoutTransition }} className={styles.allDayBand} style={{ gridTemplateColumns: columns }} role="group" aria-label="All-day and linked events">
@@ -37,7 +37,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
       className={styles.allDayColumn} data-today={day === today} data-highlighted={highlightDay === day || undefined} data-all-day-column={day}
       style={{ gridColumn: index + 2, gridRow: `1 / ${lanes + links.length + 2}` }} />)}
     <span aria-hidden="true" className={styles.allDaySpacer} style={{gridColumn:"1 / -1",gridRow:lanes + links.length + 1}} />
-    {taskSegments.length > 0 && <span className={styles.taskBandLabel} style={{gridColumn:1,gridRow:regularLanes+1}}>Tasks</span>}
+
     {segments.map(({ event, first, last, lane, continuesBefore, continuesAfter }) => {
       const calendar = calendars.find(c => c.id === event.calendarId), group = eventGroup(calendar, event.groupId);
       const title = `${event.title}${continuesBefore ? " · Continues from earlier dates" : ""}${continuesAfter ? " · Continues on later dates" : ""}`;
@@ -52,7 +52,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
 
       </TaskEventCard>;
     })}
-    {summaries.map(({day,tasks,linked},index)=>tasks.length>0?<button type="button" key={day+"tasks"} className={styles.taskSummary} style={{gridColumn:index+2,gridRow:regularLanes+1}} onClick={()=>onTasks(day)} aria-label={tasks.length+" tasks on "+day}><UnigentamosIcon role="check" size={16}/><strong>{tasks.length} tasks</strong><span className={styles.taskSummaryFaces} aria-hidden="true">{linked.slice(0,3).map(ref=><EventObjectIdentity key={ref.module+":"+ref.objectId} record={ref}/>)}{linked.length>3&&<small>+{linked.length-3}</small>}</span><UnigentamosIcon role="chevron-right" size={14}/></button>:null)}
+    {summaries.map(({day,tasks,linked,lane},index)=>tasks.length>0?<button type="button" key={day+"tasks"} className={styles.allDayItem+" "+styles.taskSummary} style={{gridColumn:index+2,gridRow:lane+1}} onClick={()=>onTasks(day)} aria-label={tasks.length+" tasks on "+day}><UnigentamosIcon role="check" size={16}/><strong>{tasks.length} tasks</strong><span className={styles.taskSummaryFaces} aria-hidden="true">{linked.slice(0,2).map(ref=><EventObjectIdentity key={ref.module+":"+ref.objectId} record={ref}/>)}{linked.length>2&&<small>+{linked.length-2}</small>}</span><UnigentamosIcon role="chevron-right" size={14}/></button>:null)}
     {links.map(({ item, first, last }, i) => <Link key={item.id} className={styles.allDayItem} style={{ gridColumn: `${first + 2} / ${last + 3}`, gridRow: lanes + i + 1, "--event-color": "var(--module-secondary-500)" } as CSSProperties} href={item.ownerRef?.route || "/admin/personal"}>
       {item.start < days[first] && <UnigentamosIcon role="chevron-right" size={12} style={{ transform: "rotate(180deg)" }} />}
       <UnigentamosIcon role={item.completed ? "check" : "link"} size={13} /><span className={styles.eventTitle}>{item.title}</span>

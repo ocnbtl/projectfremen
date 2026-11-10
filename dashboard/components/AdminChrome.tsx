@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import TaskCompletionUndo from "./planning/TaskCompletionUndo";
 import AppTopNav from "./admin-shell/AppTopNav";
 import SharedAIDock, { type SharedAIContext } from "./admin-shell/SharedAIDock";
 import OfflineVaultBridge from "./OfflineVaultBridge";
@@ -154,7 +155,7 @@ export default function AdminChrome({
   return (
     <>
       <AppTopNav showCommandSearch={showCommandSearch} />
-      <OfflineVaultBridge />
+      <OfflineVaultBridge /><TaskCompletionUndo/>
       {showPageSidebar && (
         <AdminPageSidebar
           title={sidebarTitle}

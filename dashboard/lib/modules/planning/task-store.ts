@@ -49,24 +49,39 @@ export async function changeTask(body:Record<string,unknown>) {
       if(!eventOccurrences([eventFor(item)],date,addDays(date,1),item.timeZone).some(e=>e.occurrenceKey===key))fail("Choose an available task occurrence.");
     } else if(key!=="") fail("This task has no scheduled occurrence.");
     if(body.operation==="skip" && !item.recurrence)fail("Only a repeating task occurrence can be skipped.");
+    const source=item.source;
+    const family=source?.family;
+    const sourceRecord=family&&["goals","followUps","decisions","obligations"].includes(family)?loaded.ops[family as "goals"|"followUps"|"decisions"|"obligations"].find(record=>record.id===source?.id):undefined;
+    const stateField=family==="goals"?"goalState":family==="followUps"?"followUpState":family==="decisions"?"decisionState":family==="obligations"?"obligationState":undefined;
+    const restore=body.restoreState&&typeof body.restoreState==="object"&&!completed?body.restoreState as Record<string,unknown>:undefined;
+    const restorePatch=sourceRecord&&stateField&&restore?{[stateField]:restore[stateField],lifecycle:restore.lifecycle as typeof sourceRecord.lifecycle}:{};
+    async function finish<T>(promise:Promise<T>){
+      const result=await promise;
+      if(body.withUndo!==true||body.operation!=="complete"||!completed||(item.recurrence?item.exceptions[key]?.completed:item.completed))return result;
+      const saved=result as {updatedAt?:string;sourceUpdatedAt?:string;item?:{updatedAt:string}};
+      const version=saved.item?.updatedAt||saved.updatedAt;
+      const writesPlan=!source||(!!item.recurrence&&family!=="routines"&&family!=="events");
+      const undo={title:item.title,command:{operation:"complete",id:item.id,timeZone:zone,occurrenceKey:key,completed:false,expectedUpdatedAt:writesPlan||family==="events"?version:item.updatedAt,sourceUpdatedAt:family==="legacyGoals"?saved.sourceUpdatedAt:source&&!writesPlan?version:item.sourceUpdatedAt,...(sourceRecord&&stateField&&!item.recurrence?{restoreState:{lifecycle:sourceRecord.lifecycle,[stateField]:(sourceRecord as unknown as Record<string,unknown>)[stateField]}}:{})}};
+      return {result,undo};
+    }
     if(item.source?.family==="events") {
       const record=loaded.state.events.find(e=>e.id===item.source!.id)!;
-      return savePlanningRecord("events",body.operation==="skip" ? {id:record.id,exceptions:{...record.exceptions,[key]:{...record.exceptions[key],cancelled:true}}}:taskCompletionPatch(record,item.start?key:record.start,completed),item.updatedAt);
+      return finish(savePlanningRecord("events",body.operation==="skip" ? {id:record.id,exceptions:{...record.exceptions,[key]:{...record.exceptions[key],cancelled:true}}}:taskCompletionPatch(record,item.start?key:record.start,completed),item.updatedAt));
     }
-    if(item.source?.family==="routines" && body.operation==="complete")return recordRoutineTask(item.source.id,key,completed,item.sourceUpdatedAt!);
+    if(item.source?.family==="routines" && body.operation==="complete")return finish(recordRoutineTask(item.source.id,key,completed,item.sourceUpdatedAt!));
     if(!item.recurrence && item.source) {
       const source=item.source;
-      if(source.family==="legacyGoals")return completeLegacyGoal(item,completed);
-      if(source.family==="goals")return updatePersonalOpsObject("goals",source.id,{goalState:completed?"complete":"active",lifecycle:completed?"complete":"active"},{expectedUpdatedAt:item.sourceUpdatedAt!});
+      if(source.family==="legacyGoals")return finish(completeLegacyGoal(item,completed));
+      if(source.family==="goals")return finish(updatePersonalOpsObject("goals",source.id,{goalState:completed?"complete":"active",lifecycle:completed?"complete":"active",...restorePatch},{expectedUpdatedAt:item.sourceUpdatedAt!}));
       if(source.family==="objectives") {
         const project=loaded.projects.projects.find(p=>p.id===source.projectId)!;
-        return updateProjectsObject("projects",project.id,{objectives:project.objectives.map(o=>({id:o.id,text:o.text,targetAt:o.targetAt,completed:o.id===source.id?completed:!!o.completedAt}))},{expectedUpdatedAt:item.sourceUpdatedAt!});
+        return finish(updateProjectsObject("projects",project.id,{objectives:project.objectives.map(o=>({id:o.id,text:o.text,targetAt:o.targetAt,completed:o.id===source.id?completed:!!o.completedAt}))},{expectedUpdatedAt:item.sourceUpdatedAt!}));
       }
-      if(source.family==="followUps") return updatePersonalOpsObject("followUps",source.id,{followUpState:completed?"complete":"open",lifecycle:completed?"complete":"active"},{expectedUpdatedAt:item.sourceUpdatedAt!});
-      if(source.family==="decisions") return updatePersonalOpsObject("decisions",source.id,{decisionState:completed?"decided":"open",lifecycle:completed?"complete":"active"},{expectedUpdatedAt:item.sourceUpdatedAt!});
-      if(source.family==="obligations") return updatePersonalOpsObject("obligations",source.id,{obligationState:completed?"complete":"open",lifecycle:completed?"complete":"active"},{expectedUpdatedAt:item.sourceUpdatedAt!});
+      if(source.family==="followUps") return finish(updatePersonalOpsObject("followUps",source.id,{followUpState:completed?"complete":"open",lifecycle:completed?"complete":"active",...restorePatch},{expectedUpdatedAt:item.sourceUpdatedAt!}));
+      if(source.family==="decisions") return finish(updatePersonalOpsObject("decisions",source.id,{decisionState:completed?"decided":"open",lifecycle:completed?"complete":"active",...restorePatch},{expectedUpdatedAt:item.sourceUpdatedAt!}));
+      if(source.family==="obligations") return finish(updatePersonalOpsObject("obligations",source.id,{obligationState:completed?"complete":"open",lifecycle:completed?"complete":"active",...restorePatch},{expectedUpdatedAt:item.sourceUpdatedAt!}));
     }
-    return storePlan(item,{...(item.recurrence ? {exceptions:{...item.exceptions,[key]:{...item.exceptions[key],...(body.operation==="skip"?{cancelled:true}:{completed})}}} : {completed})});
+    return finish(storePlan(item,{...(item.recurrence ? {exceptions:{...item.exceptions,[key]:{...item.exceptions[key],...(body.operation==="skip"?{cancelled:true}:{completed})}}} : {completed})}));
   }
   if(!["create","schedule"].includes(String(body.operation)))fail("Choose a task action.");
   const input=body.input as Record<string,unknown>;
