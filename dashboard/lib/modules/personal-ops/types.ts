@@ -223,6 +223,7 @@ export type RoutineRunResult = {
 };
 
 export type RoutineRun = {
+  reopenedAt?: string;
   id: string;
   operationKey: string;
   scheduledFor?: string;

@@ -1641,6 +1641,7 @@ export default function PersonalOpsWorkspace({
             <section><h3>Linked to</h3><p>Only records connected to this module.</p><div>{[["people","People"],["projects","Projects"],["calendar","Calendar"],["finance","Finance"],["reviews","Reviews"],["notes","Notes"]].map(([id,label])=><WorkspaceButton key={id} aria-pressed={linkedModule===id} onClick={()=>setViewParam("linked",linkedModule===id?"":id)}>{label}</WorkspaceButton>)}</div></section>
           </div>}>
             <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
+            <Link prefetch={false} href="/admin/personal/tasks" className="work-button"><PersonalOpsIcon name="check"/>Tasks</Link>
             <ViewCycleButton data-toolbar-view value={directoryView} onChange={setDirectoryView}/>
           </WorkspaceToolbar>
 

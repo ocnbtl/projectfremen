@@ -19,14 +19,19 @@ import EventContinuation from "./EventContinuation";
 import { eventObjectRefs } from "./EventObjects";
 import styles from "./CalendarWorkspace.module.css";
 
-export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, highlightDay, onOpen, onComplete }: {
+export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, highlightDay, onOpen, onComplete, onDay }: {
   days: string[]; events: EventOccurrence[]; calendars: Calendar[]; refs: PlanningSnapshot["refs"]; dated: PlanningSnapshot["dated"];
   zone: string; columns: string; today: string; onOpen: (event: EventOccurrence) => void; onComplete: (event: EventOccurrence) => void;
-  highlightDay?: string;
+  highlightDay?: string; onDay:(day:string)=>void;
 }) {
   const { layoutTransition } = useCalendarMotion();
-  const { segments } = monthWeekLayout(days, events.filter(e => e.allDay), zone, Infinity);
-  const lanes = Math.max(0, ...segments.map(s => s.lane + 1));
+  const regular = monthWeekLayout(days, events.filter(e => e.allDay && !e.isTask), zone, Infinity).segments;
+  const taskLayout = monthWeekLayout(days, events.filter(e => e.allDay && e.isTask), zone, 3);
+  const taskSegments = taskLayout.segments;
+  const regularLanes = Math.max(0,...regular.map(s=>s.lane+1));
+  const segments = [...regular,...taskSegments.map(s=>({...s,lane:s.lane+regularLanes+(regular.length?1:0)}))];
+  const cardLanes = Math.max(0, ...segments.map(s => s.lane + 1));
+  const lanes = cardLanes + Number(taskLayout.hidden.some(Boolean));
   const links = dated.flatMap(item => { const covered = days.flatMap((day, i) => item.start <= day && day < item.end ? [i] : []); return covered.length ? [{ item, first: covered[0], last: covered.at(-1)! }] : []; });
   if (!segments.length && !links.length) return <div className={styles.allDayBand} aria-hidden="true" />;
   return <motion.div layout transition={{ layout: layoutTransition }} className={styles.allDayBand} style={{ gridTemplateColumns: columns }} role="group" aria-label="All-day and linked events">
@@ -34,6 +39,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
       className={styles.allDayColumn} data-today={day === today} data-highlighted={highlightDay === day || undefined} data-all-day-column={day}
       style={{ gridColumn: index + 2, gridRow: `1 / ${lanes + links.length + 2}` }} />)}
     <span aria-hidden="true" className={styles.allDaySpacer} style={{gridColumn:"1 / -1",gridRow:lanes + links.length + 1}} />
+    {taskSegments.length > 0 && <span className={styles.taskBandLabel} style={{gridColumn:1,gridRow:regularLanes+(regular.length?2:1)}}>Tasks</span>}
     {segments.map(({ event, first, last, lane, continuesBefore, continuesAfter }) => {
       const calendar = calendars.find(c => c.id === event.calendarId), group = eventGroup(calendar, event.groupId);
       const title = `${event.title}${continuesBefore ? " · Continues from earlier dates" : ""}${continuesAfter ? " · Continues on later dates" : ""}`;
@@ -48,6 +54,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
 
       </TaskEventCard>;
     })}
+    {taskLayout.hidden.map((count,index)=>count>0?<button type="button" key={days[index]+"more-tasks"} className={styles.moreTasks} style={{gridColumn:index+2,gridRow:cardLanes+1}} onClick={()=>onDay(days[index])}>+{count} tasks</button>:null)}
     {links.map(({ item, first, last }, i) => <Link key={item.id} className={styles.allDayItem} style={{ gridColumn: `${first + 2} / ${last + 3}`, gridRow: lanes + i + 1, "--event-color": "var(--module-secondary-500)" } as CSSProperties} href={item.ownerRef?.route || "/admin/personal"}>
       {item.start < days[first] && <UnigentamosIcon role="chevron-right" size={12} style={{ transform: "rotate(180deg)" }} />}
       <UnigentamosIcon role={item.completed ? "check" : "link"} size={13} /><span className={styles.eventTitle}>{item.title}</span>

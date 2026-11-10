@@ -1,4 +1,5 @@
 import { interactionKind } from "./interaction-kinds";
+import { TASK_KINDS } from "./task-model";
 import { normalizePlaceImage } from "./place-presentation";
 import { GROUP_ICONS } from "./calendar-groups";
 import { validateRepeatAnchor } from "./repeat-language";
@@ -24,6 +25,12 @@ function string(
   if (out.length > max)
     throw new Error(`${label} must be ${max} characters or fewer`);
   return out;
+}
+function normalizeTaskAssignment(raw:unknown){
+  const value=raw as {calendarIds:unknown;peopleIds:unknown;kind:unknown;floating:unknown};
+  const ids=(v:unknown,max:number)=>{if(!Array.isArray(v)||v.length>max)throw new Error("Choose valid task assignments");return [...new Set(v.map(id=>string(id,"Profile",300,true)))];};
+  if(typeof value.kind!=="string"||!Object.hasOwn(TASK_KINDS,value.kind))throw new Error("Choose a task type");
+  return {calendarIds:ids(value.calendarIds,12),peopleIds:ids(value.peopleIds,20),kind:value.kind,floating:value.floating===true};
 }
 function coordinate(value: unknown, max: number) {
   const n = Number(value);
@@ -121,6 +128,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       timeZone: string(raw.timeZone, "Time zone", 100, true),
       allDay: raw.allDay === true,
       isTask: raw.isTask === true,
+      ...(raw.taskAssignment && typeof raw.taskAssignment === "object" ? {taskAssignment:normalizeTaskAssignment(raw.taskAssignment)} : {}),
       completed: raw.completed === true,
       interactionKind: raw.interactionKind === undefined ? undefined : interactionKind(raw.interactionKind),
       calendarId: string(raw.calendarId, "Calendar", 300, true),

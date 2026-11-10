@@ -2838,3 +2838,13 @@
 .settingOption > svg { flex:none; }
 .settingOption > span { min-width:0; white-space:normal; }
 @media (prefers-reduced-motion:reduce) { .detailOption { transition:none; } }
+
+.taskBandLabel{align-self:center;font-size:10px;color:#526771;text-align:center;min-width:0;padding:3px}
+
+.shell :global([data-outlined-task]){position:relative;background:transparent!important}
+.shell :global([data-outlined-task])::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;background:var(--task-border,transparent);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none}
+
+.toolbar.navigationBar .tasksButton{order:5;width:auto;min-width:0}
+@media(max-width:760px){.toolbar.navigationBar h1{grid-area:1/1/2/6}.toolbar.navigationBar[data-timeline]>.calendarSearch{grid-area:1/6/2/12}.toolbar.navigationBar .toolbarHours{grid-area:1/12/2/19}.toolbar.navigationBar .tasksButton{grid-area:1/19/2/22;min-width:0;width:auto;margin:0 3px;justify-self:stretch;padding:0}}
+
+.moreTasks{width:auto;min-width:0;margin:1px 4px;padding:5px 7px;min-height:26px;border:0;background:transparent;box-shadow:none;color:var(--module-icon);font-size:11px;text-align:left}

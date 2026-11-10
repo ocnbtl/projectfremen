@@ -28,6 +28,7 @@ export function planningWritableKeys(collection: PlanningCollection): string[] {
       "timeZone",
       "allDay",
       "isTask",
+      "taskAssignment",
       "completed",
       "interactionKind",
       "calendarId",

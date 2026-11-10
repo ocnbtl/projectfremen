@@ -31,6 +31,7 @@ import {
 } from "./types";
 
 export type PlanningSnapshot = {
+  taskItems?: import("./task-model").TaskItem[];
   wellnessEvents?: (import("../personal-wellness/calendar").WellnessCalendarEvent | import("../dog-tracker/calendar").PetCalendarEvent)[];
   workEvents?: import("./personal-calendar").PersonalCalendarEvent[];
   state: PlanningState;

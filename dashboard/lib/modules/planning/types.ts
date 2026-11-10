@@ -50,6 +50,8 @@ export type Calendar = PlanningBase & {
   accountId?: string;
 };
 export type EventFields = {
+  taskAssignment?: { calendarIds:string[]; peopleIds:string[]; kind:import("./task-model").TaskKind; floating:boolean };
+  taskContext?: { id:string; kind:import("./task-model").TaskKind; sourceUpdatedAt?:string; planUpdatedAt:string; floating:boolean; colors:string[]; calendarIds:string[]; dueAt?:string };
   interactionKind?: import("../../personal-records-store").PersonalInteractionKind | "none";
   title: string;
   description: string;
@@ -127,7 +129,7 @@ export type PlanningCollections = {
   reminders: ReminderReceipt;
 };
 export type PlanningCollection = keyof PlanningCollections;
-export type PlanningState = { schemaVersion: 1; outcomeReceipts?: import("./event-outcome-types").OutcomeReceipt[]; bookingData?: import("./booking-types").BookingData } & {
+export type PlanningState = { schemaVersion: 1; taskPlans?: import("./task-model").TaskPlan[]; outcomeReceipts?: import("./event-outcome-types").OutcomeReceipt[]; bookingData?: import("./booking-types").BookingData } & {
   [K in PlanningCollection]: PlanningCollections[K][];
 };
 export type EventOccurrence = EventFields & {

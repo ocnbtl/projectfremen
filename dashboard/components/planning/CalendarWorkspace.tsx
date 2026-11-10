@@ -3,6 +3,8 @@ import type { NativeObjectRef } from "../../lib/native-objects/types";
 import dynamic from "next/dynamic";
 import { CalendarLinkedWorkContext } from "./CalendarLinkedWorkContext";
 const CalendarLinkedWorkSheet = dynamic(() => import("./CalendarLinkedWorkSheet"), { ssr: false });
+import TaskWorkspace, { writeTask } from "./TaskWorkspace";
+import { taskEvents, calendarTaskRecords } from "../../lib/modules/planning/task-model";
 import EventOutcomeSheet from "./EventOutcomeSheet";
 import type { OutcomeSource } from "../../lib/modules/planning/event-outcome-types";
 import PetScheduleDialog from "../personal-ops/PetScheduleDialog";
@@ -144,6 +146,8 @@ export default function CalendarWorkspace() {
   const morph = useCalendarMorph(calendarSurface);
   const previousDate = useRef("");
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
+  const [tasksOpen,setTasksOpen]=useState(false);
+  const [taskTarget,setTaskTarget]=useState<{id:string;occurrence:string}>();
   const [agendaDays, setAgendaDays] = useState(30);
   const [details, setDetails] = useCalendarDisplayPreferences();
   const [early, setEarly] = useState(false), [late, setLate] = useState(false);
@@ -184,7 +188,7 @@ export default function CalendarWorkspace() {
   const [preview,setPreview] = useState<{event:EventOccurrence;anchor:DOMRect}>();
   const [previewOpen,setPreviewOpen] = useState(false);
   const previewAnchor = useRef<DOMRect | undefined>(undefined);
-  const showPreview = (event:EventOccurrence) => {setDayDetail(undefined);setPreview({event,anchor:previewAnchor.current || new DOMRect(innerWidth/2,160,1,1)});setPreviewOpen(true);};
+  const showPreview = (event:EventOccurrence) => {if(event.taskContext){setTaskTarget({id:event.taskContext.id,occurrence:event.taskContext.floating?"":event.occurrenceKey});setTasksOpen(true);return;}setDayDetail(undefined);setPreview({event,anchor:previewAnchor.current || new DOMRect(innerWidth/2,160,1,1)});setPreviewOpen(true);};
   const [addingCalendar, setAddingCalendar] = useState(false);
   const [feedName, setFeedName] = useState("");
   const [importFile, setImportFile] = useState<File>();
@@ -387,7 +391,7 @@ export default function CalendarWorkspace() {
     try {
       return {
         items: eventOccurrences(
-          snapshot?.state.events || [],
+          calendarTaskRecords(snapshot?.state.events || [], snapshot?.state.calendars || [],zone,new Date(now)),
           range.start,
           range.end,
           zone,
@@ -398,7 +402,7 @@ export default function CalendarWorkspace() {
     } catch (e) {
       return { items: [], error: (e as Error).message };
     }
-  }, [snapshot, range, zone]);
+  }, [snapshot, range, zone, now]);
   const occurrences = useMemo(() => {
     const visibleCalendars = new Set(
       snapshot?.state.calendars
@@ -408,12 +412,12 @@ export default function CalendarWorkspace() {
     return [...expanded.items.filter(
       (item) =>
         (showCompleted || !item.isTask || !item.completed) &&
-        visibleCalendars.has(item.calendarId) &&
+        (item.taskContext ? !item.taskContext.calendarIds.length || item.taskContext.calendarIds.some(id=>visibleCalendars.has(id)) : visibleCalendars.has(item.calendarId)) &&
         `${item.title} ${item.description} ${item.location}`
           .toLowerCase()
           .includes(query.trim().toLowerCase()),
-    ), ...eventOccurrences(snapshot?.wellnessEvents || [], range.start, range.end, zone).filter(item => visibleCalendars.has(item.calendarId) && (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(showDated ? snapshot?.workEvents || [] : [], range.start, range.end, zone).filter(item => (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
-  }, [showCompleted, showDated, expanded.items, snapshot?.state.calendars, snapshot?.workEvents, snapshot?.wellnessEvents, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
+    ), ...eventOccurrences(taskEvents(snapshot?.taskItems || [],snapshot?.state.calendars || [],zone,new Date(now)),range.start,range.end,zone).filter(item=>(showCompleted || !item.completed) && (!item.taskContext?.calendarIds.length || item.taskContext.calendarIds.some(id=>visibleCalendars.has(id))) && `${item.title} ${item.description}`.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(snapshot?.wellnessEvents || [], range.start, range.end, zone).filter(item => visibleCalendars.has(item.calendarId) && (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(showDated ? snapshot?.workEvents || [] : [], range.start, range.end, zone).filter(item => (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
+  }, [now, snapshot?.taskItems, showCompleted, showDated, expanded.items, snapshot?.state.calendars, snapshot?.workEvents, snapshot?.wellnessEvents, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
   const dated = showDated
     ? (snapshot?.dated || []).filter(
         (x) =>
@@ -576,21 +580,24 @@ export default function CalendarWorkspace() {
   });
   async function move(item: EventOccurrence, day: string, hour: number) {
     const original = snapshot?.state.events.find(x => x.id === item.eventId);
-    if (!original && !item.wellnessSource && !item.petSource) return;
+    if (!original && !item.wellnessSource && !item.petSource && !item.taskContext) return;
     const minute = Math.round(hour * 60), displayStart = `${day}T${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
     const ms = instantFor(displayStart, zone), start = localFor(ms, item.timeZone), end = localFor(ms + item.endMs - item.startMs, item.timeZone);
     if (ms === item.startMs) return;
+    if(item.taskContext){await updateTaskTime(item,start,end);return;}
     if (item.wellnessSource || item.petSource) { await updateWellnessTime(item, start, end); return; }
     if (original) await commitTime(timeChange(original, item, start, end));
   }
   async function resizeEvent(item: EventOccurrence, value: number, edge: "start" | "end") {
     const original = snapshot?.state.events.find(x => x.id === item.eventId);
-    if (!original && !item.wellnessSource && !item.petSource) return;
+    if (!original && !item.wellnessSource && !item.petSource && !item.taskContext) return;
     const next = resizedEventTime(item, edge, value);
     if (next.startMs === item.startMs && next.endMs === item.endMs) return;
+    if(item.taskContext){await updateTaskTime(item,localFor(next.startMs,item.timeZone),localFor(next.endMs,item.timeZone));return;}
     if (item.wellnessSource || item.petSource) { await updateWellnessTime(item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)); return; }
     if (original) await commitTime(timeChange(original, item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)));
   }
+  async function updateTaskTime(item:EventOccurrence,start:string,end:string){const task=snapshot?.taskItems?.find(t=>t.id===item.taskContext?.id);if(!task||busy)return;await action(()=>writeTask({operation:task.recurrence?"move-occurrence":"schedule",id:task.id,expectedUpdatedAt:task.updatedAt,sourceUpdatedAt:task.sourceUpdatedAt,timeZone:task.timeZone,occurrenceKey:item.occurrenceKey,input:{...task,start,end,allDay:false}}),"Task rescheduled");}
   async function updateWellnessTime(item: EventOccurrence, start: string, end: string) {
     if(item.petSource){if(busy)return;const source=item.petSource;await action(async()=>{await updatePetCare(source.id,source.updatedAt,{schedule:{start,end,calendarId:item.calendarId,timeZone:item.timeZone}});setPreviewOpen(false);},"Care schedule updated");return;}
     const source = item.wellnessSource; if (!source || busy) return;
@@ -598,6 +605,7 @@ export default function CalendarWorkspace() {
   }
   async function completeTask(item: EventOccurrence) {
     if (busy) return;
+    if(item.taskContext){const task=item.taskContext;await action(async()=>{await writeTask({operation:"complete",id:task.id,timeZone:zone,expectedUpdatedAt:task.planUpdatedAt,sourceUpdatedAt:task.sourceUpdatedAt,occurrenceKey:task.floating?"":item.occurrenceKey,completed:!item.completed});},item.completed?"Task reopened":"Task completed");return;}
     if (item.wellnessSource) { const source = item.wellnessSource; await action(async () => { await updateWellnessEntry(source.section, source.id, source.updatedAt, source.repeating ? {} : { status: item.completed ? "planned" : "completed" }, source.repeating ? { date: item.occurrenceKey.slice(0,10), completed: !item.completed } : undefined); setPreviewOpen(false); }, item.completed ? "Plan reopened" : "Plan completed"); return; }
     if(item.petSource){const source=item.petSource;await action(async()=>{await updatePetCare(source.id,source.updatedAt,{status:item.completed?"planned":"completed"});setPreviewOpen(false);},item.completed?"Care reopened":"Care completed");return;}
     if (!item.completed) {openOutcome(item);return;}
@@ -679,6 +687,7 @@ export default function CalendarWorkspace() {
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <PlaceSync onComplete={refresh} />
+      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center">{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={refresh} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
       <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
         <h1><Link prefetch={false} className="workspace-home-link" href="/admin/calendar">Calendar</Link></h1>
           <SearchField aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} value={query} onChange={e => setQuery(e.target.value)} className={styles.calendarSearch} />
@@ -732,6 +741,7 @@ export default function CalendarWorkspace() {
           </Popover.Root>
 
         </div>
+          <Button className={styles.tasksButton} icon="check" aria-label="Tasks" onClick={()=>{setTaskTarget(undefined);setTasksOpen(true);}}>{compact?null:"Tasks"}</Button>
           <Button data-calendar-event-trigger intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
       </header>
       <WorkspaceFeedback

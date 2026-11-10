@@ -171,7 +171,7 @@ export default function CalendarTimeGrid({
             </motion.div>
           );
         })}
-        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} highlightDay={hoverDay} onOpen={onOpen} onComplete={onComplete} />
+        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} highlightDay={hoverDay} onOpen={onOpen} onComplete={onComplete} onDay={onDay} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
             <span key={i} aria-label={hourName(i)} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span className={styles.hourFull}>{hourName(i)}</span><span className={styles.hourNumber} aria-hidden="true">{i % 12 || 12}{(i===0 || i===12) && <small className={styles.periodMarker}>{i===0?"am":"pm"}</small>}</span></span>
@@ -244,6 +244,7 @@ export default function CalendarTimeGrid({
                     layout={false}
                     transition={{ layout: layoutTransition }}
                     className={styles.fittedEvent}
+                    data-outlined-task={item.isTask || undefined}
                     data-morph-event={item.id}
                     data-compact={bottom - top < 44}
                     data-tiny={bottom - top < 26}

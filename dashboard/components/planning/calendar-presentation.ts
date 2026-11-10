@@ -22,8 +22,8 @@ export function calendarDisplayColor(color?: string) {
 
 /** Calendar identity stays on the outline; the category owns the fill. */
 export function eventColors(item: EventOccurrence, calendar?: Calendar) {
-  const outline = item.system?.color || calendarDisplayColor(calendar?.color);
-  return { "--event-outline": outline, "--event-color": item.system?.color || eventGroup(calendar, item.groupId)?.color || outline };
+  const outline = item.taskContext?.colors[0] || item.system?.color || calendarDisplayColor(calendar?.color);
+  return { ...(item.isTask ? { background: "transparent", border: "2px solid " + (item.taskContext && item.taskContext.colors.length > 1 ? "transparent" : outline), ...(item.taskContext && item.taskContext.colors.length > 1 ? {"--task-border": `linear-gradient(100deg, ${item.taskContext.colors.map((color,i)=>`${color} ${i*100/item.taskContext!.colors.length}%, ${color} ${(i+1)*100/item.taskContext!.colors.length}%`).join(", ")})`} : {}) } : {}), "--event-outline": outline, "--event-color": item.system?.color || eventGroup(calendar, item.groupId)?.color || outline };
 }
 
 export function eventPreviewTitle(item: EventOccurrence) {

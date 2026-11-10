@@ -1798,16 +1798,14 @@ function validateCoreDestination(destination: PersonalOpsCoreDestinationDraft, n
 }
 
 function validateRoutine(item: PersonalOpsRoutine, now: string, actorId: string): void {
-  if (item.lifecycle === "active" && item.generationRules.length === 0) {
-    validation("An active routine needs at least one generation rule", "generationRules");
-  }
+  // A routine may simply be recurring work; generation rules are optional.
   const enabledCore = item.generationRules.filter(
     (rule) =>
       rule.enabled &&
       rule.conditions.length === 0 &&
       rule.destination.module === "personal_ops"
   );
-  if (item.lifecycle === "active" && enabledCore.length === 0) {
+  if (item.lifecycle === "active" && item.generationRules.length > 0 && enabledCore.length === 0) {
     validation(
       "An active routine needs at least one enabled, unconditional core Personal destination. Condition evaluation is not connected yet.",
       "generationRules"
@@ -2623,6 +2621,22 @@ export async function confirmPersonalOpsRoutineRun(
     await writeJsonFile(FILE_NAME, nextState);
     return { item, run, created: true, auditEvents };
   });
+}
+
+/** Manual task completion records a run, without generating workflow outputs. */
+export async function recordRoutineTask(id:string, scheduledFor:string, completed:boolean, expectedUpdatedAt:string) {
+  return withMutationLock(()=>mutateJsonFile<PersonalOpsState,PersonalOpsRoutine>(FILE_NAME,newEmptyState(),raw=>{
+    const state=normalizeState(raw), current=state.routines.find(r=>r.id===id);
+    if(!current || current.archivedAt || current.lifecycle!=="active")throw new PersonalOpsStoreError("not_found","This routine is not active.",{status:404});
+    if(current.updatedAt!==expectedUpdatedAt)throw new PersonalOpsStoreError("stale","This routine changed. Reload before completing it.",{status:409});
+    const key="calendar-task:"+scheduledFor, previous=current.runHistory.find(r=>r.operationKey===key);
+    const now=monotonicTimestamp(current.updatedAt,new Date().toISOString());
+    const run:RoutineRun=previous?{...previous,...(completed?{completedAt:now,reopenedAt:undefined}:{reopenedAt:now})}:{id:"routine-run-"+crypto.randomUUID(),operationKey:key,scheduledFor,startedAt:now,completedAt:now,completedBy:"admin",outcome:"completed",generatedRefs:[],results:[],...(!completed?{reopenedAt:now}:{})};
+    const runHistory=previous?current.runHistory.map(r=>r.id===previous.id?run:r):[...current.runHistory,run];
+    const item:PersonalOpsRoutine={...current,updatedAt:now,lastRunAt:runHistory.filter(r=>!r.reopenedAt).map(r=>r.completedAt).sort().at(-1),runHistory,history:[...current.history,historyEntry(completed?"routine.task_completed":"routine.task_reopened",now,"admin",scheduledFor)]};
+    const audit=moduleAuditEvent({item,action:completed?"routine.task_completed":"routine.task_reopened",actorId:"admin",occurredAt:now,before:current});
+    return {value:{...state,routines:state.routines.map(r=>r.id===id?item:r),auditEvents:appendModuleAudits(state,[audit])},result:item};
+  }));
 }
 
 function normalizeCaptureProcessingOutputs(value: unknown): CaptureProcessingOutputDraft[] {

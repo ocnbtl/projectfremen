@@ -1,6 +1,6 @@
 import { readWellnessCalendarEvents } from "../../../lib/modules/personal-wellness/calendar";
 import { taskCompletionPatch } from "../../../lib/modules/planning/calendar-tasks";
-import { personalCalendarEvents } from "../../../lib/modules/planning/personal-calendar";
+import { taskCatalog } from "../../../lib/modules/planning/task-model";
 import { reconcilePlaces } from "../../../lib/modules/planning/place-reconciliation";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
@@ -163,16 +163,7 @@ export async function GET(request: Request) {
       const record = datedSources.find(item => item.id === ref.objectId);
       if (record) Object.assign(ref, { createdAt: record.createdAt, updatedAt: record.updatedAt });
     }
-    const dated = [...(ops?.obligations || [])]
-      .filter((x) => x.dueAt && !x.archivedAt)
-      .map((item) => ({
-        id: `work-${item.id}`,
-        title: item.title,
-        start: item.dueAt!.slice(0, 10),
-        end: addDays(item.dueAt!.slice(0, 10), 1),
-        completed: item.obligationState === "complete",
-        ownerRef: refs.find((x) => x.objectId === item.id),
-      }));
+    const dated: {id:string;title:string;start:string;end:string;completed:boolean;ownerRef?:typeof refs[number]}[] = [];
     for (const trip of life?.trips || [])
       if (trip.startDate)
         dated.push({
@@ -212,7 +203,8 @@ export async function GET(request: Request) {
       trips: life?.trips || [],
       dated,
       wellnessEvents: sources[5].status === "fulfilled" ? sources[5].value : [],
-      workEvents: personalCalendarEvents({ followUps: ops?.followUps || [], routines: ops?.routines || [], decisions:ops?.decisions || [] }),
+      workEvents: [],
+      taskItems: taskCatalog(state.taskPlans || [], ops, projects, state.events, "America/New_York"),
       sourceErrors: sources.flatMap((x, i) =>
         x.status === "rejected"
           ? [["Records", "Personal", "Work", "Projects", "Travel", "Meals and Fitness"][i]]
