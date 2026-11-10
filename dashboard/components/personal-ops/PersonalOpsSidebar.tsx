@@ -217,6 +217,7 @@ export default function PersonalOpsSidebar({
         })
       ]
     };
+  commandSection.label="Tasks";commandSection.items=[{id:"tasks",label:"Tasks",href:"/admin/personal",icon:<PersonalOpsIcon name="check"/>}];
   const sections: ModuleSidebarSection[] = isPersonalSystemView
     ? [commandSection]
     : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }];

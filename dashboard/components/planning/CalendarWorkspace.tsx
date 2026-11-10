@@ -147,6 +147,7 @@ export default function CalendarWorkspace() {
   const previousDate = useRef("");
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
   const [tasksOpen,setTasksOpen]=useState(false);
+  const [taskDay,setTaskDay]=useState<string>();
   const [taskTarget,setTaskTarget]=useState<{id:string;occurrence:string}>();
   const [agendaDays, setAgendaDays] = useState(30);
   const [details, setDetails] = useCalendarDisplayPreferences();
@@ -188,7 +189,7 @@ export default function CalendarWorkspace() {
   const [preview,setPreview] = useState<{event:EventOccurrence;anchor:DOMRect}>();
   const [previewOpen,setPreviewOpen] = useState(false);
   const previewAnchor = useRef<DOMRect | undefined>(undefined);
-  const showPreview = (event:EventOccurrence) => {if(event.taskContext){setTaskTarget({id:event.taskContext.id,occurrence:event.taskContext.floating?"":event.occurrenceKey});setTasksOpen(true);return;}setDayDetail(undefined);setPreview({event,anchor:previewAnchor.current || new DOMRect(innerWidth/2,160,1,1)});setPreviewOpen(true);};
+  const showPreview = (event:EventOccurrence) => {if(event.taskContext){setTaskDay(undefined);setTaskTarget({id:event.taskContext.id,occurrence:event.taskContext.floating?"":event.occurrenceKey});setTasksOpen(true);return;}setDayDetail(undefined);setPreview({event,anchor:previewAnchor.current || new DOMRect(innerWidth/2,160,1,1)});setPreviewOpen(true);};
   const [addingCalendar, setAddingCalendar] = useState(false);
   const [feedName, setFeedName] = useState("");
   const [importFile, setImportFile] = useState<File>();
@@ -687,7 +688,7 @@ export default function CalendarWorkspace() {
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <PlaceSync onComplete={refresh} />
-      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center">{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={refresh} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
+      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center">{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={refresh} day={taskDay} onlyAllDay={Boolean(taskDay)} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
       <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
         <h1><Link prefetch={false} className="workspace-home-link" href="/admin/calendar">Calendar</Link></h1>
           <SearchField aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} value={query} onChange={e => setQuery(e.target.value)} className={styles.calendarSearch} />
@@ -741,7 +742,7 @@ export default function CalendarWorkspace() {
           </Popover.Root>
 
         </div>
-          <Button className={styles.tasksButton} icon="check" aria-label="Tasks" onClick={()=>{setTaskTarget(undefined);setTasksOpen(true);}}>{compact?null:"Tasks"}</Button>
+          <Button className={styles.tasksButton} icon="check" aria-label="Tasks" onClick={()=>{setTaskDay(undefined);setTaskTarget(undefined);setTasksOpen(true);}}>{compact?null:"Tasks"}</Button>
           <Button data-calendar-event-trigger intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
       </header>
       <WorkspaceFeedback
@@ -840,6 +841,7 @@ export default function CalendarWorkspace() {
               late={late}
               onDay={setDayDetail}
               onOpen={showPreview}
+              onTasks={day=>{setTaskDay(day);setTaskTarget(undefined);setTasksOpen(true);}}
               onMove={(...args) => void move(...args)}
               onResize={(...args) => void resizeEvent(...args)}
             />

@@ -187,3 +187,5 @@
  .editor .groups button {height:28px;min-height:28px;padding:3px 7px;}
 }
 @media(prefers-reduced-motion:reduce) { .editor .groups button {transition:none;} }
+
+.standalone .optionRow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.standalone .optionRow>label{display:inline-flex;align-items:center;gap:7px}.standalone .repeatControl{flex:1 1 220px}.standalone .customRepeat{margin:8px 0 0}.standalone .repeatInput input{flex:1;min-width:0;min-height:38px;font:400 14px var(--font-body)}.standalone .repeatInput button{font:500 13px var(--font-body);min-height:38px;padding:7px 10px;border-radius:9px;border:1px solid var(--module-action);background:var(--module-action);color:white;box-shadow:none}.standalone .repeatInput .repeatChoices{flex:none;width:30px;padding:4px;background:transparent;color:var(--module-icon);border-color:transparent}.standalone .customRepeat small{font-size:12px;color:var(--text-secondary)}

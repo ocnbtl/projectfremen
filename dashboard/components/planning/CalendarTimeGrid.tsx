@@ -47,6 +47,7 @@ export default function CalendarTimeGrid({
   onOpen,
   onDay,
   onMove,
+  onTasks,
   onResize,
   onComplete,
 }: {
@@ -63,6 +64,7 @@ export default function CalendarTimeGrid({
   onOpen: (event: EventOccurrence) => void;
   onDay: (day: string) => void;
   onMove: (event: EventOccurrence, day: string, hour: number) => void;
+  onTasks: (day:string)=>void;
   onResize: (event: EventOccurrence, value: number, edge: "start" | "end") => void;
   onComplete: (event: EventOccurrence) => void;
 }) {
@@ -171,7 +173,7 @@ export default function CalendarTimeGrid({
             </motion.div>
           );
         })}
-        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} highlightDay={hoverDay} onOpen={onOpen} onComplete={onComplete} onDay={onDay} />
+        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} highlightDay={hoverDay} onOpen={onOpen} onComplete={onComplete} onDay={onDay} onTasks={onTasks} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
             <span key={i} aria-label={hourName(i)} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span className={styles.hourFull}>{hourName(i)}</span><span className={styles.hourNumber} aria-hidden="true">{i % 12 || 12}{(i===0 || i===12) && <small className={styles.periodMarker}>{i===0?"am":"pm"}</small>}</span></span>

@@ -1,3 +1,5 @@
+import { legacyGoalTasks } from "../../../lib/modules/planning/task-legacy-goals";
+import { readReviewsState } from "../../../lib/modules/reviews/store";
 import { readWellnessCalendarEvents } from "../../../lib/modules/personal-wellness/calendar";
 import { taskCompletionPatch } from "../../../lib/modules/planning/calendar-tasks";
 import { taskCatalog } from "../../../lib/modules/planning/task-model";
@@ -52,6 +54,8 @@ export async function GET(request: Request) {
       readProjectsState(),
       readTravelRecords(),
       readWellnessCalendarEvents(),
+      legacyGoalTasks(state.taskPlans||[],"America/New_York"),
+      readReviewsState(),
     ]);
     const records = sources[0].status === "fulfilled" ? sources[0].value : [],
       life = sources[1].status === "fulfilled" ? sources[1].value : null,
@@ -156,6 +160,8 @@ export async function GET(request: Request) {
           label: event.title,
         }),
       );
+    if(sources[7].status==="fulfilled")for(const run of sources[7].value.runs)if(!run.archivedAt)refs.push(createNativeObjectRef({module:"reviews",objectType:"review_run",objectId:run.id,label:run.title}));
+    if(sources[6].status==="fulfilled")for(const task of sources[6].value){const ref=task.ownerRef;if(ref&&!refs.some(r=>r.module===ref.module&&r.objectId===ref.objectId&&r.objectType===ref.objectType)){const organization=records.find(r=>r.className==="org"&&!r.archivedAt&&r.title.toLowerCase()===ref.label.toLowerCase());refs.push(Object.assign({...ref},{preview:{imageUrl:organization?.profile?.photoUrl,imageUpdatedAt:organization?.profile?.photoUpdatedAt}}));}}
     const datedSources = [...(projects?.projects || []), ...(ops?.obligations || []), ...(ops?.routines || []), ...(ops?.followUps || []),
       ...(ops?.goals || []),
       ...(ops?.decisions || []), ...(life?.trips || []), ...state.places, ...state.events];
@@ -204,10 +210,10 @@ export async function GET(request: Request) {
       dated,
       wellnessEvents: sources[5].status === "fulfilled" ? sources[5].value : [],
       workEvents: [],
-      taskItems: taskCatalog(state.taskPlans || [], ops, projects, state.events, "America/New_York"),
+      taskItems: [...taskCatalog(state.taskPlans || [], ops, projects, state.events, "America/New_York"),...(sources[6].status==="fulfilled"?sources[6].value:[])],
       sourceErrors: sources.flatMap((x, i) =>
         x.status === "rejected"
-          ? [["Records", "Personal", "Work", "Projects", "Travel", "Meals and Fitness"][i]]
+          ? [["Records", "Personal", "Work", "Projects", "Travel", "Meals and Fitness", "Project goals", "Reviews"][i]]
           : [],
       ),
       capabilities: {

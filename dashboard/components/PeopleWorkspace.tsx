@@ -84,6 +84,7 @@ import DateField from "./people/DateField";
 import PlaceLabelPicker from "./people/PlaceLabelPicker";
 import InteractionApproach from "./people/InteractionApproach";
 import InteractionCheckbox from "./people/InteractionCheckbox";
+
 import PeopleObjectPicker, { objectTargetKey, objectTargetIcon, objectTargetTypeLabel } from "./people/PeopleObjectPicker";
 import OrganizationObjectsEditor, { type OrganizationObjectRow } from "./people/OrganizationObjectsEditor";
 import PeopleGroupChoice from "./people/PeopleGroupChoice";
@@ -96,6 +97,7 @@ import { ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, canCompleteOrganizatio
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
 
+const PersonTasks = dynamic(() => import("./planning/PersonTasks"));
 const PeopleTransfer = dynamic(() => import("./people/PeopleTransfer"), {
   loading: () => <LogoLoader label="Opening contact transfer" />
 });
@@ -4782,6 +4784,7 @@ export default function PeopleWorkspace({
               <PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} projectRecords={projectsState.projects} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving}/>
             ) : (
               <section className="people-overview-grid">
+                {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id}/>}
                 <section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
                   <div className="people-contact-methods-compact">
                     {selectedContactMethods.filter(method=>method.available).map((method) => (

@@ -1,3 +1,8 @@
+import { legacyGoalTasks, completeLegacyGoal } from "./task-legacy-goals";
+import { refs as normalizeLinks } from "./record-validation";
+import { resolveActiveNativeObjectRef } from "../../native-objects/resolve-reference";
+import { createNativeObjectRef } from "../../native-objects/routes";
+import { taskRefKey } from "./task-model";
 import { readPlanningState, mutatePlanningState, savePlanningRecord } from "./store";
 import { readPersonalOpsState, updatePersonalOpsObject, recordRoutineTask } from "../personal-ops/store";
 import { readProjectsState, updateProjectsObject } from "../projects/store";
@@ -12,7 +17,7 @@ const text=(v:unknown,max=300)=>{if(typeof v!=="string"||v.length>max)fail("Chec
 export async function readTasks(zone:string) {
   new Intl.DateTimeFormat("en-US",{timeZone:zone});
   const [state,ops,projects]=await Promise.all([readPlanningState(),readPersonalOpsState(),readProjectsState()]);
-  return {state,ops,projects,items:taskCatalog(state.taskPlans||[],ops,projects,state.events,zone)};
+  return {state,ops,projects,items:[...taskCatalog(state.taskPlans||[],ops,projects,state.events,zone),...await legacyGoalTasks(state.taskPlans||[],zone)]};
 }
 function eventFor(item:TaskItem) { return {...item,source:undefined,id:item.id,calendarId:"native",isTask:true,kind:"event" as const,location:"",linkedRefs:[],reminderMinutes:null}; }
 export async function changeTask(body:Record<string,unknown>) {
@@ -51,6 +56,8 @@ export async function changeTask(body:Record<string,unknown>) {
     if(item.source?.family==="routines" && body.operation==="complete")return recordRoutineTask(item.source.id,key,completed,item.sourceUpdatedAt!);
     if(!item.recurrence && item.source) {
       const source=item.source;
+      if(source.family==="legacyGoals")return completeLegacyGoal(item,completed);
+      if(source.family==="goals")return updatePersonalOpsObject("goals",source.id,{goalState:completed?"complete":"active",lifecycle:completed?"complete":"active"},{expectedUpdatedAt:item.sourceUpdatedAt!});
       if(source.family==="objectives") {
         const project=loaded.projects.projects.find(p=>p.id===source.projectId)!;
         return updateProjectsObject("projects",project.id,{objectives:project.objectives.map(o=>({id:o.id,text:o.text,targetAt:o.targetAt,completed:o.id===source.id?completed:!!o.completedAt}))},{expectedUpdatedAt:item.sourceUpdatedAt!});
@@ -77,18 +84,21 @@ export async function changeTask(body:Record<string,unknown>) {
   if(peopleIds.length) {const people=await readPersonalRecords();if(peopleIds.some(id=>!people.some(p=>p.id===id&&p.className==="person"&&!p.archivedAt)))fail("Choose available People profiles.");}
   const kind=text(input.kind||"task") as TaskPlan["kind"];
   if(!Object.hasOwn(TASK_KINDS,kind))fail("Choose a task type.");
+  const linkedRefs=[...new Map(normalizeLinks(input.linkedRefs===undefined?current?.linkedRefs||[]:input.linkedRefs).map(ref=>[taskRefKey(ref),ref])).values()];
+  const priorKeys=new Set((current?.linkedRefs||[]).map(taskRefKey));
+  for(let i=0;i<linkedRefs.length;i++)if(!priorKeys.has(taskRefKey(linkedRefs[i]))){const ref=linkedRefs[i];const local=ref.module==="map"&&ref.objectType==="place"?loaded.state.places.find(p=>p.id===ref.objectId&&!p.archivedAt):ref.module==="calendar"&&ref.objectType==="event"?loaded.state.events.find(e=>e.id===ref.objectId&&!e.archivedAt):undefined;const resolved=local?createNativeObjectRef({...ref,label:"name" in local?local.name:local.title}):await resolveActiveNativeObjectRef(ref);if(!resolved)fail("One linked object is no longer available. Remove it and choose another.");linkedRefs[i]=resolved;}
   const title=current?.source?current.title:text(input.title,240),description=current?.source?current.description:text(input.description||"",20000);
   if(!title)fail("Give the task a name.");
   if(current?.source?.family==="events") {
     const record=loaded.state.events.find(e=>e.id===current.source!.id)!;
     if(record.source)fail("Edit imported tasks from their original Calendar event.");
-    return savePlanningRecord("events",{id:current.source.id,start:start||record.start,end:end||record.end,allDay:start?allDay:record.allDay,timeZone:zone,recurrence,calendarId:calendarIds[0]||record.calendarId,taskAssignment:{calendarIds,peopleIds,kind,floating:!start}},current.updatedAt);
+    return savePlanningRecord("events",{id:current.source.id,start:start||record.start,end:end||record.end,allDay:start?allDay:record.allDay,timeZone:zone,recurrence,calendarId:calendarIds[0]||record.calendarId,linkedRefs,taskAssignment:{calendarIds,peopleIds,kind,floating:!start}},current.updatedAt);
   }
   // Occurrence history is never silently erased when adjusting a repeat rule.
   if(current && Object.keys(current.exceptions).length && (start!==current.start||recurrence!==current.recurrence||allDay!==current.allDay))fail("This schedule has recorded occurrences. Keep its repeat rule and first date, or create a new task for the new schedule.");
   const now=new Date().toISOString();
   const base:TaskItem=current || {id,title,description,kind,start:"",end:"",allDay:true,timeZone:zone,recurrence:"",calendarIds:[],exceptions:{},createdAt:now,updatedAt:""};
-  return storePlan(base,{title,description,kind:current?.source?current.kind:kind,start,end,allDay,timeZone:zone,recurrence,calendarIds,peopleIds});
+  return storePlan(base,{title,description,kind:current?.source?current.kind:kind,start,end,allDay,timeZone:zone,recurrence,calendarIds,peopleIds,linkedRefs});
 }
 async function storePlan(item:TaskItem, patch:Partial<TaskPlan>) {
   return mutatePlanningState(state=>{
@@ -97,6 +107,7 @@ async function storePlan(item:TaskItem, patch:Partial<TaskPlan>) {
     const {sourceUpdatedAt,ownerRef,dueAt,blockedCompletion,...base}=item;
     void sourceUpdatedAt;void ownerRef;void dueAt;void blockedCompletion;
     const next:TaskPlan={...base,...patch,updatedAt:new Date(Math.max(Date.now(),Date.parse(existing?.updatedAt||"") + 1 || 0)).toISOString()};
+    delete (next as TaskItem).sourceLinkedRefs;
     if(next.source){delete next.title;delete next.description; if(!next.recurrence)delete next.completed;}
     // Routine completion belongs to run history, never a second persisted copy.
     if(next.source?.family==="routines")next.exceptions=Object.fromEntries(Object.entries(next.exceptions).flatMap(([key,value])=>{const {completed,...override}=value;void completed;return Object.keys(override).length?[[key,override]]:[];}));

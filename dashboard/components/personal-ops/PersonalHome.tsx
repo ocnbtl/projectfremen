@@ -11,7 +11,7 @@ import type { PersonalOpsState } from "../../lib/modules/personal-ops/types";
 import { PERSONAL_HOME_TYPES, type PersonalHomeType } from "../../lib/modules/personal-ops/agenda";
 import styles from "./PersonalHome.module.css";
 
-export default function PersonalHome({ state, projectGoalCount = 0, selectedTypes, onToggleType }: { state: PersonalOpsState; projectGoalCount?: number; selectedTypes: PersonalHomeType[]; onToggleType: (type: PersonalHomeType)=>void }) {
+export default function PersonalHome({ state, projectGoalCount = 0, selectedTypes = [], onToggleType = ()=>{}, hideOperations = false }: { state?: PersonalOpsState; projectGoalCount?: number; selectedTypes?: PersonalHomeType[]; onToggleType?: (type: PersonalHomeType)=>void; hideOperations?:boolean }) {
   const [settings, setSettings] = useState<PersonalHomeSettings>(emptyHomeSettings);
   const [draft, setDraft] = useState<PersonalHomeSettings>(emptyHomeSettings);
   const [open, setOpen] = useState(false);
@@ -56,17 +56,17 @@ export default function PersonalHome({ state, projectGoalCount = 0, selectedType
   const shortcuts = [...HOME_SHORTCUTS.filter(item => item.id !== "travel"), ...settings.sections.map(section => ({...section, href:`/admin/personal/lists?list=${encodeURIComponent(section.listId)}`}))];
   const active = (items: { lifecycle: string; goalState?: string; decisionState?: string }[]) => items.filter(item => item.goalState!=="cancelled" && !["cancelled","superseded","decided"].includes(item.decisionState || "") && !["complete", "archived"].includes(item.lifecycle)).length;
   const operations = [
-    {label:"Goals", icon:"goal" as const, href:"goals", type:"goal" as const, count:active(state.goals)+projectGoalCount, description:"Personal and project outcomes"},
-    {label:"Routines", icon:"routine" as const, href:"routines", type:"routine" as const, count:active(state.routines), description:"Habits and recurring work"},
-    {label:"Follow-ups", icon:"follow-up" as const, href:"follow-ups", type:"follow_up" as const, count:active(state.followUps), description:"Keep your next actions connected"},
-    {label:"Decisions", icon:"decision" as const, href:"decisions", type:"decision" as const, count:active(state.decisions), description:"Choices, reasons, and outcomes"},
-    {label:"Obligations", icon:"check" as const, href:"obligations", type:"obligation" as const, count:active(state.obligations), description:"Commitments to follow through"}
+    {label:"Goals", icon:"goal" as const, href:"goals", type:"goal" as const, count:active(state?.goals||[])+projectGoalCount, description:"Personal and project outcomes"},
+    {label:"Routines", icon:"routine" as const, href:"routines", type:"routine" as const, count:active(state?.routines||[]), description:"Habits and recurring work"},
+    {label:"Follow-ups", icon:"follow-up" as const, href:"follow-ups", type:"follow_up" as const, count:active(state?.followUps||[]), description:"Keep your next actions connected"},
+    {label:"Decisions", icon:"decision" as const, href:"decisions", type:"decision" as const, count:active(state?.decisions||[]), description:"Choices, reasons, and outcomes"},
+    {label:"Obligations", icon:"check" as const, href:"obligations", type:"obligation" as const, count:active(state?.obligations||[]), description:"Commitments to follow through"}
   ];
   return <section className={styles.home} aria-label="Your Personal workspace">
     <WorkspaceNavSlot kind="actions"><div className={`${styles.sectionHeader} workspace-space-actions`}><span className="workspace-action-group-label">Spaces</span><WorkspaceButton icon="plus" disabled={!loaded || busy} onClick={() => {setDraft(settings); setOpen(true); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-label="New section name"]')?.focus());}}>Add section</WorkspaceButton></div></WorkspaceNavSlot>
     {error && !open && <p role="alert">{error}</p>}
     <nav className={styles.shortcuts} aria-label="Personal spaces">{shortcuts.filter(item => !settings.hidden.includes(item.id)).map(item => <Link prefetch={false} href={item.href} key={item.id}><span><PersonalOpsIcon name={item.icon}/></span><strong>{item.label}</strong></Link>)}{loaded && shortcuts.every(item => settings.hidden.includes(item.id)) && <p>Use Add section to choose your spaces.</p>}</nav>
-    <div className={styles.operations}>{operations.map(item => <button type="button" aria-pressed={selectedTypes.length < PERSONAL_HOME_TYPES.length && selectedTypes.includes(item.type)} onClick={()=>onToggleType(item.type)} key={item.href}><PersonalOpsIcon name={item.icon}/><span><strong>{item.label}</strong></span><b>{item.count}</b></button>)}</div>
+    {!hideOperations&&<div className={styles.operations}>{operations.map(item => <button type="button" aria-pressed={selectedTypes.length < PERSONAL_HOME_TYPES.length && selectedTypes.includes(item.type)} onClick={()=>onToggleType(item.type)} key={item.href}><PersonalOpsIcon name={item.icon}/><span><strong>{item.label}</strong></span><b>{item.count}</b></button>)}</div>}
     <WorkspaceSheet open={open} onClose={() => {if (!busy) setOpen(false);}} title="Personal sections" titleIcon="module-personal" presentation="center" className={styles.customizeSheet} focusInput={false}>
       <div className={styles.customize}>
         <p>Choose the spaces shown here. Hiding a space keeps all its information.</p>

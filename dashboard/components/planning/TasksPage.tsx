@@ -1,14 +1,16 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useSearchParams } from "next/navigation";
 import TaskWorkspace from "./TaskWorkspace";
+import PersonalHome from "../personal-ops/PersonalHome";
+import ModuleSidebar from "../admin-shell/ModuleSidebar";
+import { WorkspaceTopbarProvider } from "../admin-shell/WorkspaceTopbar";
 import { planningRequest, type PlanningSnapshot } from "../../lib/modules/planning/repository";
-import styles from "./TaskWorkspace.module.css";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
-import type { CSSProperties } from "react";
+import styles from "./TaskWorkspace.module.css";
 export default function TasksPage(){
-  const [snapshot,setSnapshot]=useState<PlanningSnapshot>(),[error,setError]=useState("");
-  const refresh=useCallback(async()=>{try{setSnapshot(await planningRequest<PlanningSnapshot>());setError("");}catch(e){setError((e as Error).message);}},[]);
-  useEffect(()=>{void refresh();},[refresh]);
-  return <main className={`${styles.page} work-surface`} style={moduleThemeVariables("personal_ops") as CSSProperties}><header><Link prefetch={false} className="workspace-home-link" href="/admin/personal">Personal</Link><h1>Tasks</h1><Link prefetch={false} className="work-button" href="/admin/calendar">Calendar</Link></header>{error&&<p role="alert">{error}</p>}{snapshot?<TaskWorkspace snapshot={snapshot} zone={Intl.DateTimeFormat().resolvedOptions().timeZone} onSaved={refresh}/>:<p role="status">Loading tasks…</p>}</main>;
+ const [snapshot,setSnapshot]=useState<PlanningSnapshot>(),[error,setError]=useState("");const params=useSearchParams();
+ const refresh=useCallback(async()=>{try{setSnapshot(await planningRequest<PlanningSnapshot>());setError("");}catch(e){setError((e as Error).message);}},[]);
+ useEffect(()=>{void refresh();const focus=()=>{void refresh();};window.addEventListener("focus",focus);return()=>window.removeEventListener("focus",focus);},[refresh]);
+ return <WorkspaceTopbarProvider><main className={styles.page+" work-surface"} style={moduleThemeVariables("personal_ops") as CSSProperties}><ModuleSidebar title="Personal" sections={[]}/>{error&&<p role="alert">{error}</p>}{snapshot?<TaskWorkspace snapshot={snapshot} zone={Intl.DateTimeFormat().resolvedOptions().timeZone} onSaved={refresh} surface="page" initialId={params.get("task")||undefined} initialKind={params.get("type")||undefined} beforeList={<PersonalHome hideOperations/>}/>:<p role="status">Loading tasks…</p>}</main></WorkspaceTopbarProvider>;
 }

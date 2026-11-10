@@ -51,7 +51,7 @@ export type Calendar = PlanningBase & {
 };
 export type EventFields = {
   taskAssignment?: { calendarIds:string[]; peopleIds:string[]; kind:import("./task-model").TaskKind; floating:boolean };
-  taskContext?: { id:string; kind:import("./task-model").TaskKind; sourceUpdatedAt?:string; planUpdatedAt:string; floating:boolean; colors:string[]; calendarIds:string[]; dueAt?:string };
+  taskContext?: { id:string; kind:import("./task-model").TaskKind; sourceUpdatedAt?:string; planUpdatedAt:string; floating:boolean; colors:string[]; calendarIds:string[]; peopleIds?:string[]; dueAt?:string };
   interactionKind?: import("../../personal-records-store").PersonalInteractionKind | "none";
   title: string;
   description: string;

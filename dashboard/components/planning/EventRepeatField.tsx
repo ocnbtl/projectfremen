@@ -15,7 +15,7 @@ function RepeatControl({children,reduced}:{children:ReactNode;reduced:boolean|nu
   return <motion.div inert={!present} aria-hidden={!present||undefined} initial={{opacity:reduced?1:0,x:reduced?0:5}} animate={{opacity:1,x:0}} exit={{opacity:0}} transition={{duration:reduced?0:.18}}>{children}</motion.div>;
 }
 
-export default function EventRepeatField({fields,update,birthdays}: {fields:EventFields;update:<K extends keyof EventFields>(key:K,value:EventFields[K])=>void;birthdays?:BirthdaySource[]}) {
+export default function EventRepeatField({fields,update,birthdays,standalone=false}: {fields:EventFields;update:<K extends keyof EventFields>(key:K,value:EventFields[K])=>void;birthdays?:BirthdaySource[];standalone?:boolean}) {
   const initial=fields.recurrence.replace(/;INTERVAL=1(?=;|$)/,"");
   const [custom,setCustom]=useState(Boolean(fields.recurrenceAnchor) || !!initial && !repeatPresets.some(([value])=>value===initial));
   const [text,setText]=useState(""), input=useRef<HTMLInputElement>(null);
@@ -31,7 +31,7 @@ export default function EventRepeatField({fields,update,birthdays}: {fields:Even
     try { const candidate={...fields,...rule};validateEventTime(candidate);return eventOccurrences([{...candidate,id:"preview",createdAt:"",updatedAt:"",exceptions:{}}],fields.start.slice(0,10),addDays(fields.start,366*5),fields.timeZone,birthdays).slice(0,3).map(e=>new Date(`${e.start.slice(0,10)}T12:00`).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})); }catch{return [];}
   },[fields,birthdays,parsed.rule,pending,custom]);
   function select(value:string) { if(value==="custom"){setCustom(true);return;}setCustom(false);setText("");setApplied("");update("recurrenceAnchor",null);update("recurrence",value); }
-  return <div className={styles.repeatArea}>
+  return <div className={`${styles.repeatArea} ${standalone?styles.standalone:""}`}>
     <div className={styles.optionRow}><EventCheckbox label="Repeat" checked={custom || !!fields.recurrence} onChange={checked=>select(checked?"FREQ=DAILY":"")} />
       <div className={styles.repeatControl}><AnimatePresence initial={false}><RepeatControl key={custom?"custom":"presets"} reduced={reduced}>
       {custom ? <div className={styles.repeatInput}><input ref={input} aria-label="Custom repeat rule" maxLength={300} value={text} placeholder="Describe when to repeat" onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();if(parsed.rule){update("recurrenceAnchor",parsed.rule.recurrenceAnchor);update("recurrence",parsed.rule.recurrence);setApplied(text);}}}} /><button type="button" disabled={!parsed.rule || !pending} onClick={()=>{if(parsed.rule){update("recurrenceAnchor",parsed.rule.recurrenceAnchor);update("recurrence",parsed.rule.recurrence);setApplied(text);}}}>Apply</button><SelectField className={styles.repeatChoices} aria-label="Choose repeat preset" value="custom" onChange={e=>select(e.target.value)} triggerContent={<UnigentamosIcon role="chevron-down" size={14}/>} >{repeatPresets.map(([value,label])=><option key={value} value={value}>{label}</option>)}<option value="custom">Custom…</option></SelectField></div> : <SelectField aria-label="Repeat schedule" value={custom?"custom":initial} onChange={e=>select(e.target.value)}>{repeatPresets.map(([value,label])=><option key={value} value={value}>{label}</option>)}<option value="custom">Custom…</option></SelectField>}

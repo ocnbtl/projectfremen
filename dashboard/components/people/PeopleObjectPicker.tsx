@@ -22,6 +22,7 @@ const kinds = [
   { id: "media", label: "Media", icon: "module-media" },
   { id: "note", label: "Notes", icon: "module-notes" },
   { id: "place", label: "Places", icon: "location" },
+  { id: "review", label: "Reviews", icon: "module-reviews" },
   { id: "other", label: "Other", icon: "object" }
 ] as const;
 type Kind = typeof kinds[number]["id"];
@@ -32,13 +33,14 @@ const kindOf = (target: NativeObjectRef): Kind => {
   if (target.module === "resources") return "resource";
   if (target.module === "media") return "media";
   if (target.module === "notes") return "note";
+  if (target.module === "reviews") return "review";
   if (target.module === "map" && target.objectType === "place") return "place";
   return "other";
 };
 const searchable = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
 export const objectTargetTypeLabel = (target: NativeObjectRef) => kindOf(target) === "other"
   ? target.objectType.replace(/_/g, " ").replace(/^./, letter => letter.toUpperCase())
-  : ({ person: "Person", organization: "Organization", project: "Project", resource: "Resource", note: "Note", media: "Media", place: "Place" } as Record<string, string>)[kindOf(target)];
+  : ({ person: "Person", organization: "Organization", project: "Project", resource: "Resource", note: "Note", media: "Media", place: "Place", review: "Review" } as Record<string, string>)[kindOf(target)];
 
 export const objectTargetIcon = (target: NativeObjectRef) => kinds.find(item => item.id === kindOf(target))!.icon;
 

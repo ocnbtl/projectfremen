@@ -61,7 +61,7 @@ function normalizePlaceVerification(value: unknown) {
   }) : [];
   return { precision: v.precision, checkedAt, summary: string(v.summary, "Location review", 1600), sourceUrls };
 }
-function refs(value: unknown): NativeObjectRef[] {
+export function refs(value: unknown): NativeObjectRef[] {
   if (!Array.isArray(value)) return [];
   if (value.length > 100)
     throw new Error("Use no more than 100 linked records");
