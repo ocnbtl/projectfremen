@@ -4401,11 +4401,58 @@ export default function PeopleWorkspace({
                 <p>{selectedPerson.className === "org"
                   ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
                   : [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ") || selectedProfile.context || selectedPerson.body || "Person"}</p>
+                <div className="people-profile-contact-dates">{getLastContactValue(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))&&<span><UnigentamosIcon role="interaction-history" size={14}/>Last contact {formatLastContact(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))}</span>}{selectedProfile.nextContact&&<span><PeopleIcon name="follow-up"/>Next {getNextContactLabel(selectedPerson)}</span>}</div>
                 <div className="people-tag-row">
                   {selectedTags.map((tag) => (
                     <span key={tag}>{tag}</span>
                   ))}
                 </div>
+                {selectedContactMethods.some(method=>method.available)&&(<section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
+                  <div className="people-contact-methods-compact">
+                    {selectedContactMethods.filter(method=>method.available).map((method) => (
+                      <button
+                        type="button"
+                        key={method.id}
+                        data-contact-method={method.id}
+                        data-available={method.available || undefined}
+                        className={expandedContactMethod === method.id ? "is-active" : ""}
+                        onClick={() => setExpandedContactMethod((current) => current === method.id ? null : method.id)}
+                        aria-label={method.available ? `${expandedContactMethod === method.id ? "Hide" : "Show"} ${method.label}` : `${method.label} not added`}
+                        aria-expanded={method.available ? expandedContactMethod === method.id : undefined}
+                        title={method.available ? method.label : `${method.label} not added`}
+                        disabled={!method.available}
+                        data-icon-button="standard"
+                      >
+                        <ContactMethodIcon id={method.id} />
+                      </button>
+                    ))}
+                  </div>
+                  {expandedContact && (
+                    <div className="people-contact-disclosure" data-contact-disclosure={expandedContact.id}>
+                      {expandedContact.details?.length ? expandedContact.details.map((detail) => (
+                        <div className="people-contact-disclosure-row" key={`${detail.label}-${detail.value}`}>
+                          <span>{detail.label}</span>
+                          <strong>{detail.value}</strong>
+                          {detail.href && (
+                            <a href={detail.href} target={detail.href.startsWith("http") ? "_blank" : undefined} rel={detail.href.startsWith("http") ? "noreferrer" : undefined}>
+                              {detail.actionLabel}
+                            </a>
+                          )}
+                        </div>
+                      )) : (
+                        <>
+                          <span>{expandedContact.label}</span>
+                          <strong>{expandedContact.value}</strong>
+                          {expandedContact.href && (
+                            <a href={expandedContact.href} target={expandedContact.href.startsWith("http") ? "_blank" : undefined} rel={expandedContact.href.startsWith("http") ? "noreferrer" : undefined}>
+                              {expandedContact.actionLabel}
+                            </a>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </section>)}
               </div>
               <div className="people-profile-actions">
                 <div className="people-profile-status-control">
@@ -4518,7 +4565,7 @@ export default function PeopleWorkspace({
               </>
             )}
 
-            <div
+            <div key={selectedPerson.id+":"+activeView}
               id={!addingPerson ? `people-${selectedPerson.id}-panel-${activeView}` : undefined}
               role={!addingPerson ? "tabpanel" : undefined}
               aria-labelledby={!addingPerson ? `people-${selectedPerson.id}-tab-${activeView}` : undefined}
@@ -4711,7 +4758,7 @@ export default function PeopleWorkspace({
                   <section className="people-timeline-stream" aria-label={`${selectedPerson.title} ${selectedPerson.className === "org" ? "organization" : "relationship"} history`}>
                     <header>
                       <div>
-                        <h3>Interactions</h3>
+                        <h3><UnigentamosIcon role="interaction-history" size={18}/>Interactions</h3>
                       </div>
                       <strong className="people-section-count" aria-label={`${timelineItems.length} interactions`}>{timelineItems.length}</strong>
                     </header>
@@ -4719,7 +4766,7 @@ export default function PeopleWorkspace({
                       {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
                         <article className="people-timeline-memory" data-memory-id={item.memory.id} data-memory-date={item.memory.occurredOn || ""} key={`memory-${item.id}`}>
                           <div className="people-timeline-entry-meta">
-                            <span className="people-timeline-date">{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
+                            <span className="people-timeline-date"><UnigentamosIcon role="calendar" size={14}/>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
                             <span className="people-timeline-kind">Memory</span>
                           </div>
                           <strong className="people-timeline-entry-title">{item.memory.text}</strong>
@@ -4727,7 +4774,7 @@ export default function PeopleWorkspace({
                       ) : (
                         <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
                           <div className="people-timeline-entry-meta">
-                            <span className="people-timeline-date">{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}</span>{formatInteractionTime(item.interaction.startTime, item.interaction.endTime) && <span className="people-timeline-time">{formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}</span>}
+                            <span className="people-timeline-date">{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}</span>{formatInteractionTime(item.interaction.startTime, item.interaction.endTime) && <span className="people-timeline-time"><UnigentamosIcon role="clock" size={14}/>{formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}</span>}
                             {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind === "catch-up" ? "Catch-up" : labelize(item.interaction.kind)}</span>}
                             {item.interaction.approach && <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>}
                           </div>
@@ -4737,7 +4784,7 @@ export default function PeopleWorkspace({
                             <div className="people-interaction-participants" aria-label="Tagged people">
                               {item.participantIds.map((participantId) => {
                                 const participant = activePeople.find((record) => record.id === participantId);
-                                return participant ? <span key={participantId}>{participant.title}</span> : null;
+                                return participant ? <button type="button" key={participantId} onClick={()=>selectPerson(participant)}><PeopleProfileAvatar compact organization={participant.className==="org"} label={participant.title} initials={getInitials(participant)} photoUrl={participant.profile?.photoUrl} photoUpdatedAt={participant.profile?.photoUpdatedAt}/><span>{participant.title}</span></button> : null;
                               })}
                             </div>
                           )}
@@ -4781,62 +4828,17 @@ export default function PeopleWorkspace({
                 </div>
               </section>
             ) : detailMode === "workspace" ? (
-              <PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} projectRecords={projectsState.projects} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving}/>
+              <div className="people-connected-work"><PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} projectRecords={projectsState.projects} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving}/>{selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id}/>}</div>
             ) : (
               <section className="people-overview-grid">
-                {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id}/>}
-                <section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
-                  <div className="people-contact-methods-compact">
-                    {selectedContactMethods.filter(method=>method.available).map((method) => (
-                      <button
-                        type="button"
-                        key={method.id}
-                        data-contact-method={method.id}
-                        data-available={method.available || undefined}
-                        className={expandedContactMethod === method.id ? "is-active" : ""}
-                        onClick={() => setExpandedContactMethod((current) => current === method.id ? null : method.id)}
-                        aria-label={method.available ? `${expandedContactMethod === method.id ? "Hide" : "Show"} ${method.label}` : `${method.label} not added`}
-                        aria-expanded={method.available ? expandedContactMethod === method.id : undefined}
-                        title={method.available ? method.label : `${method.label} not added`}
-                        disabled={!method.available}
-                        data-icon-button="standard"
-                      >
-                        <ContactMethodIcon id={method.id} />
-                      </button>
-                    ))}
-                  </div>
-                  {expandedContact && (
-                    <div className="people-contact-disclosure" data-contact-disclosure={expandedContact.id}>
-                      {expandedContact.details?.length ? expandedContact.details.map((detail) => (
-                        <div className="people-contact-disclosure-row" key={`${detail.label}-${detail.value}`}>
-                          <span>{detail.label}</span>
-                          <strong>{detail.value}</strong>
-                          {detail.href && (
-                            <a href={detail.href} target={detail.href.startsWith("http") ? "_blank" : undefined} rel={detail.href.startsWith("http") ? "noreferrer" : undefined}>
-                              {detail.actionLabel}
-                            </a>
-                          )}
-                        </div>
-                      )) : (
-                        <>
-                          <span>{expandedContact.label}</span>
-                          <strong>{expandedContact.value}</strong>
-                          {expandedContact.href && (
-                            <a href={expandedContact.href} target={expandedContact.href.startsWith("http") ? "_blank" : undefined} rel={expandedContact.href.startsWith("http") ? "noreferrer" : undefined}>
-                              {expandedContact.actionLabel}
-                            </a>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </section>
+
                 <article className="people-overview-about" data-people-overview-card="about">
-                  <h3>{selectedPerson.className === "org" ? "Description" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
+                  <h3><PeopleIcon name="person"/>{selectedPerson.className === "org" ? "Description" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
                   <p>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No description recorded yet." : "No relationship context recorded yet.")}</p>
+                  {selectedProfile.lifeDream&&<section className="people-overview-dream"><h4><PeopleIcon name="life-dream"/>Life dream</h4><p>{selectedProfile.lifeDream}</p></section>}
                   <div className="people-about-notes">
                     <header>
-                      <strong>Notes <span aria-label={`${selectedNotes.length} notes`}>{selectedNotes.length}</span></strong>
+                      <strong><PeopleIcon name="notes"/>Notes <span aria-label={`${selectedNotes.length} notes`}>{selectedNotes.length}</span></strong>
                       <button
                         type="button"
                         onClick={() => setQuickNoteOpen((current) => !current)}
@@ -4864,9 +4866,9 @@ export default function PeopleWorkspace({
                   </div>
                 </article>
                 <article className="people-overview-facts" data-people-overview-card="quick-info">
-                  <h3 className="people-visually-hidden">Profile details</h3>
+                  <h3 className="people-overview-section-title"><UnigentamosIcon role="person" size={18}/>Profile details</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
-                    const facts = overviewFacts.filter((fact) => fact.group === group && Boolean(fact.value) && !["-", "—"].includes(fact.value));
+                    const facts = overviewFacts.filter((fact) => fact.group === group && Boolean(fact.value) && !["-", "—"].includes(fact.value) && !(selectedPerson.className === "person" && selectedProfile.occupations.length && ["Occupation","Employer"].includes(fact.label)) && !(selectedProfile.locations.length && fact.label === "Location"));
                     if (!facts.length) return null;
                     return <section className={`people-fact-cluster is-${group}`} aria-label={labelize(group)} key={group}>
                       {facts.map(({ label, value, icon }) => {
@@ -4890,6 +4892,9 @@ export default function PeopleWorkspace({
                       })}
                     </section>;
                   })}
+
+                  {selectedProfile.locations.length>0&&<section className="people-overview-detail-group" aria-label="Places"><h4><PeopleIcon name="location"/>Places</h4>{selectedProfile.locations.map(entry=><div className="people-overview-detail-row" key={entry.id}><div><strong>{entry.label||"Place"}</strong><span>{entry.address||entry.location}</span></div></div>)}</section>}
+                  {selectedPerson.className === "person" && selectedProfile.occupations.length>0&&<section className="people-overview-detail-group" aria-label="Work"><h4><PeopleIcon name="occupation"/>Work</h4>{selectedProfile.occupations.map(entry=>{const organization=activePeople.find(record=>record.id===entry.organizationId&&record.className==="org");return <div className="people-overview-detail-row" key={entry.id}>{organization&&<button type="button" className="people-overview-employer-avatar" aria-label={"Open "+organization.title} onClick={()=>selectPerson(organization)}><PeopleProfileAvatar compact organization label={organization.title} initials={getInitials(organization)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt}/></button>}<div><strong>{entry.title||"Occupation"}{entry.status==="past"&&<small>Past</small>}</strong>{organization?<button type="button" className="people-inline-object-link" onClick={()=>selectPerson(organization)}>{organization.title}</button>:entry.employer&&<span>{entry.employer}</span>}</div></div>;})}</section>}
                   {selectedPerson.className === "person" && overviewEducation.length > 0 && (
                     <section className="people-education-overview" aria-label="Education">
                       <span className="people-info-icon"><PeopleIcon name="university" /></span>
@@ -4907,8 +4912,8 @@ export default function PeopleWorkspace({
                                     ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{organization.title}</button>
                                     : <span className="people-education-name">{entry.institution || "University not added"}</span>}
                                   <div className="people-education-meta">
-                                    <span><small>Degree</small>{entry.degree || "—"}</span>
-                                    <span><small>Field</small>{entry.fieldOfStudy || "—"}</span>
+                                    {entry.degree&&<span>{entry.degree}</span>}
+                                    {entry.fieldOfStudy&&<span>{entry.fieldOfStudy}</span>}
                                   </div>
                                 </article>
                               );
@@ -4919,6 +4924,7 @@ export default function PeopleWorkspace({
                     </section>
                   )}
                 </article>
+                {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id} compact/>}
               </section>
             )}
             </div>
