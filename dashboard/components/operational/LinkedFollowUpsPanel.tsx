@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import {
   followUpOwnerRoute,
   getLinkedFollowUps,
@@ -94,7 +95,7 @@ export default function LinkedFollowUpsPanel({
         <header className={styles.header}>
           <div className={styles.heading}>
             {presentation !== "people" && <span>{presentation === "rail" ? "Linked to this person" : "Personal owner"}</span>}
-            <strong>{title}</strong>
+            <strong>{presentation === "people" && <UnigentamosIcon role="follow-up" size={18}/>} {title}</strong>
           </div>
           {presentation === "people" ? (
             <strong className={styles.count} aria-label={`${linked.length} linked follow-ups`}>{linked.length}</strong>
@@ -152,7 +153,7 @@ export default function LinkedFollowUpsPanel({
               ? "No follow-ups for this person."
               : "No Personal Follow-up uses this exact source."}
         </p>
-      ) : null}
+      ) : <p className={styles.empty}>{error ? "Follow-ups could not load." : "No follow-ups linked yet."}</p>}
 
       {presentation !== "people" && <div className={styles.summary}>
         <span>

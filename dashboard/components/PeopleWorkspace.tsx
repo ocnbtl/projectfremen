@@ -11,6 +11,7 @@ import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/pe
 
 import PeopleLinksPanel from "./people/PeopleLinksPanel";
 import PeopleProfilePreview from "./people/PeopleProfilePreview";
+import ProfileEntry from "./people/ProfileEntry";
 import type { ProfileRecordEdge } from "../lib/modules/people/profile-connections";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -1665,8 +1666,8 @@ function EducationEntriesEditor({
         <div className="people-repeatable-title"><span><PeopleIcon name="university" /></span><h4>Education</h4></div>
         <PeopleAddButton label="School" onClick={onAdd} />
       </header>
-      {entries.length > 0 ? entries.map((entry, index) => (
-        <article className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
+      <AnimatePresence initial={false}>{entries.length > 0 ? entries.map((entry, index) => (
+        <ProfileEntry className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-education">
             <label>
               <span className="people-visually-hidden">School</span>
@@ -1690,8 +1691,8 @@ function EducationEntriesEditor({
             <label><span className="people-visually-hidden">When</span><SelectField aria-label={`Education ${index + 1} timing`} value={entry.status || ""} onChange={(event) => onChange(entry.id, { status: event.target.value ? event.target.value as PersonalEducationEntry["status"] : undefined })}><option value="">When</option><option value="current">Current</option><option value="past">Past</option></SelectField></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove university ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
-        </article>
-      )) : <p className="people-repeatable-empty">No university added.</p>}
+        </ProfileEntry>
+      )) : <p className="people-repeatable-empty">No university added.</p>}</AnimatePresence>
     </section>
   );
 }
@@ -1717,8 +1718,8 @@ function OccupationEntriesEditor({
         <div className="people-repeatable-title"><span><PeopleIcon name="occupation" /></span><h4>Occupations</h4></div>
         <PeopleAddButton label="Occupation" onClick={onAdd} />
       </header>
-      {entries.length > 0 ? entries.map((entry, index) => (
-        <article className="people-repeatable-entry" data-occupation-entry={entry.id} key={entry.id}>
+      <AnimatePresence initial={false}>{entries.length > 0 ? entries.map((entry, index) => (
+        <ProfileEntry className="people-repeatable-entry" data-occupation-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-job">
             <label><span className="people-visually-hidden">Occupation</span><input aria-label={`Occupation ${index + 1} title`} value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Occupation" /></label>
             <label>
@@ -1741,8 +1742,8 @@ function OccupationEntriesEditor({
             <label><span className="people-visually-hidden">When</span><SelectField aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></SelectField></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove job ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
-        </article>
-      )) : <p className="people-repeatable-empty">No jobs added.</p>}
+        </ProfileEntry>
+      )) : <p className="people-repeatable-empty">No jobs added.</p>}</AnimatePresence>
     </section>
   );
 }
@@ -1774,8 +1775,8 @@ function LocationEntriesEditor({
         <PeopleAddButton label="Place" onClick={onAdd} />
       </header>
       {!organization && onComesFromChange && <label className="people-place-origin"><span>Origin</span><span className="people-place-origin-input" data-field-shell><UnigentamosIcon role="hometown" size={17} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="City or region" /></span></label>}
-      {entries.length > 0 ? entries.map((entry, index) => (
-        <motion.article layout={reducedMotion ? false : "position"} transition={{ duration: .24 }} className="people-repeatable-entry people-place-card" data-location-entry={entry.id} key={entry.id}>
+      <AnimatePresence initial={false}>{entries.length > 0 ? entries.map((entry, index) => (
+        <ProfileEntry className="people-repeatable-entry people-place-card" data-location-entry={entry.id} key={entry.id}>
           <div className="people-place-card-heading">
             <PlaceLabelPicker value={entry.label || ""} index={index} onChange={label => onChange(entry.id, { label })} />
             <RemoveIconButton className="people-place-card-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
@@ -1785,8 +1786,8 @@ function LocationEntriesEditor({
             <label><span>City / region</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value, placeId: "" })} placeholder="City, state or region" /></label>
             <label><span>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value, placeId: "" })} placeholder="Street address" /></label>
           </div></motion.div>}</AnimatePresence>
-        </motion.article>
-      )) : <p className="people-repeatable-empty">No place added.</p>}
+        </ProfileEntry>
+      )) : <p className="people-repeatable-empty">No place added.</p>}</AnimatePresence>
     </section>
   );
 }
@@ -1858,17 +1859,17 @@ function ContactCategory({label,value,onChange}:{label:string;value:PersonalCont
   return <SelectField aria-label={label} title={CONTACT_CATEGORY_OPTIONS.find(option=>option.value===value)?.label} className="people-category-icon" triggerContent={<UnigentamosIcon role={icons[value] || "person"} size={18}/>} value={value} onChange={event=>onChange(event.target.value as PersonalContactEntryCategory)}>{CONTACT_CATEGORY_OPTIONS.map(option=><option value={option.value} key={option.value}><UnigentamosIcon role={icons[option.value] || "person"} size={16}/>{option.label}</option>)}</SelectField>;
 }
 function EmailEntriesEditor({entries,onChange,onAdd,onRemove}:{entries:PersonalEmailEntry[];onChange:(id:string,patch:Partial<PersonalEmailEntry>)=>void;onAdd:()=>void;onRemove:(id:string)=>void}) {
-  return <section className="people-contact-channel-section" data-people-email-editor><header className="people-repeatable-heading"><div><h4>Email addresses</h4></div><PeopleAddButton label="Email" onClick={onAdd}/></header>{entries.map((entry,index)=><article className="people-contact-channel-entry" data-email-entry={entry.id} key={entry.id}><div className="people-contact-channel-fields">
+  return <section className="people-contact-channel-section" data-people-email-editor><header className="people-repeatable-heading"><div><h4>Email addresses</h4></div><PeopleAddButton label="Email" onClick={onAdd}/></header><AnimatePresence initial={false}>{entries.map((entry,index)=><ProfileEntry className="people-contact-channel-entry" data-email-entry={entry.id} key={entry.id}><div className="people-contact-channel-fields">
     <ContactCategory label={`Email ${index+1} category`} value={entry.category} onChange={category=>onChange(entry.id,{category})}/>
     <label className="people-contact-value-field"><span className="people-visually-hidden">Email</span><input type="email" value={entry.address} onChange={event=>onChange(entry.id,{address:event.target.value})} placeholder="name@example.com"/></label><RemoveIconButton className="people-contact-remove" label={`Remove email ${index+1}`} onClick={()=>onRemove(entry.id)}/>
-  </div>{entry.category === "custom" && <label className="people-custom-category">Custom category<input value={entry.customLabel || ""} onChange={event=>onChange(entry.id,{customLabel:event.target.value})} required={!!entry.address.trim()}/></label>}</article>)}</section>;
+  </div>{entry.category === "custom" && <label className="people-custom-category">Custom category<input value={entry.customLabel || ""} onChange={event=>onChange(entry.id,{customLabel:event.target.value})} required={!!entry.address.trim()}/></label>}</ProfileEntry>)}</AnimatePresence></section>;
 }
 function PhoneEntriesEditor({entries,onChange,onAdd,onRemove}:{entries:PersonalPhoneEntry[];onChange:(id:string,patch:Partial<PersonalPhoneEntry>)=>void;onAdd:()=>void;onRemove:(id:string)=>void}) {
   const [editing,setEditing]=useState<string|null>(null);
   const [localInput, setLocalInput] = useState("");
-  return <section className="people-contact-channel-section" data-people-phone-editor><header className="people-repeatable-heading"><div><h4>Phone numbers</h4></div><PeopleAddButton label="Phone" onClick={onAdd}/></header>{entries.map((entry,index)=>{
+  return <section className="people-contact-channel-section" data-people-phone-editor><header className="people-repeatable-heading"><div><h4>Phone numbers</h4></div><PeopleAddButton label="Phone" onClick={onAdd}/></header><AnimatePresence initial={false}>{entries.map((entry,index)=>{
     const phoneError=entry.number.trim() && editing!==entry.id?validateInternationalPhone(entry.number,entry.countryCode):null;
-    return <article className="people-contact-channel-entry" data-phone-entry={entry.id} key={entry.id}><div className="people-contact-channel-fields">
+    return <ProfileEntry className="people-contact-channel-entry" data-phone-entry={entry.id} key={entry.id}><div className="people-contact-channel-fields">
       <ContactCategory label={`Phone ${index+1} category`} value={entry.category} onChange={category=>onChange(entry.id,{category})}/>
       <div className="people-phone-value-fields"><SelectField searchable aria-label={`Phone ${index+1} country code`} className="people-country-code-select" menuClassName="people-country-menu" triggerContent={entry.countryCode} value={entry.countryCode} onChange={event=>onChange(entry.id,{countryCode:event.target.value,number:rebasePhoneCountryCode(entry.number,entry.countryCode,event.target.value)})}>
         {!PHONE_COUNTRY_CHOICES.some(country=>country.code===entry.countryCode) && <option value={entry.countryCode}>{entry.countryCode}</option>}
@@ -1877,8 +1878,8 @@ function PhoneEntriesEditor({entries,onChange,onAdd,onRemove}:{entries:PersonalP
       <RemoveIconButton className="people-contact-remove" label={`Remove phone ${index+1}`} onClick={()=>onRemove(entry.id)}/></div>
       {entry.category==="custom" && <label className="people-custom-category">Custom category<input value={entry.customLabel || ""} onChange={event=>onChange(entry.id,{customLabel:event.target.value})} required={!!entry.number.trim()}/></label>}
       {phoneError && <p className="people-phone-error" id={`people-phone-error-${entry.id}`} role="status">{phoneError}</p>}
-    </article>;
-  })}</section>;
+    </ProfileEntry>;
+  })}</AnimatePresence></section>;
 }
 
 function PeopleNotesEditor({
@@ -4793,7 +4794,7 @@ export default function PeopleWorkspace({
                   </section>
                   <aside className="people-timeline-side" aria-label={`Follow-ups and ${selectedPerson.className === "org" ? "organization" : "relationship"} rhythm`}>
                     <section className="people-relationship-rhythm">
-                      <h3>{selectedPerson.className === "org" ? "Organization rhythm" : "Relationship rhythm"}</h3>
+                      <h3><UnigentamosIcon role="interaction-history" size={18}/>{selectedPerson.className === "org" ? "Organization rhythm" : "Relationship rhythm"}</h3>
                       {[
                         ["Last contact", formatLastContact(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id))],
                         ["Next follow-up", getNextContactLabel(selectedPerson)],

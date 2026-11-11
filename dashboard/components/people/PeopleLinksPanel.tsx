@@ -31,7 +31,7 @@ export default function PeopleLinksPanel({person,people,targets,links,edges,proj
   const savedReferences=[...new Set(profileRecordReferences(person).filter(item=>!resolveProfileTarget(item.value,currentTargets,item.module)).map(item=>item.value))];
   const category=(ref:NativeObjectRef)=>ref.module === "people" ? ref.objectType === "organization" || ref.objectType === "org" ? "organizations" : "people" : ["projects","resources","notes"].includes(ref.module) ? ref.module : "other";
   return <section className={styles.panel} aria-label={`${person.title} links`}>
-    <header><h3>Links <span>{connections.length}</span></h3><button type="button" onClick={onAdd}><UnigentamosIcon role="object-add" size={18}/>Add object</button></header>
+    <header><h3><UnigentamosIcon role="link" size={18}/>Links <span>{connections.length}</span></h3><button type="button" onClick={onAdd}><UnigentamosIcon role="object-add" size={18}/>Add object</button></header>
     <SearchField aria-label="Search linked objects" placeholder="Search links" value={query} onChange={event=>setQuery(event.target.value)}/>
     {error && <p role="alert">{error}</p>}{related.error && <p role="alert">Calendar and place links could not load. Your saved links are preserved.</p>}
     {!related.loaded && !related.error && <p role="status">Loading connected schedules and places…</p>}

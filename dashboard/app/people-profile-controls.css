@@ -1,7 +1,7 @@
 /* Group pills fill and empty smoothly while the native checkbox stays accessible. */
-.people-redesign-shell .people-group-picker .people-group-choice{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;min-height:36px;border:1px solid var(--border-soft);border-radius:9px;background:#fff;cursor:pointer;transition:border-color .24s,color .24s}
+.people-redesign-shell .people-group-picker .people-group-choice{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;min-height:36px;border:1px solid var(--border-soft);border-radius:9px;background:#fff;cursor:pointer;transition:border-color .3s,color .3s,box-shadow .3s,transform .18s}
 .people-redesign-shell .people-group-picker .people-group-choice>input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
-.people-redesign-shell .people-group-picker .people-group-choice>.people-group-fill{display:block;position:absolute;inset:0;background:var(--module-primary-100,#ffe3c4);transform:scaleY(0);transform-origin:bottom;transition:transform .28s cubic-bezier(.2,.8,.2,1);z-index:-1}
+.people-redesign-shell .people-group-picker .people-group-choice>.people-group-fill{display:block;position:absolute;inset:0;background:var(--module-primary-100,#ffe3c4);transform:scaleY(0);transform-origin:bottom;transition:transform .44s cubic-bezier(.22,1,.36,1);z-index:-1}
 .people-redesign-shell .people-group-picker .people-group-choice:has(input:checked){border-color:var(--module-border);color:var(--module-icon);background:#fff}
 .people-redesign-shell .people-group-picker .people-group-choice:has(input:checked)>.people-group-fill{transform:scaleY(1)}
 .people-redesign-shell .people-group-picker .people-group-choice:has(input:focus-visible){outline:2px solid var(--module-focus);outline-offset:2px}
