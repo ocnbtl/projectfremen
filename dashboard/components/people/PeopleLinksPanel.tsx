@@ -17,9 +17,9 @@ import { projectLinkPreview } from "../../lib/modules/projects/link-preview";
 import { EventObjectIdentity } from "../planning/EventObjects";
 
 const groups = [ ["people","People","person"], ["organizations","Organizations","organization"], ["projects","Projects","module-projects"], ["resources","Resources","resource"], ["notes","Notes","module-notes"], ["other","Other linked work","object"] ] as const;
-export default function PeopleLinksPanel({person,people,targets,links,edges,projects,projectRecords,error,onOpenPerson,onRemove,busy}: {
+export default function PeopleLinksPanel({person,people,targets,links,edges,projects,projectRecords,error,onOpenPerson,onRemove,busy,onAdd}: {
   person: PersonalRecord; people: PersonalRecord[]; targets: NativeObjectRef[]; links: ObjectLink[]; edges: ProfileRecordEdge[];
-  projects: {projectRef: NativeObjectRef; roles: string[]}[]; projectRecords: Project[]; error?: string; onOpenPerson:(record:PersonalRecord)=>void; onRemove:(link:ObjectLink)=>void; busy:boolean;
+  projects: {projectRef: NativeObjectRef; roles: string[]}[]; projectRecords: Project[]; error?: string; onOpenPerson:(record:PersonalRecord)=>void; onRemove:(link:ObjectLink)=>void; busy:boolean; onAdd:()=>void;
 }) {
   const [query,setQuery] = useState("");
   const related = useRelatedRecords("people",person.className === "org" ? "organization" : "person",person.id);
@@ -30,7 +30,7 @@ export default function PeopleLinksPanel({person,people,targets,links,edges,proj
   const savedReferences=[...new Set(profileRecordReferences(person).filter(item=>!resolveProfileTarget(item.value,currentTargets,item.module)).map(item=>item.value))];
   const category=(ref:NativeObjectRef)=>ref.module === "people" ? ref.objectType === "organization" || ref.objectType === "org" ? "organizations" : "people" : ["projects","resources","notes"].includes(ref.module) ? ref.module : "other";
   return <section className={styles.panel} aria-label={`${person.title} links`}>
-    <header><h3>Links <span>{connections.length}</span></h3></header>
+    <header><h3>Links <span>{connections.length}</span></h3><button type="button" onClick={onAdd}><UnigentamosIcon role="object-add" size={18}/>Add object</button></header>
     <SearchField aria-label="Search linked objects" placeholder="Search links" value={query} onChange={event=>setQuery(event.target.value)}/>
     {error && <p role="alert">{error}</p>}{related.error && <p role="alert">Calendar and place links could not load. Your saved links are preserved.</p>}
     {!related.loaded && !related.error && <p role="status">Loading connected schedules and places…</p>}

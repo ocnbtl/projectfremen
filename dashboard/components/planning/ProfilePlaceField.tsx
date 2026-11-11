@@ -27,13 +27,13 @@ export default function ProfilePlaceField({ placeId, places, index, onSelect, on
     finally { setBusy(false); }
   }
   return <div className={styles.picker} data-profile-place-picker data-linked={Boolean(placeId)}>
-    <SelectField searchable autoFocusSearch={false} aria-label={`Saved place ${index + 1}`} value={placeId || ""} triggerContent={<span className={styles.identity}>{picture && failedPicture !== picture ? <img src={picture} alt="" data-area={isAreaPlace(selected!)} onError={() => setFailedPicture(picture)} /> : <UnigentamosIcon role="location" size={17} />}<span>{selected?.name || (placeId ? "Linked place" : "Choose a saved place")}</span></span>} onChange={event => { const place = places.find(row => row.id === event.target.value); if (place) onSelect(place); }}>
+    <SelectField searchable autoFocusSearch={false} aria-label={`Saved place ${index + 1}`} value={placeId || ""} triggerContent={<span className={styles.identity}>{picture && failedPicture !== picture ? <img src={picture} alt="" data-area={isAreaPlace(selected!)} onError={() => setFailedPicture(picture)} /> : <UnigentamosIcon role="location" size={17} />}<span>{selected?.name || (placeId ? "Linked place" : "Saved places")}</span></span>} onChange={event => { const place = places.find(row => row.id === event.target.value); if (place) onSelect(place); }}>
       <option value="">Choose a saved place</option>
       {places.map(place => <option key={place.id} value={place.id}>{place.name}{place.address && place.address !== place.name ? ` · ${place.address}` : ""}</option>)}
     </SelectField>
     {placeId && <><a className={styles.open} href={`/admin/map?selected=${encodeURIComponent(placeId)}`} aria-label={`Open ${selected?.name || "place"} in Map`} data-icon-button="compact"><UnigentamosIcon role="chevron-right" size={16} /></a><button type="button" className={styles.edit} aria-label="Change address" title="Change address" onClick={onEdit} data-icon-button="compact"><UnigentamosIcon role="edit" size={16} /></button></>}
     {selected?.address && <small>{selected.address}</small>}
-    {!placeId && <WorkspaceButton icon="search" className={styles.find} onClick={() => { setDraft({ name: initialQuery }); setError(""); setOpen(true); }}>Find a place worldwide</WorkspaceButton>}
+    {!placeId && <WorkspaceButton icon="search" className={styles.find} aria-label="Find a place worldwide" onClick={() => { setDraft({ name: initialQuery }); setError(""); setOpen(true); }}>Find worldwide</WorkspaceButton>}
     <WorkspaceSheet open={open} onClose={() => { if (!busy) setOpen(false); }} title="Find a place" titleIcon="location" presentation="center" className={styles.sheet}>
       <fieldset disabled={busy} className={styles.form}>
         <label>Place name<input aria-label="Place name" placeholder="Exumas, Bahamas, a city or an address" value={draft.name || ""} maxLength={240} onChange={e => setDraft(current => ({ ...current, name: e.target.value }))} /></label>

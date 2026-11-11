@@ -1,8 +1,11 @@
-.people-redesign-shell .people-group-picker .people-group-choice {transition:background 120ms ease,border-color 120ms ease;}
-.people-redesign-shell .people-group-picker .people-group-choice > .people-group-fill,
-.people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest {display:none;}
-.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) {background:#e7f1ec;border-color:#78a58b;}
-.people-redesign-shell .people-group-picker .people-group-choice > .people-group-label {position:relative;}
+/* Group pills fill and empty smoothly while the native checkbox stays accessible. */
+.people-redesign-shell .people-group-picker .people-group-choice{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:7px 11px;min-height:36px;border:1px solid var(--border-soft);border-radius:9px;background:#fff;cursor:pointer;transition:border-color .24s,color .24s}
+.people-redesign-shell .people-group-picker .people-group-choice>input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.people-redesign-shell .people-group-picker .people-group-choice>.people-group-fill{display:block;position:absolute;inset:0;background:var(--module-primary-100,#ffe3c4);transform:scaleY(0);transform-origin:bottom;transition:transform .28s cubic-bezier(.2,.8,.2,1);z-index:-1}
+.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked){border-color:var(--module-border);color:var(--module-icon);background:#fff}
+.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked)>.people-group-fill{transform:scaleY(1)}
+.people-redesign-shell .people-group-picker .people-group-choice:has(input:focus-visible){outline:2px solid var(--module-focus);outline-offset:2px}
+.people-redesign-shell .people-group-picker .people-group-choice>.people-group-label{position:relative;font:500 12px/1.4 var(--font-body)}
 
 /* Match the existing identity/social labels and inputs, including their weights. */
 .people-redesign-shell .people-contact-channel-section > .people-repeatable-heading h4 {

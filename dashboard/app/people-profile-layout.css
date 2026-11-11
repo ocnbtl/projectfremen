@@ -184,25 +184,28 @@
  .workspace-people-pages .people-profile-view-actions .people-add-action:hover,.workspace-people-pages .people-about-notes header button:hover{background:var(--module-primary-100)!important}
 }
 
-/* Profile header: identity first, full-width role, then contact shortcuts. */
-.workspace-people-pages .people-profile-panel .people-profile-header{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px 16px;align-items:start;padding:16px!important}
-.workspace-people-pages .people-profile-header>.people-avatar{grid-column:1;grid-row:1;width:96px!important;height:96px!important;min-width:96px!important;align-self:start}
-.workspace-people-pages .people-profile-header>.people-profile-identity{grid-column:2;grid-row:1;display:flex;flex-direction:column;justify-content:center;min-height:96px;gap:8px;min-width:0}
-.workspace-people-pages .people-profile-header .people-profile-title-line h2{margin:0;overflow-wrap:anywhere}
-.workspace-people-pages .people-profile-header>.people-profile-subtitle{grid-column:2/-1;grid-row:2;margin:0;font:400 14px/1.5 var(--font-body);color:var(--text-subtle);min-width:0;overflow-wrap:anywhere}
+/* One shared identity layout for people and organizations. */
+.workspace-people-pages .people-profile-panel .people-profile-header{display:grid;grid-template-columns:132px minmax(0,1fr) minmax(200px,320px);gap:8px 20px;align-items:center;padding:16px!important}
+.workspace-people-pages .people-profile-header>.people-avatar{grid-column:1;grid-row:1/4;width:132px!important;height:132px!important;min-width:132px!important;align-self:center}
+.workspace-people-pages .people-profile-header>.people-profile-identity{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0}
+.workspace-people-pages .people-profile-header .people-profile-title-line h2{margin:0;font-size:24px;overflow-wrap:anywhere}
+.workspace-people-pages .people-profile-header>.people-profile-subtitle{grid-column:2;grid-row:3;margin:0;font:400 15px/1.5 var(--font-body);color:var(--text-subtle);min-width:0;overflow-wrap:anywhere}
 .workspace-people-pages .people-profile-subtitle:empty{display:none}
-.workspace-people-pages .people-profile-header>.people-profile-contact-dates{grid-column:2;grid-row:3;align-self:end;font-size:11px;gap:6px 12px}
-.workspace-people-pages .people-profile-header>.people-profile-actions{grid-column:3;grid-row:1;display:grid;grid-template-columns:32px 32px;gap:7px;justify-content:end;align-items:start;align-self:start}
+.workspace-people-pages .people-profile-header>.people-profile-contact-dates{grid-column:3;grid-row:2;justify-content:flex-end;font-size:12px;gap:6px 12px}
+.workspace-people-pages .people-profile-header>.people-profile-actions{grid-column:3;grid-row:1;display:grid;grid-template-columns:36px 36px;gap:6px;justify-content:end;align-items:start;align-self:start}
 .workspace-people-pages .people-profile-actions>.people-profile-star{grid-column:1;grid-row:1}
 .workspace-people-pages .people-profile-actions>.people-profile-more{grid-column:2;grid-row:1}
 .workspace-people-pages .people-profile-actions>.people-profile-status-control{grid-column:1/-1;grid-row:2;justify-self:end}
-.workspace-people-pages .people-profile-actions :is(.people-profile-star,.people-profile-more){width:32px;height:32px;min-height:32px;padding:0;display:grid;place-items:center;border-radius:9px;box-shadow:none}
-.workspace-people-pages .people-profile-status-trigger{padding:4px 0!important;min-height:26px!important;box-shadow:none;background:transparent!important}
-.workspace-people-pages .people-profile-header>.people-overview-contact-strip{grid-column:3;grid-row:3;justify-self:end;margin:0;padding:0;min-height:0;border:0;background:none;max-width:100%;position:relative}
-.workspace-people-pages .people-profile-header .people-contact-methods-compact{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:5px}
-.workspace-people-pages .people-profile-header .people-contact-methods-compact button{width:30px;height:30px;min-height:30px;padding:0;display:grid;place-items:center;border-radius:8px;box-shadow:none;background:var(--module-quiet)!important;color:var(--module-icon)!important}
+.workspace-people-pages .people-profile-actions :is(.people-profile-star,.people-profile-more){width:36px;height:36px;min-height:36px;padding:0;display:grid;place-items:center;border-radius:9px;box-shadow:none}
+.workspace-people-pages .people-profile-status-trigger{padding:5px 7px!important;min-height:32px!important;box-shadow:none;background:var(--module-quiet)!important;border-radius:8px!important}
+.workspace-people-pages .people-profile-header .people-activity-marker{gap:5px}.workspace-people-pages .people-profile-header .people-activity-marker span{font:500 12px/1.4 var(--font-body)}
+.workspace-people-pages .people-profile-header>.people-overview-contact-strip{display:block;grid-column:3;grid-row:3;justify-self:end;margin:0;padding:0;min-height:0;border:0;background:none;width:100%;max-width:100%;position:relative}
+.workspace-people-pages .people-profile-header .people-contact-methods-compact{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:6px}
+.workspace-people-pages .people-profile-header .people-contact-methods-compact button{width:36px!important;min-width:36px!important;flex:0 0 36px;height:36px!important;min-height:36px!important;padding:0;display:grid;place-items:center;border:1px solid var(--module-border)!important;border-radius:9px!important;box-shadow:none;background:var(--module-quiet)!important;color:var(--module-icon)!important;transition:background .2s,border-color .2s}
+.workspace-people-pages .people-profile-header .people-contact-methods-compact button:is(:hover,.is-active){background:var(--module-primary-100)!important}
 .workspace-people-pages .people-profile-header .people-contact-disclosure{position:absolute;right:0;top:calc(100% + 8px);z-index:25;width:300px;max-width:calc(100vw - 52px);margin:0;padding:12px;background:#fff;border:1px solid var(--border-soft);border-radius:12px;box-shadow:0 8px 24px #2439401a;overflow-wrap:anywhere}
-.workspace-people-pages .people-profile-view-bar{margin:0;gap:10px}.people-profile-view-actions:empty{display:none}
+.workspace-people-pages .people-profile-view-bar{margin:0;gap:12px}.people-profile-view-actions:empty{display:none}
+.workspace-people-pages .people-profile-view-actions{display:flex;gap:8px}.workspace-people-pages .people-profile-view-actions button{font-size:13px;min-height:38px;padding:8px 12px}
 
 /* Two balanced reading columns, without a separate oversized task column. */
 .workspace-people-pages .people-overview-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px;align-items:start}
@@ -238,19 +241,92 @@
 .people-properties-savebar svg{width:16px;height:16px;flex:none}
 @media(max-width:900px){.workspace-people-pages .people-overview-grid{grid-template-columns:1fr}.workspace-people-pages .people-overview-story{gap:12px}}
 @media(max-width:600px){
- .workspace-people-pages .people-profile-panel .people-profile-header{grid-template-columns:76px minmax(0,1fr) 62px;gap:10px 8px;padding:12px!important}
- .workspace-people-pages .people-profile-header>.people-avatar{width:76px!important;height:76px!important;min-width:76px!important}
- .workspace-people-pages .people-profile-header>.people-profile-identity{min-height:76px;gap:6px;justify-content:flex-start}
- .workspace-people-pages .people-profile-title-line h2{font-size:17px;line-height:1.3}
+ .workspace-people-pages .people-profile-panel .people-profile-header{grid-template-columns:80px minmax(0,1fr) 80px;gap:10px 8px;padding:12px!important}
+ .workspace-people-pages .people-profile-header>.people-avatar{grid-row:1;align-self:start;width:80px!important;height:80px!important;min-width:80px!important}
+ .workspace-people-pages .people-profile-header>.people-profile-identity{grid-row:1;min-height:80px;gap:6px;justify-content:flex-start}
+ .workspace-people-pages .people-profile-header .people-profile-title-line h2{font-size:18px;line-height:1.3}
  .workspace-people-pages .people-profile-header .people-tag-row{gap:4px}.workspace-people-pages .people-profile-header .people-tag-row span{padding:3px 6px;min-height:22px;font-size:10px}
- .workspace-people-pages .people-profile-header>.people-profile-actions{grid-template-columns:28px 28px;gap:6px}
- .workspace-people-pages .people-profile-actions :is(.people-profile-star,.people-profile-more){width:28px;height:28px;min-height:28px}
- .workspace-people-pages .people-profile-header .people-activity-marker{gap:3px}.workspace-people-pages .people-profile-header .people-activity-marker span{font-size:10px}
+ .workspace-people-pages .people-profile-header>.people-profile-actions{grid-template-columns:36px 36px;gap:6px}
+ .workspace-people-pages .people-profile-actions :is(.people-profile-star,.people-profile-more){width:36px;height:36px;min-height:36px}
+ .workspace-people-pages .people-profile-header .people-activity-marker{gap:3px}.workspace-people-pages .people-profile-header .people-activity-marker span{font-size:12px}
  .workspace-people-pages .people-profile-header>.people-profile-subtitle{grid-column:1/-1;grid-row:2;font-size:13px}
- .workspace-people-pages .people-profile-header>.people-profile-contact-dates{grid-column:1/-1;grid-row:3}
+ .workspace-people-pages .people-profile-header>.people-profile-contact-dates{grid-column:1/-1;grid-row:3;justify-content:flex-start}
  .workspace-people-pages .people-profile-header>.people-overview-contact-strip{grid-column:1/-1;grid-row:4}
  .workspace-people-pages .people-overview-story>:is(.people-overview-about,[data-profile-tasks]){padding:12px!important}
  .workspace-people-pages .people-properties-columns,.workspace-people-pages .people-properties-column{gap:10px}
  .people-properties-savebar{bottom:calc(10px + env(safe-area-inset-bottom))}
 }
 @media(prefers-reduced-motion:reduce){.people-properties-savebar button{transition:none}}
+/* Compact repeatable fields respond to available section width, not just the viewport. */
+.workspace-people-pages .people-properties-column>section{container-type:inline-size}
+@media(min-width:761px) and (max-width:1899px){
+ .workspace-people-pages .people-properties-columns{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .workspace-people-pages .people-properties-column[data-profile-column=background]{grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(min-width:1900px){.workspace-people-pages .people-properties-columns{grid-template-columns:repeat(3,minmax(0,1fr))}.workspace-people-pages .people-properties-column[data-profile-column=background]{grid-column:auto;grid-template-columns:1fr}}
+.people-redesign-shell .people-properties-column .people-contact-channel-fields{display:grid;grid-template-columns:36px minmax(0,1fr) 32px!important;gap:6px;align-items:center}
+.people-redesign-shell .people-properties-column .people-phone-value-fields{grid-template-columns:54px minmax(0,1fr)!important;gap:6px;min-width:0}
+.people-redesign-shell .people-properties-column .people-contact-channel-fields>*{grid-column:auto!important;grid-row:auto!important;margin:0;min-width:0}
+.people-redesign-shell .people-properties-column .people-contact-remove{width:32px!important;min-width:32px;height:36px;min-height:36px;display:grid;place-items:center;padding:0!important}
+.people-redesign-shell .people-properties-column .people-contact-channel-section>.people-repeatable-heading h4{font:500 12px/1.4 var(--font-body)!important}
+.people-redesign-shell .people-properties-column .people-repeatable-fields>:is(label,button){min-width:0;grid-column:auto;grid-row:auto}
+.people-redesign-shell .people-properties-column .people-repeatable-inline-remove{display:grid;place-items:center;width:32px;min-width:32px;height:40px;min-height:40px;padding:0!important}
+@container(min-width:520px){
+ .people-redesign-shell .people-properties-column .people-contact-channel-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+ .people-redesign-shell .people-properties-column .people-repeatable-fields-job{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) 94px 32px!important;align-items:center}
+ .people-redesign-shell .people-properties-column .people-repeatable-fields-job>*{grid-column:auto!important;grid-row:auto!important}
+}
+@container(min-width:600px){
+ .people-redesign-shell .people-properties-column .people-repeatable-fields-education{grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr) minmax(0,1fr) 90px 32px!important;align-items:center}
+ .people-redesign-shell .people-properties-column .people-repeatable-fields-education>*{grid-column:auto!important;grid-row:auto!important}
+}
+.workspace-people-pages .people-connected-work{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+.workspace-people-pages .people-connected-work[data-has-tasks=true]{grid-template-columns:minmax(0,1fr) minmax(320px,440px)}
+.workspace-people-pages .people-connected-work>[data-profile-tasks]{grid-column:auto;padding:16px}
+.workspace-people-pages .people-connected-work>[data-profile-tasks]>div{grid-template-columns:1fr}
+.workspace-people-pages .people-connected-work>[data-profile-tasks] article{grid-template-columns:minmax(0,1fr) auto;align-items:center;background:var(--workspace-canvas);border:0}
+.workspace-people-pages .people-connected-work>[data-profile-tasks] article>div:last-child{grid-column:2}
+.workspace-people-pages [data-profile-tasks]>header h3{font:600 15px/1.4 var(--font-body)}
+.people-organization-team{padding:16px;border:1px solid var(--border-soft);border-radius:14px;background:#fff;min-width:0}
+.people-organization-team h3{display:flex;align-items:center;gap:7px}.people-organization-team h3 span{font-size:12px;color:var(--text-subtle)}
+.people-organization-team>div{display:flex;gap:8px;flex-wrap:wrap}.people-organization-team p{font-size:13px;color:var(--text-subtle)}
+.workspace-people-pages .people-organization-team button{display:flex;align-items:center;gap:8px;max-width:100%;min-width:0;padding:7px 10px;border:1px solid var(--border-soft);background:#fff;border-radius:10px;font:500 13px/1.4 var(--font-body);color:var(--text-strong);box-shadow:none;transition:background .2s}
+.workspace-people-pages .people-organization-team button:hover{background:var(--module-quiet)}.people-organization-team button>span:not(.people-avatar){overflow-wrap:anywhere}.people-organization-team button>svg{width:16px;flex:none}
+.workspace-people-pages .people-organization-team .people-avatar{width:32px!important;height:32px!important;min-width:32px!important}
+@media(max-width:1000px){.workspace-people-pages .people-connected-work[data-has-tasks=true]{grid-template-columns:1fr}.workspace-people-pages .people-connected-work>[data-profile-tasks]>div{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-people-pages .people-connected-work>[data-profile-tasks] article{grid-template-columns:1fr}.workspace-people-pages .people-connected-work>[data-profile-tasks] article>div:last-child{grid-column:1}}
+@media(max-width:600px){.workspace-people-pages .people-connected-work>[data-profile-tasks]>div{grid-template-columns:1fr}.workspace-people-pages .people-connected-work>[data-profile-tasks] article{grid-template-columns:minmax(0,1fr) auto}.workspace-people-pages .people-connected-work>[data-profile-tasks] article>div:last-child{grid-column:2}.workspace-people-pages .people-profile-view-actions{width:100%;justify-content:flex-start}.workspace-people-pages .people-profile-view-actions button{flex:none}}
+/* Unsaved edits are a compact, centered confirmation using existing focus handling. */
+.people-redesign-shell .people-discard-confirmation{place-items:center;padding:16px;z-index:240;background:#132c3c59;animation:people-confirm-overlay .18s ease-out}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__panel{width:min(440px,100%);border:1px solid var(--border-soft);border-radius:18px;background:#fff;box-shadow:0 20px 70px #132c3c30;animation:people-confirm-panel .24s cubic-bezier(.2,.8,.2,1)}
+.people-redesign-shell .people-discard-confirmation :is(.confirmation-sheet__header,.confirmation-sheet__description,.confirmation-sheet__actions){padding:16px 18px;border:0;background:none}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__header{padding-bottom:6px;align-items:center}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__title-group{display:flex;align-items:center;gap:10px}
+.people-redesign-shell .people-discard-confirmation h2{font:600 18px/1.35 var(--font-body);margin:0}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__description{font:400 14px/1.6 var(--font-body);color:var(--text-subtle);padding-top:8px;padding-bottom:8px}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__icon{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;flex:none}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__header>button{display:grid;place-items:center;padding:0;width:32px;height:32px;border:1px solid var(--border-soft);border-radius:8px;background:#fff;box-shadow:none}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__actions{display:flex;justify-content:flex-end;gap:8px}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__actions button{width:auto;min-height:40px;padding:9px 13px;border:1px solid var(--border-soft);border-radius:9px;font:500 13px/1.4 var(--font-body);box-shadow:none}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__actions .is-danger{background:#fff0ed;color:#a13e32;border-color:#eac8c0}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__actions .is-danger:hover{background:#ffe1da}
+@keyframes people-confirm-overlay{from{opacity:0}to{opacity:1}}
+@keyframes people-confirm-panel{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.people-redesign-shell .people-discard-confirmation,.people-redesign-shell .people-discard-confirmation .confirmation-sheet__panel{animation:none}.workspace-people-pages .people-organization-team button{transition:none}}
+.people-redesign-shell .people-properties-column :is(.people-repeatable-fields-job,.people-repeatable-fields-education)>label{display:grid;gap:0!important;align-self:center;margin:0}
+.people-redesign-shell .people-properties-column :is(.people-repeatable-fields-job,.people-repeatable-fields-education) :is(input,.app-select-trigger){height:40px!important;min-height:40px!important;box-sizing:border-box;margin:0}
+.people-redesign-shell .people-properties-column .people-repeatable-inline-remove{align-self:center!important;margin:0!important}
+
+.workspace-people-pages .people-timeline-stream>header{flex-wrap:wrap;gap:12px}
+.workspace-people-pages .people-organization-team button{width:auto!important}
+.workspace-people-pages .people-overview-facts .people-info-icon{color:var(--module-icon)!important}
+
+.people-redesign-shell .people-properties-column :is(.people-repeatable-heading,.people-profile-section-heading){display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.people-redesign-shell .people-properties-column :is(.people-repeatable-heading,.people-profile-section-heading)>button{width:auto!important;flex:none;min-height:36px;padding:7px 10px}
+@media(max-width:600px){.workspace-people-pages .people-profile-header:not(:has(>.people-profile-contact-dates:not(:empty)))>.people-overview-contact-strip{grid-row:3}}
+.workspace-people-pages .people-profile-header .people-contact-methods-compact{justify-content:flex-end!important;width:100%}
+.workspace-people-pages .people-connected-work>section>header>button{width:auto!important;flex:none}
+.people-redesign-shell .people-properties-column :is(.people-repeatable-heading,.people-profile-section-heading){flex-direction:row!important;justify-content:space-between!important;text-align:left!important}
+.people-redesign-shell .people-properties-column .people-repeatable-title{display:flex;flex-direction:row;align-items:center;gap:8px}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__icon{background:var(--module-quiet)!important;color:var(--module-icon)!important}
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__actions button:first-child{color:var(--text-strong);border-color:var(--border-soft)}
+.people-redesign-shell .people-discard-confirmation button:focus-visible{outline:2px solid var(--module-focus);outline-offset:2px}

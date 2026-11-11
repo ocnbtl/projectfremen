@@ -4,3 +4,8 @@
 @media(max-width:760px){.panel{padding:12px;}.groups{grid-template-columns:1fr;}}
 @media(prefers-reduced-motion:reduce){.cards article{transition:none;}}
 .cards { --linked-object-size: 32px; }
+.panel{max-width:none;margin:0;padding:16px;background:#fff;border:1px solid var(--border-soft);border-radius:14px;gap:16px}
+.panel header button{min-height:38px;border-color:var(--module-border);color:var(--module-icon);background:var(--module-quiet);font:500 13px/1.4 var(--font-body);padding:8px 12px;box-shadow:none;transition:background .2s}
+.panel header button:hover{background:var(--module-primary-100)}
+.groups{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:18px}.panel h4{font-size:14px}.cards article{border-color:var(--border-soft)}
+@media(prefers-reduced-motion:reduce){.panel header button{transition:none}}

@@ -648,14 +648,13 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
       { key: "organizationType", label: "Organization type" },
       { key: "industry", label: "Industry" },
       { key: "foundedYear", label: "Founded year", placeholder: "1998" },
-      { key: "teamSize", label: "Team size", placeholder: "1–10, 50, global network..." },
-      { key: "context", label: "Description", type: "textarea", placeholder: "What this organization is and why it is relevant." }
+      { key: "teamSize", label: "Team size", placeholder: "1–10, 50, global network..." }
     ]
   },
   {
     title: "About",
     tone: "green",
-    fields: []
+    fields: [{ key: "context", label: "Description", type: "textarea" }]
   },
   {
     title: "Links",
@@ -2563,7 +2562,6 @@ export default function PeopleWorkspace({
     { id: "linkedin", label: "LinkedIn", value: selectedProfile.linkedin },
     { id: "youtube", label: "YouTube", value: selectedProfile.youtube }
   ] satisfies Array<Omit<ContactMethod, "available">>)
-    .filter((method) => selectedPerson?.className !== "org" || !["email", "phone"].includes(method.id))
     .map((method) => ({
     ...method,
     available: Boolean(method.value),
@@ -2679,7 +2677,7 @@ export default function PeopleWorkspace({
     return person ? { ...row, object: { ...row.object, label: person.title }, photoUrl: person.profile?.photoUrl, photoUpdatedAt: person.profile?.photoUpdatedAt } : row;
   }).sort((a, b) => objectTargetTypeLabel(a.object).localeCompare(objectTargetTypeLabel(b.object)) || a.object.label.localeCompare(b.object.label));
   const timelineItems = selectedInteractionItems.slice(0, 20);
-  const selectedTags = Array.from(new Set([
+  const selectedTags = selectedPerson?.className === "org" ? Object.values(organizationLabels(selectedProfile)).filter(Boolean) : Array.from(new Set([
     ...(fallbackPerson?.subjects || []).slice(0, 3),
     ...(selectedPerson?.projects || []).slice(0, 2)
   ].filter(Boolean)));
@@ -2688,8 +2686,7 @@ export default function PeopleWorkspace({
     { label: "Industry", value: selectedProfile.industry, icon: "industry", group: "work" },
     { label: "Headquarters", value: selectedProfile.headquarters || selectedProfile.livesIn, icon: "location", group: "life" },
     { label: "Founded", value: selectedProfile.foundedYear, icon: "founded", group: "life" },
-    { label: "Team size", value: formatTeamSize(selectedProfile.teamSize || ""), icon: "team", group: "relationships" },
-    { label: "Linked people", value: selectedOrganizationPeople.length ? String(selectedOrganizationPeople.length) : "-", icon: "children", group: "relationships" }
+    { label: "Team size", value: formatTeamSize(selectedProfile.teamSize || ""), icon: "team", group: "relationships" }
   ] : [
     { label: "Birthday", value: selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "-", icon: "birthday", group: "life" },
     { label: "Location", value: selectedProfile.livesIn, icon: "location", group: "life" },
@@ -4374,7 +4371,7 @@ export default function PeopleWorkspace({
       </main>
 
       {isInteractions && <section ref={setInteractionDetailTarget} id="people-interaction-panel" className="people-profile-panel people-interaction-panel" aria-label="Selected interaction" />}
-      {!isInteractions && <section className="people-profile-panel" aria-label="Selected profile">
+      {!isInteractions && <section className="people-profile-panel" data-profile-kind={selectedPerson?.className} aria-label="Selected profile">
         {initialLoadError ? (
           <SystemState
             variant="error"
@@ -4405,7 +4402,7 @@ export default function PeopleWorkspace({
                 </div>
               </div>
                 <p className="people-profile-subtitle">{selectedPerson.className === "org"
-                  ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
+                  ? selectedProfile.headquarters || selectedProfile.livesIn
                   : [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ")}</p>
                 <div className="people-profile-contact-dates">{getLastContactValue(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))&&<span><UnigentamosIcon role="interaction-history" size={14}/>Last contact {formatLastContact(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))}</span>}{selectedProfile.nextContact&&<span><PeopleIcon name="follow-up"/>Next {getNextContactLabel(selectedPerson)}</span>}</div>
                 {selectedContactMethods.some(method=>method.available)&&(<section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
@@ -4549,13 +4546,7 @@ export default function PeopleWorkspace({
                 ariaLabel={`${selectedPerson.title} profile sections`}
                 className="people-profile-tabs"
               />
-              <div className="people-profile-view-actions" aria-label={`${activeView} actions`}>
-                {activeView === "timeline" && <>
-                  <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
-                  <PeopleAddButton label="Follow-up" icon="follow-up-add" onClick={() => router.push(followUpCreationRoute(selectedPerson))} ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`} />
-                </>}
-                {activeView === "links" && <PeopleAddButton label="Object" icon="object-add" ariaLabel="Add object" onClick={() => setObjectLinkOpen(true)} />}
-              </div>
+
               </div>
               {activeView === "properties" && error && <p className="people-profile-save-error" role="alert">{error}</p>}
               </>
@@ -4579,12 +4570,12 @@ export default function PeopleWorkspace({
                     <section className={`people-profile-section people-themed-section module-ref-tone-${section.tone}`} data-profile-section={section.title.toLowerCase().replace(/\s+/g, "-")}>
                       <header className={`people-profile-section-heading${section.title === "Links" || section.title === "Communication" ? " people-autofill-heading" : ""}`}>
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
-                        <h4>{section.title}</h4>
+                        <h4>{selectedPerson.className === "org" && section.title === "Links" ? "Communication" : section.title}</h4>
                         {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="life-dream" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
                         {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onDescription={context => setProfileDraft(current => ({ ...current, context }))} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
                         {section.title === "Communication" && selectedPerson.className === "person" && <PersonAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileDraft} onApply={applyProfilePersonAutofill} organizations={organizationAutofillSeeds} onBusyChange={setPersonAutofillBusy} disabled={profileSaving} />}
                       </header>
-                      {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
+                      {(section.title === "Communication" || (section.title === "Links" && selectedPerson.className === "org")) && <div className="people-contact-channel-grid">
                         <EmailEntriesEditor
                           entries={profileDraft.emails}
                           onChange={updateProfileEmail}
@@ -4643,6 +4634,7 @@ export default function PeopleWorkspace({
                               <TeamSizeInput value={profileDraft.teamSize} onChange={(value) => updateProfileDraft("teamSize", value)} placeholder={field.label} />
                             ) : field.type === "textarea" ? (
                               <textarea
+                                aria-label={field.label}
                                 value={profileDraft[field.key]}
                                 onChange={(event) => updateProfileDraft(field.key, event.target.value)}
                                 placeholder={field.label}
@@ -4754,9 +4746,12 @@ export default function PeopleWorkspace({
                   <section className="people-timeline-stream" aria-label={`${selectedPerson.title} ${selectedPerson.className === "org" ? "organization" : "relationship"} history`}>
                     <header>
                       <div>
-                        <h3><UnigentamosIcon role="interaction-history" size={18}/>Interactions</h3>
+                        <h3><UnigentamosIcon role="interaction-history" size={18}/>Interactions <span className="people-section-count">{timelineItems.length}</span></h3>
                       </div>
-                      <strong className="people-section-count" aria-label={`${timelineItems.length} interactions`}>{timelineItems.length}</strong>
+                      <div className="people-profile-view-actions" aria-label="Timeline actions">
+                  <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
+                  <PeopleAddButton label="Follow-up" icon="follow-up-add" onClick={() => router.push(followUpCreationRoute(selectedPerson))} ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`} />
+                      </div>
                     </header>
                     <div className="people-timeline-list">
                       {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
@@ -4824,14 +4819,14 @@ export default function PeopleWorkspace({
                 </div>
               </section>
             ) : detailMode === "workspace" ? (
-              <div className="people-connected-work"><PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} projectRecords={projectsState.projects} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving}/>{selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id}/>}</div>
+              <div className="people-connected-work" data-has-tasks={selectedPerson.className === "person"}><PeopleLinksPanel key={selectedPerson.id} person={selectedPerson} people={activePeople} targets={initialObjectTargets} links={objectLinks} edges={initialRecordEdges} projects={selectedProjectConnections} projectRecords={projectsState.projects} error={[initialObjectLinksError,projectsError,actionNotice].filter(Boolean).join(" ")} onOpenPerson={selectPerson} onRemove={link=>void removeObjectLink(link)} busy={objectLinkSaving} onAdd={()=>setObjectLinkOpen(true)}/>{selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id}/>}</div>
             ) : (
               <section className="people-overview-grid">
 
                 <div className="people-overview-story"><article className="people-overview-about" data-people-overview-card="about">
-                  <h3><PeopleIcon name="person"/>{selectedPerson.className === "org" ? "Description" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
+                  <h3><PeopleIcon name={selectedPerson.className === "org" ? "organization" : "person"}/>{selectedPerson.className === "org" ? "About this organization" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
                   <p>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No description recorded yet." : "No relationship context recorded yet.")}</p>
-                  {selectedProfile.lifeDream&&<section className="people-overview-dream"><h4><PeopleIcon name="life-dream"/>Life dream</h4><p>{selectedProfile.lifeDream}</p></section>}
+                  {selectedPerson.className === "person" && selectedProfile.lifeDream&&<section className="people-overview-dream"><h4><PeopleIcon name="life-dream"/>Life dream</h4><p>{selectedProfile.lifeDream}</p></section>}
                   <div className="people-about-notes">
                     <header>
                       <strong><PeopleIcon name="notes"/>Notes {selectedNotes.length>0&&<span aria-label={`${selectedNotes.length} notes`}>{selectedNotes.length}</span>}</strong>
@@ -4861,11 +4856,12 @@ export default function PeopleWorkspace({
                     )}
                   </div>
                 </article>
-                {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id} compact/>}</div>
+                {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id} compact/>}
+                {selectedPerson.className === "org" && <section className="people-organization-team" aria-label="Organization people"><h3><PeopleIcon name="person"/>People <span>{selectedOrganizationPeople.length}</span></h3>{selectedOrganizationPeople.length ? <div>{selectedOrganizationPeople.map(person=><button type="button" key={person.id} onClick={()=>selectPerson(person)}><PeopleProfileAvatar compact label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt}/><span>{person.title}</span><PeopleIcon name="chevron"/></button>)}</div> : <p>No people linked yet.</p>}</section>}</div>
                 <article className="people-overview-facts" data-people-overview-card="quick-info">
-                  <h3 className="people-overview-section-title"><UnigentamosIcon role="person" size={18}/>Profile details</h3>
+                  <h3 className="people-overview-section-title"><UnigentamosIcon role={selectedPerson.className === "org" ? "organization" : "person"} size={18}/>{selectedPerson.className === "org" ? "Organization details" : "Profile details"}</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
-                    const facts = overviewFacts.filter((fact) => fact.group === group && Boolean(fact.value) && !["-", "—"].includes(fact.value) && !(selectedPerson.className === "person" && selectedProfile.occupations.length && ["Occupation","Employer"].includes(fact.label)) && !(selectedProfile.locations.length && fact.label === "Location"));
+                    const facts = overviewFacts.filter((fact) => fact.group === group && Boolean(fact.value) && !["-", "—"].includes(fact.value) && !(selectedPerson.className === "person" && selectedProfile.occupations.length && ["Occupation","Employer"].includes(fact.label)) && !(selectedProfile.locations.length && ["Location","Headquarters"].includes(fact.label)));
                     if (!facts.length) return null;
                     return <section className={`people-fact-cluster is-${group}`} aria-label={labelize(group)} key={group}>
                       {facts.map(({ label, value, icon }) => {
