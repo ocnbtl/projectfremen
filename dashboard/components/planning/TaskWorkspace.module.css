@@ -27,3 +27,14 @@
 @media(max-width:700px){.workspace .list[data-directory-view=compact] .rowActions{flex-direction:row}.workspace .list[data-directory-view=compact] .row{grid-template-columns:minmax(0,1fr)}.workspace .list[data-directory-view=compact] .rowActions{grid-column:1;grid-row:3}.workspace .list[data-directory-view=compact] .rowMeta{grid-column:1;grid-row:2}.workspace .list[data-directory-view=compact] .rowBody{grid-column:1;grid-row:1}.calendarBadge{width:24px;height:24px}.workspace .context .kind{white-space:normal}.contextHeading{align-items:flex-start}}
 .context :global([data-profile-preview]){max-width:min(180px,100%)}.contextLinks .linked{max-width:100%;min-width:0}.calendarBadges{flex-wrap:wrap;flex-shrink:0;max-width:calc(100% - 30px)}.contextHeading .kind{min-width:0}.contextHeading .kind svg{flex:none}
 @media(max-width:380px){.workspace .list[data-directory-view=grid] .contextHeading .kind{font-size:0;padding:2px;gap:0}.workspace .list[data-directory-view=grid] .calendarBadge{width:22px;height:22px;font-size:10px}}
+
+/* Schedule and actions stay together; the context group leaves room for the task. */
+.workspace .list .rowActions{min-width:0;flex-wrap:nowrap;gap:10px;align-self:end}
+.actionButtons{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex:none}
+.workspace .list .schedule{display:inline-flex;align-items:center;flex-wrap:nowrap;gap:5px;min-width:0;max-width:100%;padding:6px 9px;border-radius:12px;background:var(--task-date-bg);color:var(--task-date-text);font:500 11px/1.4 var(--font-body);box-sizing:border-box}
+.schedule>span{min-width:0;overflow-wrap:anywhere}.dueDate{display:block;font-size:10px;font-weight:400}
+.workspace .list[data-directory-view=compact] .rowActions{flex-direction:column;align-items:flex-end;gap:6px}
+.workspace .list[data-directory-view=compact] .rowBody p{-webkit-line-clamp:2}
+.workspace .list[data-directory-view=grid] .rowActions{justify-content:space-between;flex-wrap:nowrap}
+@media(min-width:701px){.workspace .list[data-directory-view=comfortable] .row{grid-template-columns:minmax(0,1fr) fit-content(280px)}.workspace .list[data-directory-view=comfortable] .rowMeta{max-width:280px;justify-self:end}}
+@media(max-width:700px){.workspace .list[data-directory-view=grid] .rowActions{gap:5px}.workspace .list[data-directory-view=grid] .schedule{padding:5px 6px;font-size:10px;gap:4px}.workspace .list[data-directory-view=grid] .schedule>svg{display:none}.workspace .list[data-directory-view=grid] .actionButtons{gap:4px}.workspace .list[data-directory-view=grid] .actionButtons :global(.work-button){width:28px;min-width:28px;height:32px;padding:0;display:grid;place-items:center}.workspace .list[data-directory-view=grid] .actionButtons :global(.work-button)>span{display:none}.workspace .list[data-directory-view=grid] .actionButtons svg{width:16px;height:16px}}
