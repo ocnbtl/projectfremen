@@ -1,5 +1,5 @@
 "use client";
-import { useContext, useLayoutEffect, useRef, useState } from "react";
+import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { CalendarLinkedWorkContext } from "./CalendarLinkedWorkContext";
 import { editableCalendarRef } from "../../lib/modules/planning/linked-work-types";
@@ -15,15 +15,15 @@ import { useCalendarDetails } from "./CalendarDisplayPreferences";
 const identity = (ref: NativeObjectRef) => ref.objectType === "person" ? <PersonAvatar person={ref}/> : <EventObjectIdentity record={ref}/>;
 
 /** Preview here; navigate only when the user explicitly opens the profile. */
-export function EventObjectPreview({record, showName = false, iconOnly = false, onEditHere}: {onEditHere?:()=>void;record: NativeObjectRef; showName?: boolean; iconOnly?: boolean}) {
+export function EventObjectPreview({record, showName = false, iconOnly = false, onEditHere, children, triggerClassName, onOpenProfile}: {onEditHere?:()=>void;record: NativeObjectRef; showName?: boolean; iconOnly?: boolean; children?: ReactNode; triggerClassName?: string; onOpenProfile?:()=>void}) {
   const detail = (record as NativeObjectRef & {preview?: {detail?: string}}).preview?.detail;
   if (onEditHere) return <button type="button" className={styles.trigger} data-profile-preview aria-label={"Edit linked "+record.label} title={record.label} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onEditHere();}}>{iconOnly ? <UnigentamosIcon role="module-notes" size={14}/> : identity(record)}{showName&&!iconOnly&&<span className={styles.name}>{record.label}</span>}</button>;
-  return <Popover.Root><Popover.Trigger asChild><button type="button" className={styles.trigger} data-profile-preview aria-label={"Preview "+record.label} title={record.label} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
-    {iconOnly ? <UnigentamosIcon role={record.objectType === "person" ? "person" : "object"} size={14}/> : identity(record)}{showName && !iconOnly && <span className={styles.name}>{record.label}</span>}
+  return <Popover.Root><Popover.Trigger asChild><button type="button" className={triggerClassName ?? styles.trigger} data-profile-preview aria-label={"Preview "+record.label} title={record.label} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+    {children ?? <>{iconOnly ? <UnigentamosIcon role={record.objectType === "person" ? "person" : "object"} size={14}/> : identity(record)}{showName && !iconOnly && <span className={styles.name}>{record.label}</span>}</>}
   </button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.panel} sideOffset={6} collisionPadding={10} aria-label={record.label} onOpenAutoFocus={e=>e.preventDefault()} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
     <header className={styles.profileHeading}>{identity(record)}<strong>{record.label}</strong><Popover.Close aria-label="Close profile preview"><UnigentamosIcon role="close" size={16}/></Popover.Close></header>
     {detail && <p className={styles.detail}>{detail}</p>}
-    {record.route && <Link prefetch={false} className={styles.profileLink} href={record.route}><UnigentamosIcon role="link" size={14}/>Open {record.objectType === "person" || record.objectType === "organization" ? "profile" : "record"}</Link>}
+    {onOpenProfile ? <Popover.Close asChild><button type="button" className={styles.profileLink} onClick={onOpenProfile}><UnigentamosIcon role="link" size={14}/>Open profile</button></Popover.Close> : record.route && <Link prefetch={false} className={styles.profileLink} href={record.route}><UnigentamosIcon role="link" size={14}/>Open {record.objectType === "person" || record.objectType === "organization" ? "profile" : "record"}</Link>}
   </Popover.Content></Popover.Portal></Popover.Root>;
 }
 

@@ -191,6 +191,8 @@
 .workspace-people-pages .people-profile-header .people-profile-title-line h2{margin:0;font-size:24px;overflow-wrap:anywhere}
 .workspace-people-pages .people-profile-header>.people-profile-subtitle{grid-column:2;grid-row:3;margin:0;font:400 15px/1.5 var(--font-body);color:var(--text-subtle);min-width:0;overflow-wrap:anywhere}
 .workspace-people-pages .people-profile-subtitle:empty{display:none}
+.workspace-people-pages .people-profile-subtitle .people-header-employer{display:inline;width:auto;min-height:0;padding:1px 3px;margin:-1px -3px;border:0;border-radius:5px;background:transparent;box-shadow:none;font:inherit;color:inherit;cursor:pointer;transition:background .2s,color .2s}
+.workspace-people-pages .people-profile-subtitle .people-header-employer:hover,.workspace-people-pages .people-profile-subtitle .people-header-employer:focus-visible{background:var(--module-quiet);color:var(--module-icon)}
 .workspace-people-pages .people-profile-header>.people-profile-contact-dates{grid-column:3;grid-row:2;justify-content:flex-end;font-size:12px;gap:6px 12px}
 .workspace-people-pages .people-profile-header>.people-profile-actions{grid-column:3;grid-row:1;display:grid;grid-template-columns:36px 36px;gap:6px;justify-content:end;align-items:start;align-self:start}
 .workspace-people-pages .people-profile-actions>.people-profile-star{grid-column:1;grid-row:1}

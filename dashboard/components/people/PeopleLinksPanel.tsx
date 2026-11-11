@@ -7,6 +7,7 @@ import type { ObjectLink } from "../../lib/native-objects/links";
 import { buildProfileRecordEdges, collectProfileConnections, profileConnectionKey, profileRecordReferences, resolveProfileTarget, type ProfileRecordEdge } from "../../lib/modules/people/profile-connections";
 import { useRelatedRecords } from "../planning/RelatedRecords";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import PeopleProfilePreview from "./PeopleProfilePreview";
 import { PeopleProfileAvatar } from "./PeopleProfilePhoto";
 import { objectTargetIcon } from "./PeopleObjectPicker";
 import SearchField from "../ui/SearchField";
@@ -38,7 +39,7 @@ export default function PeopleLinksPanel({person,people,targets,links,edges,proj
       const record=item.ref.module === "people" ? people.find(record=>record.id===item.ref.objectId) : undefined;
       const project = item.ref.module === "projects" ? projectRecords.find(project => project.id === item.ref.objectId) : undefined;
       const content=<>{record ? <PeopleProfileAvatar organization={record.className==="org"} label={record.title} initials={record.title.split(/\s+/).map(s=>s[0]).slice(0,2).join("")} photoUrl={record.profile?.photoUrl} photoUpdatedAt={record.profile?.photoUpdatedAt} compact/> : project?.photoUpdatedAt ? <EventObjectIdentity record={{...item.ref, preview: projectLinkPreview(project)}}/> : <UnigentamosIcon role={objectTargetIcon(item.ref)} size={22}/>}<span><strong>{item.ref.label}</strong><small>{item.details.join(" · ")}</small></span></>;
-      return <article key={profileConnectionKey(item.ref)}>{record ? <button type="button" onClick={()=>onOpenPerson(record)}>{content}</button> : <Link prefetch={false} href={item.ref.route}>{content}</Link>}{item.linkIds.length===1 && <button type="button" className={styles.unlink} disabled={busy} aria-label={`Remove direct link to ${item.ref.label}`} title="Remove direct link; profile and other connections are kept" onClick={()=>{const link=links.find(link=>link.id===item.linkIds[0]);if(link)onRemove(link);}}><UnigentamosIcon role="close" size={16}/></button>}</article>;
+      return <article key={profileConnectionKey(item.ref)}>{record ? <PeopleProfilePreview person={record} onOpen={onOpenPerson}>{content}</PeopleProfilePreview> : <Link prefetch={false} href={item.ref.route}>{content}</Link>}{item.linkIds.length===1 && <button type="button" className={styles.unlink} disabled={busy} aria-label={`Remove direct link to ${item.ref.label}`} title="Remove direct link; profile and other connections are kept" onClick={()=>{const link=links.find(link=>link.id===item.linkIds[0]);if(link)onRemove(link);}}><UnigentamosIcon role="close" size={16}/></button>}</article>;
     })}</div></section>;})}</div>
     {!visible.length && <p>{query ? "No links match your search." : "No linked objects yet."}</p>}
     {savedReferences.length>0 && <details><summary>Saved references · {savedReferences.length}</summary><p>These names or IDs have no unique active match. They are preserved for review.</p>{savedReferences.map(value=><div key={value}>{value}</div>)}</details>}

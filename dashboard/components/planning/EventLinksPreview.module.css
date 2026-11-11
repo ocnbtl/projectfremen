@@ -37,3 +37,5 @@
 .detail { margin:6px 0 10px; color:#626072; }
 .profileLink { display:inline-flex; align-items:center; gap:6px; color:inherit; font-weight:600; text-decoration:none; padding:5px 0; }
 .profileLink:hover { text-decoration:underline; }
+button.profileLink { width:auto; min-height:36px; border:0; background:transparent; font:inherit; font-weight:600; cursor:pointer; }
+.panel { overflow-y:auto; }

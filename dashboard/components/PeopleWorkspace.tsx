@@ -10,6 +10,7 @@ import LogoLoader from "./operational/LogoLoader";
 import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/people/relationships";
 
 import PeopleLinksPanel from "./people/PeopleLinksPanel";
+import PeopleProfilePreview from "./people/PeopleProfilePreview";
 import type { ProfileRecordEdge } from "../lib/modules/people/profile-connections";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -2677,6 +2678,8 @@ export default function PeopleWorkspace({
     return person ? { ...row, object: { ...row.object, label: person.title }, photoUrl: person.profile?.photoUrl, photoUpdatedAt: person.profile?.photoUpdatedAt } : row;
   }).sort((a, b) => objectTargetTypeLabel(a.object).localeCompare(objectTargetTypeLabel(b.object)) || a.object.label.localeCompare(b.object.label));
   const timelineItems = selectedInteractionItems.slice(0, 20);
+  const headerEmployerId = selectedProfile.occupations.find(entry => entry.status !== "past" && entry.employer === selectedProfile.primaryEmployer)?.organizationId;
+  const headerEmployer = headerEmployerId ? activePeople.find(record => record.id === headerEmployerId && record.className === "org") : undefined;
   const selectedTags = selectedPerson?.className === "org" ? Object.values(organizationLabels(selectedProfile)).filter(Boolean) : Array.from(new Set([
     ...(fallbackPerson?.subjects || []).slice(0, 3),
     ...(selectedPerson?.projects || []).slice(0, 2)
@@ -4403,7 +4406,7 @@ export default function PeopleWorkspace({
               </div>
                 <p className="people-profile-subtitle">{selectedPerson.className === "org"
                   ? selectedProfile.headquarters || selectedProfile.livesIn
-                  : [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ")}</p>
+                  : <>{selectedProfile.primaryOccupation}{selectedProfile.primaryEmployer && <>{selectedProfile.primaryOccupation ? " at " : ""}{headerEmployer ? <PeopleProfilePreview person={headerEmployer} onOpen={selectPerson} className="people-header-employer">{headerEmployer.title}</PeopleProfilePreview> : selectedProfile.primaryEmployer}</>}</>}</p>
                 <div className="people-profile-contact-dates">{getLastContactValue(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))&&<span><UnigentamosIcon role="interaction-history" size={14}/>Last contact {formatLastContact(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))}</span>}{selectedProfile.nextContact&&<span><PeopleIcon name="follow-up"/>Next {getNextContactLabel(selectedPerson)}</span>}</div>
                 {selectedContactMethods.some(method=>method.available)&&(<section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
                   <div className="people-contact-methods-compact">
@@ -4857,7 +4860,7 @@ export default function PeopleWorkspace({
                   </div>
                 </article>
                 {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id} compact/>}
-                {selectedPerson.className === "org" && <section className="people-organization-team" aria-label="Organization people"><h3><PeopleIcon name="person"/>People <span>{selectedOrganizationPeople.length}</span></h3>{selectedOrganizationPeople.length ? <div>{selectedOrganizationPeople.map(person=><button type="button" key={person.id} onClick={()=>selectPerson(person)}><PeopleProfileAvatar compact label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt}/><span>{person.title}</span><PeopleIcon name="chevron"/></button>)}</div> : <p>No people linked yet.</p>}</section>}</div>
+                {selectedPerson.className === "org" && <section className="people-organization-team" aria-label="Organization people"><h3><PeopleIcon name="person"/>People <span>{selectedOrganizationPeople.length}</span></h3>{selectedOrganizationPeople.length ? <div>{selectedOrganizationPeople.map(person=><PeopleProfilePreview key={person.id} person={person} onOpen={selectPerson}><PeopleProfileAvatar compact label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt}/><span>{person.title}</span><PeopleIcon name="chevron"/></PeopleProfilePreview>)}</div> : <p>No people linked yet.</p>}</section>}</div>
                 <article className="people-overview-facts" data-people-overview-card="quick-info">
                   <h3 className="people-overview-section-title"><UnigentamosIcon role={selectedPerson.className === "org" ? "organization" : "person"} size={18}/>{selectedPerson.className === "org" ? "Organization details" : "Profile details"}</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
@@ -4877,7 +4880,7 @@ export default function PeopleWorkspace({
                             <span className="people-info-copy">
                               <strong>{label}</strong>
                               {organization
-                                ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{value || organization.title}</button>
+                                ? <PeopleProfilePreview className="people-inline-object-link" person={organization} onOpen={selectPerson}>{value || organization.title}</PeopleProfilePreview>
                                 : <span>{value || "-"}</span>}
                             </span>
                           </div>
@@ -4887,7 +4890,7 @@ export default function PeopleWorkspace({
                   })}
 
                   {selectedProfile.locations.length>0&&<section className="people-overview-detail-group" aria-label="Places"><h4><PeopleIcon name="location"/>Places</h4>{selectedProfile.locations.map(entry=><div className="people-overview-detail-row" key={entry.id}><div><strong>{entry.label||"Place"}</strong><span>{entry.address||entry.location}</span></div></div>)}</section>}
-                  {selectedPerson.className === "person" && selectedProfile.occupations.length>0&&<section className="people-overview-detail-group" aria-label="Work"><h4><PeopleIcon name="occupation"/>Work</h4>{selectedProfile.occupations.map(entry=>{const organization=activePeople.find(record=>record.id===entry.organizationId&&record.className==="org");return <div className="people-overview-detail-row" key={entry.id}>{organization&&<button type="button" className="people-overview-employer-avatar" aria-label={"Open "+organization.title} onClick={()=>selectPerson(organization)}><PeopleProfileAvatar compact organization label={organization.title} initials={getInitials(organization)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt}/></button>}<div><strong>{entry.title||"Occupation"}{entry.status==="past"&&<small>Past</small>}</strong>{organization?<button type="button" className="people-inline-object-link" onClick={()=>selectPerson(organization)}>{organization.title}</button>:entry.employer&&<span>{entry.employer}</span>}</div></div>;})}</section>}
+                  {selectedPerson.className === "person" && selectedProfile.occupations.length>0&&<section className="people-overview-detail-group" aria-label="Work"><h4><PeopleIcon name="occupation"/>Work</h4>{selectedProfile.occupations.map(entry=>{const organization=activePeople.find(record=>record.id===entry.organizationId&&record.className==="org");return <div className="people-overview-detail-row" key={entry.id}>{organization&&<PeopleProfilePreview className="people-overview-employer-avatar" person={organization} onOpen={selectPerson}><PeopleProfileAvatar compact organization label={organization.title} initials={getInitials(organization)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt}/></PeopleProfilePreview>}<div><strong>{entry.title||"Occupation"}{entry.status==="past"&&<small>Past</small>}</strong>{organization?<PeopleProfilePreview className="people-inline-object-link" person={organization} onOpen={selectPerson}>{organization.title}</PeopleProfilePreview>:entry.employer&&<span>{entry.employer}</span>}</div></div>;})}</section>}
                   {selectedPerson.className === "person" && overviewEducation.length > 0 && (
                     <section className="people-education-overview" aria-label="Education">
                       <span className="people-info-icon"><PeopleIcon name="university" /></span>
@@ -4902,7 +4905,7 @@ export default function PeopleWorkspace({
                               return (
                                 <article key={entry.id}>
                                   {organization
-                                    ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{organization.title}</button>
+                                    ? <PeopleProfilePreview className="people-inline-object-link" person={organization} onOpen={selectPerson}>{organization.title}</PeopleProfilePreview>
                                     : <span className="people-education-name">{entry.institution || "University not added"}</span>}
                                   <div className="people-education-meta">
                                     {entry.degree&&<span>{entry.degree}</span>}
