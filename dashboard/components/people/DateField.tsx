@@ -18,8 +18,8 @@ const parse = (value: string) => {
   return iso(date) === value ? date : null;
 };
 
-export default function DateField({ label, value, onChange, required = true, compact = false, theme }: {
-  label: string; value: string; onChange: (value: string) => void; required?: boolean; compact?: boolean; theme?: "finance";
+export default function DateField({ label, value, onChange, required = true, compact = false, insetLabel = false, theme }: {
+  label: string; value: string; onChange: (value: string) => void; required?: boolean; compact?: boolean; insetLabel?: boolean; theme?: "finance";
 }) {
   const [open, setOpen] = useState(false), [focusDate, setFocusDate] = useState(() => parse(value) || new Date());
   const [month, setMonth] = useState(() => parse(value) || new Date());
@@ -31,10 +31,11 @@ export default function DateField({ label, value, onChange, required = true, com
   }, [focusDate, month]);
   function choose(date: Date) { onChange(iso(date)); setOpen(false); }
   function moveMonth(offset: number) { const next = dateAt(year, monthIndex + offset, 1); if (next.getFullYear() > 0 && next.getFullYear() <= 9999) { setMonth(next); setFocusDate(next); } }
-  return <div className="people-date-field"><span>{label}</span><Popover.Root open={open} onOpenChange={next => {
+  return <div className="people-date-field" data-inset-label={insetLabel || undefined}>{!insetLabel&&<span>{label}</span>}<Popover.Root open={open} onOpenChange={next => {
     if (next) { const initial = parse(value) || new Date(); setMonth(initial); setFocusDate(initial); } setOpen(next);
   }}>
     <Popover.Trigger asChild><button type="button" className="people-date-trigger" aria-label={label} aria-description={selected ? display(selected) : "No date selected"} title={selected ? display(selected) : label} data-value={value} aria-required={required}>
+      {insetLabel&&<small className="people-date-inset-label">{label}</small>}
       {compact ? <><span className="people-date-display-wide">{selected ? selected.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }) : "Set date"}</span><span className="people-date-display-narrow" aria-hidden="true">{selected ? selected.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }) : "Set date"}</span></> : <span>{selected ? display(selected) : "Choose a date"}</span>}
       <UnigentamosIcon role="interaction-date" size={18} />
     </button></Popover.Trigger>

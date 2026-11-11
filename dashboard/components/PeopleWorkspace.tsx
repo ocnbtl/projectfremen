@@ -1669,7 +1669,7 @@ function EducationEntriesEditor({
         <article className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-education">
             <label>
-              <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>School</span>
+              <span className="people-visually-hidden">School</span>
               <SelectField searchable onCreate={() => onCreateOrganization(entry.id)}
                 aria-label={`Education ${index + 1} organization`}
                 value={entry.organizationId || ""}
@@ -1678,16 +1678,16 @@ function EducationEntriesEditor({
                   onChange(entry.id, { organizationId: organization?.id, institution: organization?.title || entry.institution });
                 }}
               >
-                <option value="">{entry.institution || "Select school"}</option>
+                <option value="">{entry.institution || "School"}</option>
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.institution || "Unavailable organization"} · unavailable</option>
                 )}
                 {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar organization={true} label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
               </SelectField>
             </label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Degree</span><input aria-label={`Education ${index + 1} degree`} value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Field of study</span><input aria-label={`Education ${index + 1} field of study`} value={entry.fieldOfStudy || ""} onChange={(event) => onChange(entry.id, { fieldOfStudy: event.target.value })} placeholder="Economics, design, engineering..." /></label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><SelectField aria-label={`Education ${index + 1} timing`} value={entry.status || ""} onChange={(event) => onChange(entry.id, { status: event.target.value ? event.target.value as PersonalEducationEntry["status"] : undefined })}><option value="">Not set</option><option value="current">Current</option><option value="past">Past</option></SelectField></label>
+            <label><span className="people-visually-hidden">Degree</span><input aria-label={`Education ${index + 1} degree`} value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Degree" /></label>
+            <label><span className="people-visually-hidden">Field of study</span><input aria-label={`Education ${index + 1} field of study`} value={entry.fieldOfStudy || ""} onChange={(event) => onChange(entry.id, { fieldOfStudy: event.target.value })} placeholder="Field of study" /></label>
+            <label><span className="people-visually-hidden">When</span><SelectField aria-label={`Education ${index + 1} timing`} value={entry.status || ""} onChange={(event) => onChange(entry.id, { status: event.target.value ? event.target.value as PersonalEducationEntry["status"] : undefined })}><option value="">When</option><option value="current">Current</option><option value="past">Past</option></SelectField></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove university ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
@@ -1720,9 +1720,9 @@ function OccupationEntriesEditor({
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-occupation-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-job">
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Occupation</span><input aria-label={`Occupation ${index + 1} title`} value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Product designer" /></label>
+            <label><span className="people-visually-hidden">Occupation</span><input aria-label={`Occupation ${index + 1} title`} value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Occupation" /></label>
             <label>
-              <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Employer</span>
+              <span className="people-visually-hidden">Employer</span>
               <SelectField searchable onCreate={() => onCreateOrganization(entry.id)}
                 aria-label={`Job ${index + 1} organization`}
                 value={entry.organizationId || ""}
@@ -1731,14 +1731,14 @@ function OccupationEntriesEditor({
                   onChange(entry.id, { organizationId: organization?.id, employer: organization?.title || entry.employer });
                 }}
               >
-                <option value="">{entry.employer || "Select an organization"}</option>
+                <option value="">{entry.employer || "Employer"}</option>
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.employer || "Unavailable organization"} · unavailable</option>
                 )}
                 {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar organization={true} label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
               </SelectField>
             </label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><SelectField aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></SelectField></label>
+            <label><span className="people-visually-hidden">When</span><SelectField aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></SelectField></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove job ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
@@ -4398,15 +4398,16 @@ export default function PeopleWorkspace({
                 <div className="people-profile-title-line">
                   <h2>{selectedPerson.title}{selectedPerson.className === "person" && selectedProfile.nickname && <>, <span>aka {selectedProfile.nickname}</span></>}</h2>
                 </div>
-                <p>{selectedPerson.className === "org"
-                  ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
-                  : [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ") || selectedProfile.context || selectedPerson.body || "Person"}</p>
-                <div className="people-profile-contact-dates">{getLastContactValue(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))&&<span><UnigentamosIcon role="interaction-history" size={14}/>Last contact {formatLastContact(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))}</span>}{selectedProfile.nextContact&&<span><PeopleIcon name="follow-up"/>Next {getNextContactLabel(selectedPerson)}</span>}</div>
                 <div className="people-tag-row">
                   {selectedTags.map((tag) => (
                     <span key={tag}>{tag}</span>
                   ))}
                 </div>
+              </div>
+                <p className="people-profile-subtitle">{selectedPerson.className === "org"
+                  ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
+                  : [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ")}</p>
+                <div className="people-profile-contact-dates">{getLastContactValue(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))&&<span><UnigentamosIcon role="interaction-history" size={14}/>Last contact {formatLastContact(selectedPerson,latestInteractionDateByParticipant.get(selectedPerson.id))}</span>}{selectedProfile.nextContact&&<span><PeopleIcon name="follow-up"/>Next {getNextContactLabel(selectedPerson)}</span>}</div>
                 {selectedContactMethods.some(method=>method.available)&&(<section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
                   <div className="people-contact-methods-compact">
                     {selectedContactMethods.filter(method=>method.available).map((method) => (
@@ -4453,7 +4454,6 @@ export default function PeopleWorkspace({
                     </div>
                   )}
                 </section>)}
-              </div>
               <div className="people-profile-actions">
                 <div className="people-profile-status-control">
                   <button
@@ -4550,10 +4550,6 @@ export default function PeopleWorkspace({
                 className="people-profile-tabs"
               />
               <div className="people-profile-view-actions" aria-label={`${activeView} actions`}>
-                {activeView === "properties" && <>
-                  <button type="button" onClick={requestCancelEditor} disabled={profileSaving}><PeopleIcon name="close" /><span>Cancel</span></button>
-                  <button type="submit" form="people-profile-properties-form" disabled={profileSaving || personAutofillBusy || Boolean(lifecycleSaving)}><PeopleIcon name="check" /><span>{personAutofillBusy ? "Autofilling…" : profileSaving ? "Saving..." : "Save"}</span></button>
-                </>}
                 {activeView === "timeline" && <>
                   <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
                   <PeopleAddButton label="Follow-up" icon="follow-up-add" onClick={() => router.push(followUpCreationRoute(selectedPerson))} ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`} />
@@ -4613,10 +4609,10 @@ export default function PeopleWorkspace({
                       </div>}
                       <div className={`people-profile-field-grid${section.title === "Identity" && selectedPerson.className === "person" ? " people-profile-identity-grid" : ""}${section.title === "Cadence" ? " people-cadence-fields is-profile" : ""}`}>
                         {section.fields.map((field) => field.type === "date" ? (
-                          <DateField key={field.key} label={field.label} value={profileDraft[field.key]} onChange={value => updateProfileDraft(field.key, value)} required={false} compact />
+                          <DateField key={field.key} label={field.label} value={profileDraft[field.key]} onChange={value => updateProfileDraft(field.key, value)} required={false} compact insetLabel />
                         ) : (
                           <label className={`${field.type === "textarea" ? "is-wide " : ""}people-profile-field-${field.key}`} key={field.key}>
-                            {field.label}
+                            <span className={field.key === "contactCadence" || ["organizationType","industry","teamSize"].includes(field.key) ? "people-field-label" : "people-visually-hidden"}>{field.label}</span>
                             {field.key === "contactCadence" ? (
                               <SelectField
                                 data-people-cadence-select
@@ -4644,13 +4640,13 @@ export default function PeopleWorkspace({
                                 onChange={(value) => updateProfileDraft("industry", value)}
                               />
                             ) : field.key === "teamSize" ? (
-                              <TeamSizeInput value={profileDraft.teamSize} onChange={(value) => updateProfileDraft("teamSize", value)} placeholder={field.placeholder} />
+                              <TeamSizeInput value={profileDraft.teamSize} onChange={(value) => updateProfileDraft("teamSize", value)} placeholder={field.label} />
                             ) : field.type === "textarea" ? (
                               <textarea
                                 value={profileDraft[field.key]}
                                 onChange={(event) => updateProfileDraft(field.key, event.target.value)}
-                                placeholder={field.placeholder}
-                                rows={3}
+                                placeholder={field.label}
+                                rows={2}
                               />
                             ) : (
                               <input
@@ -4662,7 +4658,7 @@ export default function PeopleWorkspace({
                                 onChange={(event) => updateProfileDraft(field.key, event.target.value)}
                                 inputMode={field.key === "foundedYear" ? "numeric" : field.type === "url" ? "url" : undefined}
                                 pattern={field.key === "foundedYear" ? "\\d{4}" : undefined}
-                                placeholder={field.placeholder}
+                                placeholder={field.label}
                               />
                             )}
                           </label>
@@ -4832,13 +4828,13 @@ export default function PeopleWorkspace({
             ) : (
               <section className="people-overview-grid">
 
-                <article className="people-overview-about" data-people-overview-card="about">
+                <div className="people-overview-story"><article className="people-overview-about" data-people-overview-card="about">
                   <h3><PeopleIcon name="person"/>{selectedPerson.className === "org" ? "Description" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
                   <p>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No description recorded yet." : "No relationship context recorded yet.")}</p>
                   {selectedProfile.lifeDream&&<section className="people-overview-dream"><h4><PeopleIcon name="life-dream"/>Life dream</h4><p>{selectedProfile.lifeDream}</p></section>}
                   <div className="people-about-notes">
                     <header>
-                      <strong><PeopleIcon name="notes"/>Notes <span aria-label={`${selectedNotes.length} notes`}>{selectedNotes.length}</span></strong>
+                      <strong><PeopleIcon name="notes"/>Notes {selectedNotes.length>0&&<span aria-label={`${selectedNotes.length} notes`}>{selectedNotes.length}</span>}</strong>
                       <button
                         type="button"
                         onClick={() => setQuickNoteOpen((current) => !current)}
@@ -4865,6 +4861,7 @@ export default function PeopleWorkspace({
                     )}
                   </div>
                 </article>
+                {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id} compact/>}</div>
                 <article className="people-overview-facts" data-people-overview-card="quick-info">
                   <h3 className="people-overview-section-title"><UnigentamosIcon role="person" size={18}/>Profile details</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
@@ -4924,7 +4921,6 @@ export default function PeopleWorkspace({
                     </section>
                   )}
                 </article>
-                {selectedPerson.className === "person" && <PersonTasks key={selectedPerson.id} personId={selectedPerson.id} compact/>}
               </section>
             )}
             </div>
@@ -4949,7 +4945,11 @@ export default function PeopleWorkspace({
       </section>
 
       }
-      {!initialLoadError && mobileSurface === "editor" && <nav className="people-mobile-actionbar" aria-label="People quick actions">
+      {!initialLoadError && !addingPerson && selectedPerson && detailMode === "edit" && <nav className="people-properties-savebar" aria-label="Profile editing actions">
+        <button type="button" onClick={requestCancelEditor} disabled={profileSaving || personAutofillBusy}><PeopleIcon name="close"/><span>Cancel</span></button>
+        <button type="submit" form="people-profile-properties-form" disabled={profileSaving || personAutofillBusy || Boolean(lifecycleSaving)}><PeopleIcon name="check"/><span>{personAutofillBusy ? "Autofilling…" : profileSaving ? "Saving…" : "Save"}</span></button>
+      </nav>}
+      {!initialLoadError && addingPerson && mobileSurface === "editor" && <nav className="people-mobile-actionbar" aria-label="People quick actions">
             <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
             <button
               type="button"
