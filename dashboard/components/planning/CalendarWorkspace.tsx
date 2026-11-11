@@ -256,17 +256,18 @@ export default function CalendarWorkspace() {
   const [wellnessTarget, setWellnessTarget] = useState<NonNullable<EventOccurrence["wellnessSource"]>>();
   const nativeCalendar = snapshot?.state.calendars.find(c => c.id === "native");
   const observanceSettings = useMemo(() => nativeCalendar?.observances || defaultObservances(), [nativeCalendar?.observances]);
-  const refresh = useCallback(async () => {
-    if (writeCount.current) return;
+  const refresh = useCallback(async (requireFresh = false) => {
+    if (writeCount.current) { if(requireFresh)throw new Error("Calendar is still saving. Refresh tasks in a moment."); return; }
     const startedAt = revision.current;
     try {
       const next = await planningRequest<PlanningSnapshot>();
-      if (writeCount.current || startedAt !== revision.current) return;
+      if (writeCount.current || startedAt !== revision.current) { if(requireFresh)throw new Error("Calendar changed while refreshing. Refresh tasks to continue."); return; }
       confirmed.current = next;
       setSnapshot(next);
       setError("");
     } catch (e) {
       setError((e as Error).message);
+      if(requireFresh)throw e;
     }
   }, []);
   useEffect(() => {
@@ -282,16 +283,17 @@ export default function CalendarWorkspace() {
     void refresh();
     const timer = setInterval(() => setNow(Date.now()), 60000);
     const wellnessChanged = (event: StorageEvent) => { if (!document.hidden && (event.key === WELLNESS_CHANGE_KEY || event.key === PET_CHANGE_KEY)) void refresh(); };
+    const refreshFromEvent = () => { void refresh(); };
     window.addEventListener("storage", wellnessChanged);
-    window.addEventListener("online", refresh);
-    window.addEventListener("focus", refresh);
-    window.addEventListener("unigentamos-planning-changed", refresh);window.addEventListener("unigentamos-tasks-restored", refresh);
+    window.addEventListener("online", refreshFromEvent);
+    window.addEventListener("focus", refreshFromEvent);
+    window.addEventListener("unigentamos-planning-changed", refreshFromEvent);window.addEventListener("unigentamos-tasks-restored", refreshFromEvent);
     return () => {
       clearInterval(timer);
       window.removeEventListener("storage", wellnessChanged);
-      window.removeEventListener("online", refresh);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("unigentamos-planning-changed", refresh);window.removeEventListener("unigentamos-tasks-restored", refresh);
+      window.removeEventListener("online", refreshFromEvent);
+      window.removeEventListener("focus", refreshFromEvent);
+      window.removeEventListener("unigentamos-planning-changed", refreshFromEvent);window.removeEventListener("unigentamos-tasks-restored", refreshFromEvent);
     };
   }, [refresh, params]);
   useEffect(() => {
@@ -689,7 +691,7 @@ export default function CalendarWorkspace() {
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <PlaceSync onComplete={refresh} />
-      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center" className={styles.taskSheet}>{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={refresh} day={taskDay} onlyAllDay={Boolean(taskDay)} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
+      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center" className={styles.taskSheet}>{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={()=>refresh(true)} day={taskDay} onlyAllDay={Boolean(taskDay)} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
       <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
         <h1><Link prefetch={false} className="workspace-home-link" href="/admin/calendar">Calendar</Link></h1>
           <SearchField aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} value={query} onChange={e => setQuery(e.target.value)} className={styles.calendarSearch} />

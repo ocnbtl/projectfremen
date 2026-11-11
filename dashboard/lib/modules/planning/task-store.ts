@@ -27,6 +27,18 @@ export async function changeTask(body:Record<string,unknown>) {
   if(current && (body.expectedUpdatedAt!==current.updatedAt || body.sourceUpdatedAt!==current.sourceUpdatedAt))fail("This task changed elsewhere. Reload before saving; your draft is still here.",409);
   if(body.operation==="create" && current)fail("This task was already created. Reload to see it.",409);
   if(body.operation==="create" && !/^task-[a-f0-9-]{36}$/.test(id))fail("Choose a new task identity.");
+  if(body.operation==="assign-calendars"){
+    const item=current!;
+    if(!Array.isArray(body.calendarIds))fail("Choose Calendar profiles.");
+    const calendarIds=[...new Set(body.calendarIds.map(value=>text(value)))];
+    if(calendarIds.length>12 || calendarIds.some(id=>!loaded.state.calendars.some(c=>c.id===id&&!c.archivedAt&&!c.connectionId)))fail("Choose available Calendar profiles.");
+    if(item.source?.family==="events"){
+      const record=loaded.state.events.find(event=>event.id===item.source!.id)!;
+      if(record.source)fail("Edit imported tasks from their original Calendar event.");
+      return savePlanningRecord("events",{id:record.id,calendarId:calendarIds[0]||record.calendarId,taskAssignment:{...record.taskAssignment,calendarIds,peopleIds:item.peopleIds||[],kind:item.kind,floating:!item.start}},item.updatedAt);
+    }
+    return storePlan(item,{calendarIds});
+  }
   if(body.operation==="move-occurrence"){
     const item=current!,key=text(body.occurrenceKey,40),input=body.input as Record<string,unknown>;
     if(!item.recurrence || !input)fail("Choose a repeating task occurrence.");
