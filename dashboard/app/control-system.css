@@ -255,6 +255,11 @@ html[data-active-module="people"] :is(.workspace-topnav,.workspace-actions-menu)
 .workspace-people-pages .people-directory-list.is-grid .people-row-occupation { display:flex; align-items:center; min-width:0; gap:5px; overflow:visible; }
 .people-occupation-label { min-width:0; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 .people-employer-picture { display:inline-flex; flex:none; align-items:center; }
+.workspace-people-pages button.people-employer-picture { position:relative; z-index:1; pointer-events:auto; justify-content:center; width:30px; height:30px; min-height:30px; padding:4px; border:0; border-radius:7px; background:transparent; color:inherit; box-shadow:none; cursor:pointer; transition:background 180ms ease; }
+.workspace-people-pages button.people-employer-picture:hover { background:var(--module-primary-100,#ffe0c0); }
+.workspace-people-pages button.people-employer-picture:focus-visible { outline:2px solid var(--module-focus); outline-offset:2px; }
+@media(pointer:coarse) { .workspace-people-pages button.people-employer-picture { width:34px; height:34px; min-height:34px; padding:6px; } }
+@media(prefers-reduced-motion:reduce) { .workspace-people-pages button.people-employer-picture { transition:none; } }
 .workspace-people-pages .people-employer-picture .people-profile-photo { width:22px !important; height:22px !important; min-width:22px !important; flex:0 0 22px !important; margin:0; }
 .workspace-topnav .media-directory-toolbar kbd { display:none; }
 .workspace-topnav [class*="directoryHeader"] { padding:0; margin:0; border:0; }
