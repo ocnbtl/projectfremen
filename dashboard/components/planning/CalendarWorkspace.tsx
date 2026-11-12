@@ -394,7 +394,7 @@ export default function CalendarWorkspace() {
     try {
       return {
         items: eventOccurrences(
-          calendarTaskRecords(snapshot?.state.events || [], snapshot?.state.calendars || [],zone,new Date(now)),
+          calendarTaskRecords((snapshot?.state.events || []).filter(event=>!effectiveEvent(event).isTask||!snapshot?.state.hiddenTaskIds?.includes(`events:${event.id}`)), snapshot?.state.calendars || [],zone,new Date(now)),
           range.start,
           range.end,
           zone,
@@ -419,8 +419,8 @@ export default function CalendarWorkspace() {
         `${item.title} ${item.description} ${item.location}`
           .toLowerCase()
           .includes(query.trim().toLowerCase()),
-    ), ...eventOccurrences(taskEvents(snapshot?.taskItems || [],snapshot?.state.calendars || [],zone,new Date(now)),range.start,range.end,zone).filter(item=>(showCompleted || !item.completed) && (!item.taskContext?.calendarIds.length || item.taskContext.calendarIds.some(id=>visibleCalendars.has(id))) && `${item.title} ${item.description}`.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(snapshot?.wellnessEvents || [], range.start, range.end, zone).filter(item => visibleCalendars.has(item.calendarId) && (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(showDated ? snapshot?.workEvents || [] : [], range.start, range.end, zone).filter(item => (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
-  }, [now, snapshot?.taskItems, showCompleted, showDated, expanded.items, snapshot?.state.calendars, snapshot?.workEvents, snapshot?.wellnessEvents, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
+    ), ...eventOccurrences(taskEvents((snapshot?.taskItems || []).filter(item=>!snapshot?.state.hiddenTaskIds?.includes(item.id)),snapshot?.state.calendars || [],zone,new Date(now)),range.start,range.end,zone).filter(item=>(showCompleted || !item.completed) && (!item.taskContext?.calendarIds.length || item.taskContext.calendarIds.some(id=>visibleCalendars.has(id))) && `${item.title} ${item.description}`.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(snapshot?.wellnessEvents || [], range.start, range.end, zone).filter(item => visibleCalendars.has(item.calendarId) && (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...eventOccurrences(showDated ? snapshot?.workEvents || [] : [], range.start, range.end, zone).filter(item => (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
+  }, [now, snapshot?.taskItems, snapshot?.state.hiddenTaskIds, showCompleted, showDated, expanded.items, snapshot?.state.calendars, snapshot?.workEvents, snapshot?.wellnessEvents, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
   const dated = showDated
     ? (snapshot?.dated || []).filter(
         (x) =>

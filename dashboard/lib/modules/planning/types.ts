@@ -129,7 +129,7 @@ export type PlanningCollections = {
   reminders: ReminderReceipt;
 };
 export type PlanningCollection = keyof PlanningCollections;
-export type PlanningState = { schemaVersion: 1; taskPlans?: import("./task-model").TaskPlan[]; outcomeReceipts?: import("./event-outcome-types").OutcomeReceipt[]; bookingData?: import("./booking-types").BookingData } & {
+export type PlanningState = { schemaVersion: 1; hiddenTaskIds?: string[]; taskPlans?: import("./task-model").TaskPlan[]; outcomeReceipts?: import("./event-outcome-types").OutcomeReceipt[]; bookingData?: import("./booking-types").BookingData } & {
   [K in PlanningCollection]: PlanningCollections[K][];
 };
 export type EventOccurrence = EventFields & {

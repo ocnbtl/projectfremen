@@ -28,6 +28,7 @@ export function planningState(value: unknown): PlanningState {
     throw new Error("This planning data needs a newer application version");
   const result = emptyPlanningState();
   if (Array.isArray(raw.taskPlans)) result.taskPlans = raw.taskPlans;
+  if (Array.isArray(raw.hiddenTaskIds)) result.hiddenTaskIds = [...new Set(raw.hiddenTaskIds.filter(id => typeof id === "string"))];
   if (Array.isArray(raw.outcomeReceipts)) result.outcomeReceipts = raw.outcomeReceipts;
   // Booking definitions and receipts share the event transaction, but are not
   // writable through generic planning collections or offline record commands.

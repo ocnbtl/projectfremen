@@ -27,6 +27,17 @@ export async function changeTask(body:Record<string,unknown>) {
   if(current && (body.expectedUpdatedAt!==current.updatedAt || body.sourceUpdatedAt!==current.sourceUpdatedAt))fail("This task changed elsewhere. Reload before saving; your draft is still here.",409);
   if(body.operation==="create" && current)fail("This task was already created. Reload to see it.",409);
   if(body.operation==="create" && !/^task-[a-f0-9-]{36}$/.test(id))fail("Choose a new task identity.");
+  if(body.operation==="visibility"){
+    if(typeof body.hidden!=="boolean" || typeof body.expectedHidden!=="boolean")fail("Choose whether to hide this task from Calendar.");
+    const hidden=body.hidden;
+    return mutatePlanningState(state=>{
+      const ids=new Set(state.hiddenTaskIds||[]);
+      if(ids.has(id)!==body.expectedHidden && ids.has(id)!==hidden)fail("Task visibility changed elsewhere. Reload tasks to continue.",409);
+      if(hidden)ids.add(id);else ids.delete(id);
+      // Visibility is a preference, never a copied task or a scheduling/status edit.
+      return {state:{...state,hiddenTaskIds:[...ids]},result:{id,hidden}};
+    });
+  }
   if(body.operation==="assign-calendars"){
     const item=current!;
     if(!Array.isArray(body.calendarIds))fail("Choose Calendar profiles.");

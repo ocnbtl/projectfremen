@@ -75,7 +75,7 @@ let browser,page;
  const firstCard=page.getByRole('listitem').filter({has:page.getByText('Pending task 1',{exact:true})});const layout=await page.locator('[data-directory-view]').first().getAttribute('data-directory-view');
  await expect(firstCard.locator('[data-task-date]')).toHaveCSS('background-color','rgb(224, 228, 236)');
  const dateBox=await firstCard.locator('[data-task-date]').boundingBox(),editBox=await firstCard.getByRole('button',{name:'Edit Pending task 1',exact:true}).boundingBox();
- assert(layout==='compact'?dateBox.y+dateBox.height<=editBox.y+1:dateBox.x+dateBox.width<=editBox.x+1,'Date pill position '+width+' '+layout);
+ assert(dateBox.height<34 && (dateBox.y+dateBox.height<=editBox.y+1 || dateBox.x+dateBox.width<=editBox.x+1),'Single-line date stays clear of actions '+width+' '+layout);
  if(layout==='compact')await expect(firstCard.getByText('Choose one important next step.',{exact:true})).toBeVisible();
  if(layout==='comfortable'&&width>700)assert((await firstCard.locator('[data-task-calendar-picker]').boundingBox()).width<=280,'Comfortable context stays compact');
  await expect(page.getByRole('listitem').filter({has:page.getByText('Afternoon planning',{exact:true})}).locator('[data-task-date]')).toContainText('4:30 PM');

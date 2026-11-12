@@ -38,3 +38,58 @@
 .workspace .list[data-directory-view=grid] .rowActions{justify-content:space-between;flex-wrap:nowrap}
 @media(min-width:701px){.workspace .list[data-directory-view=comfortable] .row{grid-template-columns:minmax(0,1fr) fit-content(280px)}.workspace .list[data-directory-view=comfortable] .rowMeta{max-width:280px;justify-self:end}}
 @media(max-width:700px){.workspace .list[data-directory-view=grid] .rowActions{gap:5px}.workspace .list[data-directory-view=grid] .schedule{padding:5px 6px;font-size:10px;gap:4px}.workspace .list[data-directory-view=grid] .schedule>svg{display:none}.workspace .list[data-directory-view=grid] .actionButtons{gap:4px}.workspace .list[data-directory-view=grid] .actionButtons :global(.work-button){width:28px;min-width:28px;height:32px;padding:0;display:grid;place-items:center}.workspace .list[data-directory-view=grid] .actionButtons :global(.work-button)>span{display:none}.workspace .list[data-directory-view=grid] .actionButtons svg{width:16px;height:16px}}
+/* Tasks keep a stable reading order at every size. Compact is a row; Grid is a card. */
+.workspace{container-type:inline-size}
+.visibilityControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hiddenCount{font-variant-numeric:tabular-nums;padding:1px 5px;border-radius:5px;background:var(--module-quiet)}
+.hiddenToggle[aria-pressed=true]{background:var(--module-primary-100);border-color:var(--module-primary-300)}
+.workspace .list .schedule{flex:none;width:max-content;max-width:100%;white-space:nowrap}
+.workspace .list .schedule>span{overflow-wrap:normal;white-space:nowrap}
+.workspace .list .rowActions{flex-wrap:wrap;gap:8px}
+.workspace .list .actionButtons{gap:5px;min-width:0}
+.workspace .list .actionButtons :global(.work-button){min-height:32px;padding:5px 8px}
+.workspace .list .hideButton{background:transparent;border-color:transparent;color:var(--text-muted,#526771)}
+.workspace .list .hideButton:hover{background:var(--module-quiet);color:var(--text-strong)}
+.workspace .list[data-directory-view=compact]{grid-template-columns:1fr;gap:7px}
+.workspace .list[data-directory-view=compact] .row{grid-template-columns:minmax(0,1fr) minmax(150px,25%) auto;gap:10px 16px;padding:11px 14px;align-items:center}
+.workspace .list[data-directory-view=compact] .rowBody{grid-column:1;grid-row:1;gap:3px}
+.workspace .list[data-directory-view=compact] .rowBody p{-webkit-line-clamp:1}
+.workspace .list[data-directory-view=compact] .rowMeta{grid-column:2;grid-row:1;display:grid;overflow:visible}
+.workspace .list[data-directory-view=compact] .rowActions{grid-column:3;grid-row:1;align-self:center;align-items:flex-end;gap:5px}
+.workspace .list[data-directory-view=compact] .context{padding:6px;gap:4px}
+.workspace .list[data-directory-view=compact] .contextLinks{flex-wrap:nowrap;overflow:hidden}
+.workspace .list[data-directory-view=compact] .contextLinks>.linked{flex:0 1 auto}
+.workspace .list[data-directory-view=grid]{grid-template-columns:repeat(auto-fill,minmax(min(100%,310px),1fr));gap:12px;align-items:stretch}
+.workspace .list[data-directory-view=grid] .row{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr auto;padding:14px;gap:12px}
+.workspace .list[data-directory-view=grid] .rowMeta{grid-column:1;grid-row:1;display:grid;overflow:visible}
+.workspace .list[data-directory-view=grid] .rowBody{grid-column:1;grid-row:2;align-content:start;gap:6px}
+.workspace .list[data-directory-view=grid] .rowBody>strong{font-size:14px}
+.workspace .list[data-directory-view=grid] .rowActions{grid-column:1;grid-row:3;flex-direction:row;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.workspace .list[data-directory-view=grid] .schedule{font-size:11px;padding:6px 9px}
+.workspace .list[data-directory-view=grid] .schedule>svg{display:block}
+.workspace .list[data-directory-view=grid] .actionButtons :global(.work-button){display:inline-flex;width:auto;min-width:0;height:32px;padding:5px 8px}
+.workspace .list[data-directory-view=grid] .actionButtons :global(.work-button)>span{display:inline}
+.workspace .list[data-directory-view=grid] .contextHeading .kind{font-size:11px;gap:6px;padding:3px;white-space:nowrap}
+@container(max-width:760px){
+ .workspace .list[data-directory-view=compact] .row{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:10px 12px}
+ .workspace .list[data-directory-view=compact] .rowBody{grid-column:1/-1;grid-row:1}
+ .workspace .list[data-directory-view=compact] .rowMeta{grid-column:1;grid-row:2;align-self:center}
+ .workspace .list[data-directory-view=compact] .rowActions{grid-column:2;grid-row:2}
+ .workspace .list[data-directory-view=compact] .contextLinks :global([data-profile-preview])>span:last-child{max-width:72px}
+}
+@container(max-width:460px){
+ .workspace .list[data-directory-view=compact] .rowMeta{grid-column:1/-1;grid-row:2}
+ .workspace .list[data-directory-view=compact] .rowActions{grid-column:1/-1;grid-row:3;flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap}
+ .workspace .list[data-directory-view=compact] .context{display:flex;align-items:center;gap:8px}
+ .workspace .list[data-directory-view=compact] .contextHeading{flex:none}
+ .workspace .list[data-directory-view=compact] .contextLinks{flex:1;min-width:0}
+ .workspace .list[data-directory-view=compact] .rowBody p{font-size:12px}
+ .workspace .list[data-directory-view=comfortable] .rowActions{justify-content:space-between}
+}
+@media(prefers-reduced-motion:reduce){.hiddenToggle{transition:none}}
+@container(max-width:460px){
+ .workspace .list[data-directory-view=compact] .context :global([data-task-calendar-picker]){width:auto;flex:1;min-width:0}
+ .workspace .list[data-directory-view=compact] .contextLinks{flex:0 1 auto;max-width:38%;gap:4px}
+ .workspace .list[data-directory-view=compact] .contextLinks :global([data-profile-preview])>span:last-child{display:none}
+ .workspace .list[data-directory-view=compact] .contextLinks .linked{flex:none}
+}
