@@ -2,12 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import { TASK_KINDS, type TaskItem } from "../../lib/modules/planning/task-model";
+import { type TaskItem } from "../../lib/modules/planning/task-model";
 import type { Calendar } from "../../lib/modules/planning/types";
 import { writeTask } from "./task-client";
 import styles from "./TaskCalendarPicker.module.css";
 
-const icons:Record<string,string>={task:"check",goal:"goal",routine:"routine",obligation:"check",decision:"decision",follow_up:"follow-up",objective:"goal"};
 function Badge({calendar}:{calendar:Calendar}){
  return <span className={styles.badge} title={"Calendar: "+calendar.name} aria-label={"Calendar: "+calendar.name} style={{background:`color-mix(in srgb, ${calendar.color} 22%, white)`,borderColor:calendar.color}}>{[...calendar.name.trim()][0]?.toLocaleUpperCase()||"C"}</span>;
 }
@@ -36,7 +35,7 @@ export default function TaskCalendarPicker({item,calendars,onSaved,disabled=fals
  }
  return <Popover.Root open={open} onOpenChange={setOpen}>
   <Popover.Trigger asChild><button type="button" className={styles.trigger} data-task-calendar-picker aria-label={"Change calendars for "+item.title} title="Change assigned calendars" disabled={disabled} aria-busy={saving} onClick={event=>event.stopPropagation()}>
-   <span className={styles.kind} title={TASK_KINDS[item.kind]}><UnigentamosIcon role={icons[item.kind]||"check"} size={15}/><span>{TASK_KINDS[item.kind]}</span></span>
+
    <span className={styles.badges}>{selected.map(id=>{const calendar=calendars.find(c=>c.id===id);return calendar?<Badge calendar={calendar} key={id}/>:null;})}{!selected.length&&<UnigentamosIcon role="calendar" size={16}/>}</span>
   </button></Popover.Trigger>
   {!open&&error&&<button type="button" className={styles.errorTrigger} onClick={()=>setOpen(true)} role="alert">Assignment needs attention</button>}

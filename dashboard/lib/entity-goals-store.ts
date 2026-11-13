@@ -32,6 +32,14 @@ export async function writeEntityGoals(
 ): Promise<EntityGoalItem[]> {
   const state = await readJsonFile<EntityGoalsState>(FILE_NAME, EMPTY_STATE);
   const normalized = normalizeGoalItems(goals);
+  const prior = normalizeGoalItems(state.goalsBySlug[slug] || []);
+  const used = new Set<number>();
+  for (const goal of normalized) {
+    const index = prior.findIndex((entry, index) => !used.has(index) && entry.text === goal.text);
+    if (index < 0) continue;
+    used.add(index);
+    if (!goal.taskIdentity && prior[index].taskIdentity) goal.taskIdentity = prior[index].taskIdentity;
+  }
 
   const nextState: EntityGoalsState = {
     goalsBySlug: {

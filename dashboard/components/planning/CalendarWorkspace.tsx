@@ -147,6 +147,8 @@ export default function CalendarWorkspace() {
   const previousDate = useRef("");
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
   const [tasksOpen,setTasksOpen]=useState(false);
+  const [taskAllDayOnly,setTaskAllDayOnly]=useState(false);
+  function openTaskDay(day:string,allDayOnly=false){setTaskDay(day);setTaskTarget(undefined);setTaskAllDayOnly(allDayOnly);setTasksOpen(true);}
   const [taskDay,setTaskDay]=useState<string>();
   const [taskTarget,setTaskTarget]=useState<{id:string;occurrence:string}>();
   const [agendaDays, setAgendaDays] = useState(30);
@@ -691,7 +693,7 @@ export default function CalendarWorkspace() {
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <PlaceSync onComplete={refresh} />
-      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center" className={styles.taskSheet}>{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={()=>refresh(true)} day={taskDay} onlyAllDay={Boolean(taskDay)} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
+      <WorkspaceSheet open={tasksOpen} onClose={()=>setTasksOpen(false)} title="Tasks" titleIcon="check" presentation="center" className={styles.taskSheet}>{tasksOpen && snapshot && <TaskWorkspace snapshot={snapshot} zone={zone} onSaved={()=>refresh(true)} day={taskDay} onlyAllDay={Boolean(taskDay)&&taskAllDayOnly} initialId={taskTarget?.id} initialOccurrence={taskTarget?.occurrence}/>}</WorkspaceSheet>
       <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
         <h1><Link prefetch={false} className="workspace-home-link" href="/admin/calendar">Calendar</Link></h1>
           <SearchField aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} value={query} onChange={e => setQuery(e.target.value)} className={styles.calendarSearch} />
@@ -823,12 +825,12 @@ export default function CalendarWorkspace() {
             changePeriod(dx < 0 ? 1 : -1);
           }}>
           <CalendarZoom resetKey={`${view}:${range.start}`} enabled={view !== "agenda"}><CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
-          {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={item => eventButton(item)} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} calendars={snapshot.state.calendars} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
-            <CalendarMonthView onComplete={item => void completeTask(item)} days={days} date={date} today={localDate(new Date(now), zone)} events={occurrences} calendars={snapshot.state.calendars} refs={snapshot.refs} zone={zone} showWeekends={showWeekends}
+          {compact && view === "month" ? <CalendarMobileView refs={snapshot.refs} onTasks={openTaskDay} view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={item => eventButton(item)} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} calendars={snapshot.state.calendars} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
+            <CalendarMonthView onTasks={openTaskDay} onComplete={item => void completeTask(item)} days={days} date={date} today={localDate(new Date(now), zone)} events={occurrences} calendars={snapshot.state.calendars} refs={snapshot.refs} zone={zone} showWeekends={showWeekends}
               onDay={day => changeView("day", day)} onMore={day => setDayDetail(day)}
               onOpen={showPreview} />
           ) : view === "agenda" ? (
-            <CalendarAgenda rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={item => eventButton(item)} onDay={day => changeView("day", day)} />
+            <CalendarAgenda refs={snapshot.refs} onTasks={openTaskDay} rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={item => eventButton(item)} onDay={day => changeView("day", day)} />
           ) : (
             <CalendarTimeGrid
               onComplete={item => void completeTask(item)}
@@ -844,7 +846,7 @@ export default function CalendarWorkspace() {
               late={late}
               onDay={setDayDetail}
               onOpen={showPreview}
-              onTasks={day=>{setTaskDay(day);setTaskTarget(undefined);setTasksOpen(true);}}
+              onTasks={day=>openTaskDay(day,true)}
               onMove={(...args) => void move(...args)}
               onResize={(...args) => void resizeEvent(...args)}
             />

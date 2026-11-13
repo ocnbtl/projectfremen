@@ -1,4 +1,6 @@
 "use client";
+import TaskSummary from "./TaskSummary";
+import { localFor } from "../../lib/modules/planning/calendar-model";
 import TaskEventCard, { TaskCheck } from "./TaskEventCard";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Calendar, EventOccurrence } from "../../lib/modules/planning/types";
@@ -17,9 +19,9 @@ import EventGlyph from "./EventGlyph";
 import EventContinuation from "./EventContinuation";
 import styles from "./CalendarMonthView.module.css";
 
-export default function CalendarMonthView({ days, date, today, events, calendars, refs, zone, showWeekends, onDay, onMore, onOpen, onComplete }: {
+export default function CalendarMonthView({ days, date, today, events, calendars, refs, zone, showWeekends, onDay, onMore, onOpen, onComplete, onTasks }: {
   days: string[]; date: string; today: string; events: EventOccurrence[]; calendars: Calendar[]; refs: NativeObjectRef[];
-  zone: string; showWeekends: boolean; onDay: (day: string) => void; onMore: (day: string) => void; onOpen: (event: EventOccurrence) => void; onComplete: (event: EventOccurrence) => void;
+  zone: string; onTasks:(day:string)=>void; showWeekends: boolean; onDay: (day: string) => void; onMore: (day: string) => void; onOpen: (event: EventOccurrence) => void; onComplete: (event: EventOccurrence) => void;
 }) {
   const { layoutTransition } = useCalendarMotion(), columns = showWeekends ? 7 : 5;
   const details = useCalendarDetails();
@@ -37,10 +39,13 @@ export default function CalendarMonthView({ days, date, today, events, calendars
   return <div ref={container} className={styles.month} aria-label="Month calendar">
     {Array.from({ length: days.length / columns }, (_, row) => {
       const week = days.slice(row * columns, (row + 1) * columns);
-      const needed = Math.max(0, ...monthWeekLayout(week, events, zone, Infinity).segments.map(item => item.lane + 1));
-      const capacity = monthLaneCapacity(rowHeight, needed, eventHeight);
-      const { segments, hidden } = monthWeekLayout(week, events, zone, capacity);
-      return <div key={week[0]} className={styles.week} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gridTemplateRows: `28px ${capacity ? `repeat(${capacity}, ${eventHeight}px)` : ""} minmax(0, 1fr)` }} data-month-week={week[0]}>
+      const regular=events.filter(event=>!event.isTask);
+      const tasksOn=(day:string)=>events.filter(event=>event.isTask&&localFor(event.startMs,zone).slice(0,10)<=day&&localFor(event.endMs-1,zone).slice(0,10)>=day);
+      const hasTasks=week.some(day=>tasksOn(day).length>0);
+      const needed = Math.max(0, ...monthWeekLayout(week, regular, zone, Infinity).segments.map(item => item.lane + 1));
+      const capacity = monthLaneCapacity(rowHeight-(hasTasks?30:0), needed, eventHeight);
+      const { segments, hidden } = monthWeekLayout(week, regular, zone, capacity);
+      return <div key={week[0]} className={styles.week} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gridTemplateRows: `28px ${capacity ? `repeat(${capacity}, ${eventHeight}px)` : ""} minmax(0, 1fr) ${hasTasks?"28px":""}` }} data-month-week={week[0]}>
         {week.map((day, column) => <div key={day} className={styles.day} data-today={day === today} data-outside={day.slice(0, 7) !== date.slice(0, 7)} style={{ gridColumn: column + 1, gridRow: "1 / -1" }}>
           <button type="button" className={styles.date} aria-label={label(day, { weekday: "long", month: "long", day: "numeric" })} onClick={() => onDay(day)}>
             <small>{label(day, { weekday: "long" })}</small><span data-morph-date={day}>{Number(day.slice(-2))}</span>
@@ -66,6 +71,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
 
           </TaskEventCard>;
         })}
+        {week.map((day,column)=>{const tasks=tasksOn(day);return tasks.length?<TaskSummary key={day+"tasks"} day={day} tasks={tasks} refs={refs} style={{gridColumn:column+1,gridRow:capacity+3,alignSelf:"center"}} onOpen={()=>onTasks(day)}/>:null;})}
         {hidden.map((count, column) => count > 0 && <button type="button" key={week[column]} className={styles.more} style={{ gridColumn: column + 1, gridRow: capacity + 2 }} onClick={() => onMore(week[column])} aria-label={`${count} more events on ${label(week[column], { month: "long", day: "numeric" })}`}>+{count} more</button>)}
       </div>;
     })}

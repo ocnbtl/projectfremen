@@ -1,4 +1,5 @@
 "use client";
+import TaskSummary from "./TaskSummary";
 import { useRef, type ReactNode } from "react";
 import Link from "next/link";
 import type { EventOccurrence } from "../../lib/modules/planning/types";
@@ -11,8 +12,8 @@ import { useCalendarMotion } from "./CalendarMotion";
 import styles from "./CalendarWorkspace.module.css";
 
 /** Phone calendars use full-width event rows instead of seven unreadable time columns. */
-export default function CalendarMobileView({ view, date, today, days, events, linked, zone, onDate, renderEvent }: {
-  view: "day" | "week" | "month"; date: string; today: string; days: string[];
+export default function CalendarMobileView({ view, date, today, days, events, linked, zone, onDate, renderEvent, refs, onTasks }: {
+  refs:PlanningSnapshot["refs"];onTasks:(day:string)=>void; view: "day" | "week" | "month"; date: string; today: string; days: string[];
   events: EventOccurrence[]; linked: PlanningSnapshot["dated"]; zone: string;
   onDate: (day: string) => void; renderEvent: (event: EventOccurrence) => ReactNode;
 }) {
@@ -42,10 +43,11 @@ export default function CalendarMobileView({ view, date, today, days, events, li
     </div>}
     <div className={styles.mobileSchedule} ref={list} aria-label={view === "week" ? "Week events" : "Day events"}>
       {shown.map(day => {
-        const items = eventsOn(day), links = linksOn(day);
+        const items = eventsOn(day), links = linksOn(day), eventCount=items.filter(item=>!item.isTask).length+links.length;
         return <section key={day} data-schedule-day={day} className={styles.mobileScheduleDay}>
-          <header><h2>{day === today ? "Today" : label(day, { weekday: "long" })}<span>{label(day, { month: "short", day: "numeric" })}</span></h2><small>{items.length + links.length} {items.length + links.length === 1 ? "event" : "events"}</small></header>
-          {items.map(renderEvent)}
+          <header><h2>{day === today ? "Today" : label(day, { weekday: "long" })}<span>{label(day, { month: "short", day: "numeric" })}</span></h2><small>{eventCount} {eventCount === 1 ? "event" : "events"}</small></header>
+          {items.filter(item=>!item.isTask).map(renderEvent)}
+          {items.some(item=>item.isTask)&&<TaskSummary day={day} tasks={items.filter(item=>item.isTask)} refs={refs} onOpen={()=>onTasks(day)}/>}
           {links.map(item => <Link className={styles.mobileLinked} key={item.id} href={item.ownerRef?.route || "/admin/personal"}><UnigentamosIcon role={item.completed ? "check" : "link"} size={16} /><span>{item.title}</span></Link>)}
           {!items.length && !links.length && <p className={styles.mobileEmpty}>No events scheduled</p>}
         </section>;

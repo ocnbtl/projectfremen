@@ -43,7 +43,7 @@ function draftToGoalItems(goals: string[], previousGoals: EntityGoalItem[]): Ent
     );
     if (previousIndex >= 0) {
       usedPreviousIndexes.add(previousIndex);
-      return { text: item.text, done: previousGoals[previousIndex].done };
+      return { ...previousGoals[previousIndex], text: item.text, done: previousGoals[previousIndex].done };
     }
     return { text: item.text, done: false };
   });

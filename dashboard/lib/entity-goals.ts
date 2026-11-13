@@ -1,4 +1,5 @@
 export type EntityGoalItem = {
+  taskIdentity?: string;
   text: string;
   done: boolean;
   status?: "draft" | "planned" | "active" | "waiting" | "blocked" | "paused" | "cancelled";
@@ -18,6 +19,7 @@ export function normalizeGoalItems(
       }
 
       return {
+        ...(item && "taskIdentity" in item && typeof item.taskIdentity==="string" && /^[a-f0-9]{20}:\d+$/.test(item.taskIdentity)?{taskIdentity:item.taskIdentity}:{}),
         text: normalizeGoalText(item?.text),
         done: Boolean(item?.done),
         ...(item && "status" in item && ["draft", "planned", "active", "waiting", "blocked", "paused", "cancelled"].includes(String(item.status)) ? {status:item.status as EntityGoalItem["status"]} : {})

@@ -59,7 +59,12 @@ export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
   const { reduced } = useCalendarMotion();
   const active = useRef<ViewTransition | null>(null), revision = useRef(0);
   const cleanup = useRef<() => void>(() => {});
-  useLayoutEffect(() => () => { revision.current++; active.current?.skipTransition(); cleanup.current(); }, []);
+  useLayoutEffect(() => {
+    // A viewport change invalidates snapshot geometry, especially at the phone breakpoint.
+    const stop = () => { revision.current++; active.current?.skipTransition(); cleanup.current(); active.current = null; };
+    window.addEventListener("resize", stop);
+    return () => { window.removeEventListener("resize", stop); stop(); };
+  }, []);
   return (update: () => void) => {
     const version = ++revision.current;
     active.current?.skipTransition(); cleanup.current();

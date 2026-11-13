@@ -87,9 +87,34 @@
  .workspace .list[data-directory-view=comfortable] .rowActions{justify-content:space-between}
 }
 @media(prefers-reduced-motion:reduce){.hiddenToggle{transition:none}}
+/* Independent, compact controls keep the task itself in focus. */
+.contextControls{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.contextControls>*{min-width:0}
+.workspace .list .actionButtons :global(.work-button){display:inline-flex;align-items:center;justify-content:center;flex:none;width:34px;min-width:34px;height:34px;min-height:34px;padding:0;border-radius:9px}
+.workspace .list .actionButtons svg{width:17px;height:17px;flex:none}
+.visibilityControls :global(.work-button[aria-pressed=true]){background:var(--module-primary-100);border-color:var(--module-primary-300);color:var(--module-action)}
+.workspace[data-focus] .list .rowMeta{display:none}
+.workspace[data-focus] .list .row{grid-template-columns:minmax(0,1fr);gap:10px}
+.workspace[data-focus] .list .rowBody{grid-column:1;grid-row:1}
+.workspace[data-focus] .list .rowActions{grid-column:1;grid-row:2;justify-content:space-between}
+.workspace[data-focus] .list[data-directory-view=compact] .row{grid-template-columns:minmax(0,1fr) auto}
+.workspace[data-focus] .list[data-directory-view=compact] .rowActions{grid-column:2;grid-row:1}
+.workspace[data-focus] .list[data-directory-view=grid] .row{grid-template-rows:1fr auto}
+.backLabel{display:inline-flex;align-items:center;gap:6px;line-height:1}
+.editor{gap:16px;padding-bottom:4px}
+.editor .top{margin:0}.editor h3{display:flex;align-items:center;gap:7px;line-height:1.4}
+.editor section{padding:14px;border:1px solid var(--border,#d7e1e5);border-radius:12px;background:var(--surface,#fff);gap:10px}
+.editor .detailFields:empty{display:none}.editor .detailFields{padding:0;border:0;background:none}
+.dueControl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.dueControl>span{color:var(--text-muted);margin-right:auto}
+.editor .hint{margin:0}.editor footer{position:sticky;bottom:0;padding:12px 0 4px;background:var(--surface,#fff);z-index:4}
+@container(max-width:460px){.workspace[data-focus] .list[data-directory-view=compact] .row{grid-template-columns:minmax(0,1fr)}.workspace[data-focus] .list[data-directory-view=compact] .rowActions{grid-column:1;grid-row:2;flex-direction:row}.contextControls{gap:5px}.editor .fields{grid-template-columns:1fr}.editor section{padding:12px}.visibilityControls{gap:5px}}
 @container(max-width:460px){
  .workspace .list[data-directory-view=compact] .context :global([data-task-calendar-picker]){width:auto;flex:1;min-width:0}
  .workspace .list[data-directory-view=compact] .contextLinks{flex:0 1 auto;max-width:38%;gap:4px}
  .workspace .list[data-directory-view=compact] .contextLinks :global([data-profile-preview])>span:last-child{display:none}
  .workspace .list[data-directory-view=compact] .contextLinks .linked{flex:none}
 }
+
+.visibilityControls :global([data-compact])>span{display:none}.visibilityControls :global([data-compact]){flex:none}.visibilityControls{flex-wrap:nowrap}.visibilityControls :global(.work-button){height:38px;min-height:38px}.visibilityControls :global([data-compact]) button{min-height:38px}
+@media(max-width:700px){.workspace[data-task-surface=sheet] .taskToolbar{gap:8px}.workspace[data-task-surface=sheet] .taskToolbar>.visibilityControls{grid-column:1;min-width:0;gap:6px}.workspace[data-task-surface=sheet] .taskToolbar>:global(.work-button){height:38px;min-width:38px;width:38px;padding:0;justify-content:center}.workspace[data-task-surface=sheet] .taskToolbar>:global(.work-button)>span{display:none}.visibilityControls :global([data-compact]) button{padding:5px 8px;gap:5px}.visibilityControls :global(.work-button){padding:6px 8px}}

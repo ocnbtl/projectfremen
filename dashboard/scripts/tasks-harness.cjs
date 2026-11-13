@@ -79,5 +79,28 @@ const create=async input=>{const id='task-'+crypto.randomUUID();await changeTask
    await assert.rejects(()=>command({...item,id:'task-missing'},'visibility',{hidden:true,expectedHidden:false}),/no longer available/);
    assert.deepEqual(await readPlanningState(),before);
  });
+
+ await check('quick type changes preserve the source, assignments and completion behavior',async()=>{
+  const source=(await createPersonalOpsObject('followUps',{title:'Type change fixture',context:'Keep context'})).item;const item=await read('followUps:'+source.id),before=(await readPersonalOpsState()).followUps.find(f=>f.id===source.id);
+  await command(item,'classify',{kind:'task'});let next=await read(item.id);assert.equal(next.kind,'task');assert.deepEqual(next.source,item.source);assert.deepEqual(next.calendarIds,item.calendarIds);assert.deepEqual((await readPersonalOpsState()).followUps.find(f=>f.id===source.id),before);
+  await command(next,'complete',{occurrenceKey:next.start,completed:true});assert.equal((await readPersonalOpsState()).followUps.find(f=>f.id===source.id).followUpState,'complete');
+ });
+ await check('task editor writes decision details to the original record and enables completion',async()=>{
+  let item=await read('decisions:'+decision.id);const saved=await command(item,'details',{input:{...item,title:'Choose supplier',description:'Compare delivery',details:{finalDecision:'Supplier A',rationale:'Reliable delivery'}}});assert.equal(saved.title,'Choose supplier');assert.equal(saved.details.finalDecision,'Supplier A');
+  await command(saved,'complete',{occurrenceKey:'',completed:true});const ops=await readPersonalOpsState();assert.equal(ops.decisions.filter(d=>d.id===decision.id).length,1);assert.equal(ops.decisions.find(d=>d.id===decision.id).decisionState,'decided');
+ });
+ await check('objective editor preserves sibling objectives and stores optional notes',async()=>{
+  const before=(await readProjectsState()).projects.find(p=>p.id===project.id);let item=await read('objectives:'+project.id+':'+before.objectives[0].id);
+  item=await command(item,'details',{input:{...item,title:'Deliver final prototype',dueAt:'2026-12-12'}});
+  await command(item,'schedule',{input:{...item,description:'Review the prototype with the team.'}});const after=(await readProjectsState()).projects.find(p=>p.id===project.id);assert.deepEqual(after.objectives[1],before.objectives[1]);assert.equal(after.objectives[0].text,'Deliver final prototype');assert.equal(after.objectives[0].targetAt,'2026-12-12');assert.equal((await read(item.id)).description,'Review the prototype with the team.');
+ });
+ await check('legacy goal renaming preserves task identity, assignments and Undo',async()=>{
+  const item=(await readTasks(zone)).items.find(t=>t.source?.family==='legacyGoals'&&!t.completed);const before=(await readTasks(zone)).items.filter(t=>t.source?.family==='legacyGoals').map(t=>t.id);
+  let saved=await command(item,'details',{input:{...item,title:'Renamed historical goal'}});assert.equal(saved.id,item.id);assert.deepEqual(saved.calendarIds,item.calendarIds);assert.deepEqual((await readTasks(zone)).items.filter(t=>t.source?.family==='legacyGoals').map(t=>t.id),before);
+  await command(saved,'schedule',{input:{...saved,description:'Keep these notes',dueAt:'2026-12-20'}});saved=await read(saved.id);assert.equal(saved.description,'Keep these notes');assert.equal(saved.dueAt,'2026-12-20');const receipt=await command(saved,'complete',{occurrenceKey:'',completed:true,withUndo:true});await changeTask(receipt.undo.command);assert(!(await read(saved.id)).completed);
+ });
+ await check('native task due dates save without changing the scheduled date',async()=>{
+  let item=await create({title:'Due date fixture',dueAt:'2026-12-03'});assert.equal(item.dueAt,'2026-12-03');item=await command(item,'details',{input:{...item,title:'Edited fixture',dueAt:'2026-12-05',description:'Updated note'}});assert.equal(item.title,'Edited fixture');assert.equal(item.dueAt,'2026-12-05');assert.equal(item.start,'');await assert.rejects(()=>command(item,'classify',{kind:'unknown'}));await command(item,'schedule',{input:{...item,dueAt:''}});assert.equal((await read(item.id)).dueAt,'');
+ });
  console.log(`PASS ${count} task integration checks; isolated data: ${data}`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
