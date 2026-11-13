@@ -108,3 +108,7 @@ to{opacity:1;transform:none}
 .content .profileTabs button{width:auto!important;min-width:0!important;flex:0 0 auto}.profilePhoto :global(.people-avatar),.profilePhoto :global(.people-row-avatar),.avatar :global(.people-row-avatar){border-radius:50%!important;overflow:hidden}.entries article{background:var(--surface-panel,#fff)}
 
 .profilePhoto :global(.people-profile-photo-trigger){overflow:visible!important}.profilePhoto :global(.people-profile-photo-trigger)>img{border-radius:50%}.profilePhoto :global(.people-profile-photo-badge){right:0;bottom:0}
+
+.careType{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:500;color:var(--text-strong)}.careReveal{overflow:hidden}.careReveal>.fields{padding-top:16px}.careHeading{grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--module-icon);padding:10px 12px;background:var(--module-primary-50);border-radius:10px}.careHeading strong{font-size:14px;font-weight:550}.careHeading span{margin-left:auto;font-size:13px;color:var(--text-muted)}.careReveal textarea{min-height:72px!important;resize:vertical}.careReveal .fields{gap:14px}.careReveal .fields label{font-size:13px}.careReveal .fields input{min-height:40px}
+
+.careTiming{grid-column:1/-1;padding:14px;background:var(--module-primary-50);border-radius:12px;display:grid;gap:12px}.careTiming h3{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:550;margin:0}

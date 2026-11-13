@@ -152,7 +152,7 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
       // Count real actions, not alternate mobile navigation or hidden menu copies.
       const actions = [...host.querySelectorAll<HTMLElement>("button, a[href]")].filter(action => {
         for (let node: HTMLElement | null = action; node && node !== host; node = node.parentElement) {
-          if (node.matches('[hidden], .work-mobile-only, [class*="mobileMenuButton"], .finance-mobile-menu, .people-mobile-nav-trigger, .workspace-create-actions, [role="menu"], [role="dialog"]')) return false;
+          if (node.matches('[data-task-navigation], [hidden], .work-mobile-only, [class*="mobileMenuButton"], .finance-mobile-menu, .people-mobile-nav-trigger, .workspace-create-actions, [role="menu"], [role="dialog"]')) return false;
         }
         return true;
       });

@@ -118,3 +118,18 @@
 
 .visibilityControls :global([data-compact])>span{display:none}.visibilityControls :global([data-compact]){flex:none}.visibilityControls{flex-wrap:nowrap}.visibilityControls :global(.work-button){height:38px;min-height:38px}.visibilityControls :global([data-compact]) button{min-height:38px}
 @media(max-width:700px){.workspace[data-task-surface=sheet] .taskToolbar{gap:8px}.workspace[data-task-surface=sheet] .taskToolbar>.visibilityControls{grid-column:1;min-width:0;gap:6px}.workspace[data-task-surface=sheet] .taskToolbar>:global(.work-button){height:38px;min-width:38px;width:38px;padding:0;justify-content:center}.workspace[data-task-surface=sheet] .taskToolbar>:global(.work-button)>span{display:none}.visibilityControls :global([data-compact]) button{padding:5px 8px;gap:5px}.visibilityControls :global(.work-button){padding:6px 8px}}
+
+/* Keep controls stable across every density and give exiting cards their own layer. */
+.list{position:relative}
+.workspace .list[data-directory-view] .actionButtons :global(.work-button){width:34px;min-width:34px;max-width:34px;height:34px;min-height:34px;max-height:34px;aspect-ratio:1;flex:0 0 34px;padding:0;box-sizing:border-box}
+.visibilityControls[data-task-navigation]{order:-1;gap:6px;flex-wrap:nowrap}
+@media(max-width:600px){.visibilityControls[data-task-navigation] .scopes button{padding:7px 8px;font-size:12px}.visibilityControls[data-task-navigation]{gap:4px}.visibilityControls[data-task-navigation] :global(.work-button){min-width:32px;height:34px;padding:0 7px}}
+
+@media(max-width:700px){
+ :global(.workspace-topnav[data-inline-actions]:has([data-task-navigation])>.workspace-topnav__actions){max-width:100%;flex-wrap:wrap;gap:5px}
+ :global(.workspace-topnav[data-inline-actions]:has([data-task-navigation]) .workspace-topnav__actions) :global(.work-button){width:34px;min-width:34px;height:36px;min-height:36px;flex:none}
+ :global(.workspace-topnav[data-inline-actions]) .visibilityControls[data-task-navigation] .hiddenToggle{width:auto;min-width:43px;padding:0 5px;gap:4px}
+ :global(.workspace-topnav[data-inline-actions]) .visibilityControls[data-task-navigation] .hiddenToggle>span{display:inline-flex;font-size:12px}
+ .visibilityControls[data-task-navigation] .scopes button{padding:7px 6px;font-size:12px}
+ .visibilityControls[data-task-navigation]{max-width:100%;gap:4px}
+}

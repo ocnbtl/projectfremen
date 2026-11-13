@@ -62,7 +62,7 @@ let browser,page;
   const url=page.url(),scroll=await page.evaluate(()=>scrollY),view=await page.getByRole('button',{name:/^View: /}).getAttribute('aria-label');
   const writes=[];const watch=r=>{if(!['GET','HEAD'].includes(r.method()))writes.push(r.url());};page.on('request',watch);
   await trigger.locator('img').click();const preview=page.getByRole('dialog',{name,exact:true});await expect(preview).toBeVisible();await expect(preview).toHaveCSS('opacity','1');
-  await expect(preview.getByRole('link',{name:name==='Jamie Harper'?'Open profile':'Open record',exact:true})).toBeVisible();
+  await expect(preview.getByRole('link',{name:name==='Jamie Harper'?'Open profile':'Open Object',exact:true})).toBeVisible();
   assert(await preview.locator('img').evaluate(n=>n.complete&&n.naturalWidth>0),'Preview picture loaded');
   if(name==='Community garden')await expect(preview.getByText('A shared garden for the neighborhood.',{exact:true})).toBeVisible();
   const box=await preview.boundingBox();assert(box.x>=0&&box.x+box.width<=width+1,'Preview stays within viewport');

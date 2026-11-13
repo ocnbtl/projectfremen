@@ -230,7 +230,7 @@ export default function PersonalOpsSidebar({
       status={status}
       onHome={onHome}
       description="Daily command, durable records, and personal systems."
-      sections={activeView === "command" ? [] : sections}
+      sections={activeView === "command" || activeView === "dog" ? [] : sections}
       className={styles.sidebar}
       mobileOpen={mobileOpen}
       onClose={onClose}
