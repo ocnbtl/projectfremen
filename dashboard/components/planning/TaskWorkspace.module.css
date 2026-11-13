@@ -93,7 +93,7 @@
 .workspace .list .actionButtons :global(.work-button){display:inline-flex;align-items:center;justify-content:center;flex:none;width:34px;min-width:34px;height:34px;min-height:34px;padding:0;border-radius:9px}
 .workspace .list .actionButtons svg{width:17px;height:17px;flex:none}
 .visibilityControls :global(.work-button[aria-pressed=true]){background:var(--module-primary-100);border-color:var(--module-primary-300);color:var(--module-action)}
-.workspace[data-focus] .list .rowMeta{display:none}
+.workspace[data-focus] .list .rowMeta{position:absolute;pointer-events:none}
 .workspace[data-focus] .list .row{grid-template-columns:minmax(0,1fr);gap:10px}
 .workspace[data-focus] .list .rowBody{grid-column:1;grid-row:1}
 .workspace[data-focus] .list .rowActions{grid-column:1;grid-row:2;justify-content:space-between}
@@ -133,3 +133,19 @@
  .visibilityControls[data-task-navigation] .scopes button{padding:7px 6px;font-size:12px}
  .visibilityControls[data-task-navigation]{max-width:100%;gap:4px}
 }
+
+/* Task details share a compact, stable form grid. */
+.editor{gap:12px}.editor .top{justify-content:flex-start}.editor .backButton{padding:6px 10px;min-height:34px}.editor .backButton>span{display:flex;align-items:center}.editor .backLabel{display:inline-flex!important;align-items:center!important;gap:6px;line-height:20px}.backLabel svg{display:block;flex:none}
+.identityFields{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:12px;align-items:end}.editor textarea{min-height:56px;resize:vertical}.editor section{padding:12px;gap:10px}.editorAssociations{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.editorAssociations>section{min-width:0}.editor .people:empty{display:none}.editor .choices button{padding:7px 9px}.editor footer{padding:8px 0 2px}
+.scheduleFields{display:grid;grid-template-columns:minmax(160px,1fr) minmax(130px,1fr) minmax(140px,1fr);gap:10px;align-items:start}.scheduleFields[data-timed]{grid-template-columns:minmax(170px,1.15fr) minmax(170px,1.15fr) minmax(120px,.85fr) minmax(120px,.85fr)}.scheduleFields>*{min-width:0}.scheduleFields :global(.app-select-trigger){min-height:38px;font-size:12px;padding:7px 9px}.repeatField{display:grid;gap:7px;font-size:13px;font-weight:500;min-width:0}.repeatField>div{min-width:0}.repeatField>div>div:first-child{display:block;min-width:0}.repeatField>div>div:first-child>div{width:100%;min-width:0}.dueControl{gap:6px;flex-wrap:nowrap;font-size:12px}.dueControl>span{display:none}.dueControl :global(.work-button){min-height:30px;padding:5px 8px;font-size:12px}.dueControl :global([data-compact])>span{display:none}.dueControl :global([data-compact]) button{min-height:30px}
+.workspace[data-focus] .list .rowActions{justify-content:flex-end}
+@container(max-width:720px){.scheduleFields[data-timed]{grid-template-columns:1fr 1fr}.editorAssociations{grid-template-columns:1fr 1fr}}
+@container(max-width:500px){.identityFields{grid-template-columns:minmax(0,1fr) 135px;gap:8px}.editorAssociations{grid-template-columns:1fr}.scheduleFields{grid-template-columns:1fr 1fr}.repeatField{grid-column:1/-1}.scheduleFields[data-timed] .repeatField{grid-column:auto}.editor .sectionHeading{align-items:center}.editor section{padding:10px}.editor .hint{font-size:11px}}
+
+.editor input,.editor textarea{margin:0!important}.identityFields input,.identityFields :global(.app-select-trigger){height:40px;min-height:40px;margin:0!important}.identityFields>label{align-content:start}
+
+.editor{gap:10px}.editor textarea{min-height:48px}.editorAssociations>section{gap:8px}.taskSheet{height:min(840px,calc(100dvh - 32px))!important}.taskSheet>:global(.work-sheet-body){flex:1;scrollbar-gutter:stable}:global(html:has([data-task-surface=page])){scrollbar-gutter:stable}
+
+.workspace .list .row{position:relative}
+
+.scheduleFields .repeatField:has(input){grid-column:1/-1}

@@ -1,4 +1,5 @@
 [
+  {"id":"focus-mode","label":"Focus mode","defaultCandidate":"viewfinder","candidates":["viewfinder","focus-2","target","target-arrow","circle-dot"],"usages":[{"module":"Personal","breadcrumb":"Tasks > Focus mode"}]},
   {"id": "travel-kind-country", "label": "Travel: Country", "defaultCandidate": "world", "candidates": ["world", "globe", "world-pin", "flag", "map"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
   {"id": "travel-kind-state", "label": "Travel: U.S. state", "defaultCandidate": "map-2", "candidates": ["map-2", "map", "map-pin", "flag-2", "route"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
   {"id": "travel-kind-city", "label": "Travel: City", "defaultCandidate": "building-community", "candidates": ["building-community", "buildings", "building-skyscraper", "building-estate", "building"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
