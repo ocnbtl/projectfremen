@@ -12,6 +12,7 @@ import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/pe
 import PeopleLinksPanel from "./people/PeopleLinksPanel";
 import PeopleProfilePreview from "./people/PeopleProfilePreview";
 import ProfileEntry from "./people/ProfileEntry";
+import ProfileTabPanel from "./people/ProfileTabPanel";
 import type { ProfileRecordEdge } from "../lib/modules/people/profile-connections";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -4556,7 +4557,7 @@ export default function PeopleWorkspace({
               </>
             )}
 
-            <div key={selectedPerson.id+":"+activeView}
+            <ProfileTabPanel panelKey={selectedPerson.id+":"+activeView}
               id={!addingPerson ? `people-${selectedPerson.id}-panel-${activeView}` : undefined}
               role={!addingPerson ? "tabpanel" : undefined}
               aria-labelledby={!addingPerson ? `people-${selectedPerson.id}-tab-${activeView}` : undefined}
@@ -4890,13 +4891,11 @@ export default function PeopleWorkspace({
                     </section>;
                   })}
 
-                  {selectedProfile.locations.length>0&&<section className="people-overview-detail-group" aria-label="Places"><h4><PeopleIcon name="location"/>Places</h4>{selectedProfile.locations.map(entry=><div className="people-overview-detail-row" key={entry.id}><div><strong>{entry.label||"Place"}</strong><span>{entry.address||entry.location}</span></div></div>)}</section>}
-                  {selectedPerson.className === "person" && selectedProfile.occupations.length>0&&<section className="people-overview-detail-group" aria-label="Work"><h4><PeopleIcon name="occupation"/>Work</h4>{selectedProfile.occupations.map(entry=>{const organization=activePeople.find(record=>record.id===entry.organizationId&&record.className==="org");return <div className="people-overview-detail-row" key={entry.id}>{organization&&<PeopleProfilePreview className="people-overview-employer-avatar" person={organization} onOpen={selectPerson}><PeopleProfileAvatar compact organization label={organization.title} initials={getInitials(organization)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt}/></PeopleProfilePreview>}<div><strong>{entry.title||"Occupation"}{entry.status==="past"&&<small>Past</small>}</strong>{organization?<PeopleProfilePreview className="people-inline-object-link" person={organization} onOpen={selectPerson}>{organization.title}</PeopleProfilePreview>:entry.employer&&<span>{entry.employer}</span>}</div></div>;})}</section>}
+                  {selectedProfile.locations.length>0&&<section className="people-overview-detail-group" aria-label="Places"><h4><PeopleIcon name="location"/>Places</h4>{selectedProfile.locations.map(entry=><div className="people-overview-detail-row" key={entry.id}><PeopleIcon name="location"/><div><strong>{entry.label||"Place"}</strong><span>{entry.address||entry.location}</span></div></div>)}</section>}
+                  {selectedPerson.className === "person" && selectedProfile.occupations.length>0&&<section className="people-overview-detail-group" aria-label="Work"><h4><PeopleIcon name="occupation"/>Work</h4>{selectedProfile.occupations.map(entry=>{const organization=activePeople.find(record=>record.id===entry.organizationId&&record.className==="org");return <div className="people-overview-detail-row people-work-entry" key={entry.id}><PeopleIcon name="organization"/><div className="people-work-entry-line"><strong>{entry.title||"Occupation"}</strong>{(organization||entry.employer)&&<><span className="people-work-at" aria-hidden="true">@</span>{organization?<PeopleProfilePreview className="people-inline-object-link people-work-organization" person={organization} onOpen={selectPerson}><PeopleProfileAvatar compact organization label={organization.title} initials={getInitials(organization)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt}/><span>{organization.title}</span></PeopleProfilePreview>:<span>{entry.employer}</span>}</>}{entry.status==="past"&&<small>Past</small>}</div></div>;})}</section>}
                   {selectedPerson.className === "person" && overviewEducation.length > 0 && (
-                    <section className="people-education-overview" aria-label="Education">
-                      <span className="people-info-icon"><PeopleIcon name="university" /></span>
-                      <div className="people-education-overview-copy">
-                        <strong>Education</strong>
+                    <section className="people-overview-detail-group people-education-overview" aria-label="Education">
+                      <h4><PeopleIcon name="university"/>Education</h4>
                         {overviewEducation.length > 0 ? (
                           <div className="people-education-overview-list">
                             {overviewEducation.map((entry) => {
@@ -4906,7 +4905,7 @@ export default function PeopleWorkspace({
                               return (
                                 <article key={entry.id}>
                                   {organization
-                                    ? <PeopleProfilePreview className="people-inline-object-link" person={organization} onOpen={selectPerson}>{organization.title}</PeopleProfilePreview>
+                                    ? <PeopleProfilePreview className="people-inline-object-link people-work-organization" person={organization} onOpen={selectPerson}><PeopleProfileAvatar compact organization label={organization.title} initials={getInitials(organization)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt}/><span>{organization.title}</span></PeopleProfilePreview>
                                     : <span className="people-education-name">{entry.institution || "University not added"}</span>}
                                   <div className="people-education-meta">
                                     {entry.degree&&<span>{entry.degree}</span>}
@@ -4917,13 +4916,12 @@ export default function PeopleWorkspace({
                             })}
                           </div>
                         ) : <span className="people-education-empty">—</span>}
-                      </div>
                     </section>
                   )}
                 </article>
               </section>
             )}
-            </div>
+            </ProfileTabPanel>
             {!addingPerson && PEOPLE_VIEWS.filter((view) => view.id !== activeView).map((view) => (
               <section
                 id={`people-${selectedPerson.id}-panel-${view.id}`}

@@ -399,3 +399,18 @@
 .workspace-people-pages .people-relationship-rhythm>div>span{font:400 12px/1.5 var(--font-body)!important;color:var(--text-subtle)}
 .workspace-people-pages .people-timeline-stream .people-profile-view-actions button>span{font:500 13px/1.4 var(--font-body)}
 .workspace-people-pages .people-timeline-stream .people-interaction-participants button>span:last-child{font:500 12px/1.4 var(--font-body);background:none;border:0;padding:0;color:var(--text-strong)}
+
+/* Outlined entries keep role, institution, and place information distinct. */
+.workspace-people-pages .people-overview-detail-row,.workspace-people-pages .people-education-overview-list>article{background:transparent;border:1px solid #24394050;border-radius:10px;padding:10px 12px;min-width:0;box-shadow:none}
+.workspace-people-pages .people-overview-detail-row>svg{width:18px;height:18px;flex:none;color:var(--module-icon)}
+.workspace-people-pages .people-work-entry>div.people-work-entry-line{display:flex;align-items:center;flex-wrap:wrap;gap:5px 7px;min-width:0}.people-work-at{color:var(--text-muted)}
+.workspace-people-pages .people-work-entry .people-work-organization,.workspace-people-pages .people-education-overview .people-work-organization{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;padding:2px 4px;border-radius:7px;background:transparent;color:var(--text-strong);font:500 13px/1.4 var(--font-body)}
+.workspace-people-pages .people-work-organization :is(.people-avatar,.people-row-avatar){width:23px!important;height:23px!important;min-width:23px!important;flex:none}.workspace-people-pages .people-work-organization>span:last-child{overflow-wrap:anywhere;text-align:left}.workspace-people-pages .people-work-organization:hover{background:var(--module-quiet)}
+.workspace-people-pages .people-work-entry small{font-size:11px;color:var(--text-subtle);margin-left:auto}
+.workspace-people-pages .people-education-overview-list{display:grid;gap:8px}.workspace-people-pages .people-education-overview-list>article{display:grid;gap:5px}.workspace-people-pages .people-education-meta{display:flex;flex-wrap:wrap;gap:4px 10px}
+.people-redesign-shell .people-properties-column :is(.people-profile-section-heading,.people-repeatable-heading){background:transparent!important;border:1px solid #24394080!important;border-radius:9px;padding:7px 9px!important}
+.people-profile-panel-transition{position:relative;min-width:0;flex:1;isolation:isolate}.workspace-people-pages .people-profile-panel-transition>.people-active-tab-panel{animation:none!important;min-width:0;width:100%;box-sizing:border-box}.people-profile-panel-transition>[inert]{pointer-events:none}
+
+.workspace-people-pages .people-education-overview-list>article{border:1px solid #24394050!important;padding:10px 12px!important;background:transparent!important}.workspace-people-pages .people-overview-facts .people-work-organization{background:transparent!important;color:var(--text-strong)!important}.workspace-people-pages .people-overview-facts .people-work-organization:hover{color:var(--module-icon)!important}
+
+.workspace-people-pages .people-overview-facts .people-education-overview{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:10px}.workspace-people-pages .people-education-overview>h4{display:flex;align-items:center;gap:8px;margin:0}
