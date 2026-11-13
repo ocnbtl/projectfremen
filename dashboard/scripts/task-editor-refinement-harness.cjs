@@ -79,8 +79,8 @@ let browser,page;
   await due.click();await expect(page.getByRole('button',{name:'Due date',exact:true})).toBeVisible();
   for(const mode of ['Choose a day','Choose a time']){
    await page.getByRole('button',{name:mode,exact:true}).click();await page.waitForTimeout(300);
-   const start=await page.getByRole('button',{name:'Start',exact:true}).boundingBox(),tz=await page.getByRole('combobox',{name:'Task time zone',exact:true}).boundingBox();
-   if(width===1440||mode==='Choose a day'){assert(Math.abs(start.height-tz.height)<1,'date and time zone equal height');assert(Math.abs(start.y-tz.y)<2,'matching field baseline');}
+   const start=await page.getByRole('group',{name:'Start',exact:true}).boundingBox(),tz=await page.getByRole('combobox',{name:'Task time zone',exact:true}).boundingBox();
+   if(width===1440){assert(Math.abs(start.y+start.height/2-tz.y-tz.height/2)<5,'date and time zone align');}
    assert(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1),'editor no horizontal overflow');
    await page.screenshot({path:path.join(out,'editor-'+width+'-'+mode.replaceAll(' ','-')+'.png')});
   }

@@ -179,3 +179,18 @@
 .repeatField :global(.app-select-trigger){min-height:36px}
 @media(max-width:700px){.workspace[data-task-surface=sheet] .taskToolbar>.visibilityControls{flex-wrap:wrap}.workspace[data-task-surface=sheet] .visibilityControls .scopes button{padding:7px 6px;font-size:11px}.workspace[data-task-surface=sheet] .visibilityControls :global(.work-button){padding:4px;min-width:32px;flex:none}}
 @container(max-width:500px){.scheduleFields[data-timed]{grid-template-columns:repeat(2,minmax(0,1fr))}.scheduleFields[data-timed] .timeZoneField{grid-column:1/-1}.scheduleFields[data-timed] .timeZoneField :global(.app-select-trigger){height:40px;min-height:40px}.scheduleFields[data-timed] .repeatField{grid-column:1/-1}}
+
+/* Reuse Calendar's typed date segments, with zone and Repeat beside Start. */
+.scheduleFields,.scheduleFields[data-timed]{grid-template-columns:minmax(280px,1.3fr) minmax(110px,.6fr) minmax(210px,1fr);align-items:center;gap:6px 12px}
+.scheduleFields [data-task-start]{grid-column:1;grid-row:1}
+.scheduleFields [data-task-end]{grid-column:1;grid-row:2}
+.scheduleFields .timeZoneField{grid-column:2;grid-row:1}
+.scheduleFields .repeatField{grid-column:3;grid-row:1}
+.scheduleFields .timeZoneField :global(.app-select-trigger),.scheduleFields[data-timed] .timeZoneField :global(.app-select-trigger){height:36px;min-height:36px;padding:6px 8px}
+.taskZone{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;font:500 12px var(--font-body)}
+.taskZone svg{flex:none}
+.scheduleFields .repeatField:has(input){grid-column:3}
+.scheduleFields .repeatField:has(input[aria-label="Custom repeat rule"]){grid-column:1/-1;grid-row:3}
+.scheduleFields input[data-segment]:focus{outline:none;outline-offset:0}
+@container(max-width:720px){.scheduleFields,.scheduleFields[data-timed]{grid-template-columns:minmax(100px,.7fr) minmax(175px,1fr)}.scheduleFields [data-task-start],.scheduleFields [data-task-end]{grid-column:1/-1}.scheduleFields .timeZoneField{grid-column:1;grid-row:3}.scheduleFields .repeatField,.scheduleFields .repeatField:has(input){grid-column:2;grid-row:3}.scheduleFields .repeatField:has(input[aria-label="Custom repeat rule"]){grid-column:1/-1;grid-row:4}}
+@container(max-width:360px){.scheduleFields,.scheduleFields[data-timed]{grid-template-columns:minmax(0,1fr)}.scheduleFields .timeZoneField{grid-column:1;grid-row:3}.scheduleFields .repeatField,.scheduleFields .repeatField:has(input){grid-column:1;grid-row:4}}

@@ -18,10 +18,10 @@
 .dateRow { display:flex; align-items:center; gap:6px; min-height:36px; min-width:0; }
 .dateLabel { flex:none; width:50px; font-weight:500; }
 .segments { display:flex; align-items:center; gap:0; min-width:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
-.editor .segment { border:1px solid transparent; border-radius:5px; box-shadow:none; outline:none; background:transparent; width:2.45ch; min-width:0; padding:4px 1px; min-height:30px; text-align:center; font:500 13px/1.5 var(--font-body); }
-.editor .segment[data-segment="year"] { width:4.7ch; }
-.editor .segment[data-segment="period"] { width:3ch; margin-left:1px; }
-.editor .segment:focus { background:var(--module-quiet); }
+.dateRow .segment { border:1px solid transparent; border-radius:5px; box-shadow:none; outline:none; background:transparent; width:2.45ch; min-width:0; padding:4px 1px; min-height:30px; text-align:center; font:500 13px/1.5 var(--font-body); }
+.dateRow .segment[data-segment="year"] { width:4.7ch; }
+.dateRow .segment[data-segment="period"] { width:3ch; margin-left:1px; }
+.dateRow .segment:focus { background:var(--module-quiet); }
 .segment::selection { background:var(--module-action); color:white; }
 .comma { margin-right:5px; }
 .calendar { display:grid; gap:6px; }
@@ -40,7 +40,7 @@
 .links :global(.work-links) a { font-size:13px; gap:6px; }
 .links :global(.work-links) > span > button { min-width:24px; width:24px; min-height:26px; padding:3px; }
 .participants { font-size:12px; color:var(--text-secondary); }
-@media(max-width:700px) { .editor {grid-template-columns:minmax(0,1fr);gap:22px;} .left,.right {gap:14px;} .editor .title {width:100%;} .editor input,.editor textarea {font-size:16px;} .editor .segment {font-size:14px;} .optionRow {grid-template-columns:100px 40px minmax(0,1fr);} }
+@media(max-width:700px) { .editor {grid-template-columns:minmax(0,1fr);gap:22px;} .left,.right {gap:14px;} .editor .title {width:100%;} .editor input,.editor textarea {font-size:16px;} .dateRow .segment {font-size:14px;} .optionRow {grid-template-columns:100px 40px minmax(0,1fr);} }
 
 .editor .schedule label {font-size:13px;color:var(--text-strong);}
 .editor .schedule label > span:last-child {font-size:13px;color:var(--text-strong);}
@@ -53,10 +53,10 @@
 .editor .optionRow > label { flex:0 0 98px; }
 .editor .optionRow > input { flex:0 0 34px; width:34px; padding:3px 0; }
 .editor .optionRow > button { width:auto; min-width:0; flex:none; padding:4px; }
-.editor .segment { width:2.2ch; padding:3px 0; border-radius:3px; }
-.editor .segment[data-segment="year"] { width:4.4ch; }
-.editor .segment[data-segment="period"] { width:2.7ch; margin:0; }
-.editor .segment:focus { box-shadow:inset 0 -2px var(--module-action)!important; }
+.dateRow .segment { width:2.2ch; padding:3px 0; border-radius:3px; }
+.dateRow .segment[data-segment="year"] { width:4.4ch; }
+.dateRow .segment[data-segment="period"] { width:2.7ch; margin:0; }
+.dateRow .segment:focus { box-shadow:inset 0 -2px var(--module-action)!important; }
 .calendar { display:flex; align-items:flex-start; gap:12px; min-height:115px; }
 .calendarSelect { flex:none; max-width:48%; }
 .calendarSelect > button { width:auto; max-width:100%; padding:6px 9px; border-radius:18px; }
@@ -73,8 +73,8 @@
 .editor .groups button {width:auto;min-height:26px;flex:0 1 auto;}
 
 /* Equal, tight optical spacing on both sides of the time separator. */
-.editor .segment[data-segment="hour"] { text-align:right; padding-right:1px; }
-.editor .segment[data-segment="minute"] { text-align:left; padding-left:1px; }
+.dateRow .segment[data-segment="hour"] { text-align:right; padding-right:1px; }
+.dateRow .segment[data-segment="minute"] { text-align:left; padding-left:1px; }
 .dateRow > div:first-child { flex:0 0 18px; width:18px; }
 .calendar { position:relative; align-items:center; height:120px; min-height:120px; flex:none; }
 .editor .calendarSelect { align-self:center; max-width:36%; }
@@ -152,7 +152,7 @@
  .editor .optionRow > input {min-height:28px;}
  .dateRow {min-height:29px;gap:4px;}
  .dateLabel {width:39px;font-size:11px;}
- .editor .segment {min-height:28px;padding-block:2px;font-size:13px;}
+ .dateRow .segment {min-height:28px;padding-block:2px;font-size:13px;}
  .links {order:5;}
  .links :global(.work-object-links) {gap:4px;}
  .links :global(.work-links) {max-height:56px;overflow:auto;gap:3px 9px;}
@@ -161,7 +161,7 @@
 }
 @media(max-width:700px) {
  .editor {gap:6px;}
- .editor .segment {font-size:16px!important;zoom:.8125;}
+ .dateRow .segment {font-size:16px!important;zoom:.8125;}
  .editor .optionRow > input {font-size:16px!important;zoom:.8125;}
  .locationSlot input {font-size:16px!important;zoom:.875;}
 }

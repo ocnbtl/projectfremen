@@ -12,6 +12,7 @@ import SearchField from "../ui/SearchField";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventDateTimePicker from "./EventDateTimePicker";
+import EventDateSegments from "./EventDateSegments";
 import EventRepeatField from "./EventRepeatField";
 import RecordLinks from "./RecordLinks";
 import { EventObjectIdentity } from "./EventObjects";
@@ -101,9 +102,9 @@ function TaskEditor({item,occurrence,zone,snapshot,busy,onBack,onSave,onComplete
     <TaskDetailFields draft={draft} update={update} zone={zone}/>
     <section className={styles.scheduleSection}><div className={styles.sectionHeading}><h3><UnigentamosIcon role="calendar" size={17}/>Schedule</h3><TaskDueDateField draft={draft} update={update} zone={zone}/></div><div className={styles.choices}>{[["floating","Today until done"],["day","Choose a day"],["time","Choose a time"]].map(([value,label])=><button type="button" key={value} aria-pressed={value===(!draft.start?"floating":draft.allDay?"day":"time")} onClick={()=>value==="floating"?schedule(""):schedule(draft.start||today,value==="day")}>{label}</button>)}</div>
       {!draft.start?<p className={styles.hint}>Appears in Today’s tasks until complete.</p>:<div className={styles.scheduleFields} data-timed={!draft.allDay||undefined}>
-        <EventDateTimePicker compact label="Start" value={draft.start} allDay={draft.allDay} timeZone={draft.timeZone} onChange={value=>schedule(value)}/>
-        {!draft.allDay&&<EventDateTimePicker compact label="End" value={draft.end} allDay={false} timeZone={draft.timeZone} onChange={value=>update({end:value})}/>}
-        <label className={styles.timeZoneField}>Time zone<SelectField contained searchable aria-label="Task time zone" value={draft.timeZone} onChange={e=>update({timeZone:e.target.value})}>{[...new Set([draft.timeZone,"UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}</SelectField></label>
+        <div data-task-start><EventDateSegments label="Start" value={draft.start} allDay={draft.allDay} timeZone={draft.timeZone} onChange={value=>schedule(value)}/></div>
+        {!draft.allDay&&<div data-task-end><EventDateSegments label="End" value={draft.end} allDay={false} timeZone={draft.timeZone} onChange={value=>update({end:value})}/></div>}
+        <div className={styles.timeZoneField}><SelectField contained searchable autoFocusSearch={false} triggerContent={<span className={styles.taskZone}><UnigentamosIcon role="clock" size={15}/>{draft.timeZone.split("/").pop()?.replaceAll("_"," ")}<UnigentamosIcon role="chevron-down" size={12}/></span>} aria-label="Task time zone" value={draft.timeZone} onChange={e=>update({timeZone:e.target.value})}>{[...new Set([draft.timeZone,"UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}</SelectField></div>
         <div className={styles.repeatField}><EventRepeatField standalone fields={fields} update={(key,value)=>{if(key==="recurrenceAnchor")setRepeatError(value?"Choose a repeat schedule based on days, weeks, months, or years.":"");if(key==="recurrence")update({recurrence:value as string});}}/></div>
       </div>}
     </section>
