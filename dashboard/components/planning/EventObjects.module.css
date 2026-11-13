@@ -29,7 +29,7 @@
 @container timed-event (max-width:80px) {.objects[data-object-list] .visual {margin-left:0;}}
 
 .visual,.visual img { border-radius:50%; clip-path:circle(50%); }
-.visual[data-project-logo], .visual[data-project-logo] img { border-radius:22%; clip-path:none; background:transparent; }
+.visual[data-project-logo], .visual[data-project-logo] img { border-radius:var(--project-picture-radius); clip-path:none; background:transparent; }
 .visual[data-project-logo] img { object-fit:contain; }
 .objects[data-object-list] .label { white-space:nowrap; }
 .objects[data-object-list] .more { order:3; width:auto; height:20px; min-width:0; gap:3px; padding:0 3px; background:transparent; }

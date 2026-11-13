@@ -1,0 +1,12 @@
+/* One picture treatment for saved project images and unsaved upload previews.
+   Keep the stored crop intact; round only its displayed frame at every size. */
+:root { --project-picture-radius: 22%; }
+
+img[src^="/api/projects/photos/"],
+img[data-project-picture] {
+  border-radius: var(--project-picture-radius);
+  clip-path: inset(0 round var(--project-picture-radius));
+  object-fit: contain;
+  object-position: center;
+  background: transparent;
+}

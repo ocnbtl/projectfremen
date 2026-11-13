@@ -22,6 +22,7 @@ import "./control-system.css";
 import "./search-controls.css";
 import "./people-profile-layout.css";
 import "./workspace-surfaces.css";
+import "./project-pictures.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 import NavigationHost from "../components/admin-shell/NavigationHost";
 import LoadingHost from "../components/operational/LoadingHost";

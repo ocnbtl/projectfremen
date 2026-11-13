@@ -2970,7 +2970,7 @@ export default function ProjectsWorkspace({
         <fieldset className={`${styles.formGrid} ${styles.projectDraft}`} disabled={Boolean(editor.createdProject)}>
           {editor.kind === "project-create" && <div className={styles.draftPicture} data-wide="true">
             <button type="button" className={styles.draftPictureButton} aria-label="Add project picture" onClick={() => setDraftPhotoOpen(true)}>
-              {editor.picture ? <img src={editor.picture.preview} alt="Project picture preview" /> : <UnigentamosIcon role="photo-upload" size={28} />}
+              {editor.picture ? <img src={editor.picture.preview} data-project-picture alt="Project picture preview" /> : <UnigentamosIcon role="photo-upload" size={28} />}
             </button>
             <div><button type="button" className={styles.addRowButton} onClick={() => setDraftPhotoOpen(true)}><UnigentamosIcon role={editor.picture ? "edit" : "plus"} size={16} />{editor.picture ? "Change picture" : "Add picture"}</button>
               {editor.picture && <button type="button" className={styles.addRowButton} onClick={() => { setEditor(current => current ? { ...current, picture: undefined } : current); setEditorDirty(true); }}>Remove</button>}</div>

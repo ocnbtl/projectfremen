@@ -395,7 +395,7 @@
   aspect-ratio: 1;
 }
 .projectDirectory :global(.resource-card-picture:has([data-photo-state="loading"], [data-photo-state="ready"])) {
-  border-radius: 0;
+  border-radius: var(--project-picture-radius);
   background: transparent;
 }
 .projectDirectory :global(.resource-card-picture .people-profile-photo) {
@@ -406,7 +406,7 @@
 .projectIdentity :global(:is(.people-profile-photo, .people-profile-photo-trigger):is([data-photo-state="loading"], [data-photo-state="ready"])) {
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--project-picture-radius);
   background: transparent;
   box-shadow: none;
 }
