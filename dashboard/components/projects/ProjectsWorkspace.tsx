@@ -2,6 +2,7 @@
 import ProjectDirectoryCards from "./ProjectDirectoryCards";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "../people/PeopleProfilePhoto";
 import SelectField from "../ui/SelectField";
+import DateField from "../people/DateField";
 import ProjectProperties from "./ProjectProperties";
 import ProjectLinkedItems, { ProjectLinkedItem } from "./ProjectLinkedItems";
 import { PersonalOpsStatusChip, personalOpsToneForState } from "../personal-ops/PersonalOpsPrimitives";
@@ -15,6 +16,8 @@ import { milestoneLabel } from "../../lib/modules/projects/milestone-display";
 import type { ObjectivePreviewTarget } from "./ProjectObjectivePreview";
 import ProjectObjectiveUndo from "./ProjectObjectiveUndo";
 import { createPersonalOpsRepository } from "../../lib/modules/personal-ops/repository";
+import { TASK_KINDS, type TaskKind } from "../../lib/modules/planning/task-model";
+import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -145,6 +148,8 @@ type EditorState = {
   values: Record<string, string | boolean>;
   objectives?: EditorObjectiveDraft[];
   people?: EditorPersonDraft[];
+  picture?: { preview: string; source: Blob; crop: Record<string, unknown> };
+  createdProject?: Project;
 };
 
 type EditorObjectiveDraft = {
@@ -152,6 +157,7 @@ type EditorObjectiveDraft = {
   text: string;
   targetAt: string;
   completed: boolean;
+  kind?: TaskKind;
 };
 
 type EditorPersonDraft = {
@@ -819,14 +825,14 @@ function EditorSurface({
         ref={panelRef}
         className={styles.formPanel}
         aria-labelledby="projects-editor-title"
-        aria-describedby="projects-editor-description"
+        aria-describedby={description ? "projects-editor-description" : undefined}
         aria-busy={busy || undefined}
         onSubmit={onSubmit}
       >
         <header className={styles.formHeader}>
           <div>
             <h2 id="projects-editor-title">{title.toLowerCase().includes("milestone") && <UnigentamosIcon role="goal" size={20}/>} {title}</h2>
-            <p id="projects-editor-description">{description}</p>
+            {description && <p id="projects-editor-description">{description}</p>}
           </div>
           <button type="button" className={styles.iconButton} onClick={onRequestClose} disabled={busy} aria-label={`Close ${title}`} data-icon-button="standard">
             <UnigentamosIcon role="close" size={18} />
@@ -1368,7 +1374,7 @@ export default function ProjectsWorkspace({
     let people: EditorPersonDraft[] | undefined;
     if (kind === "project-create") {
       values = { name: "", description: "", completionTarget: "", lifecycle: "idea", defaultCadence: "" };
-      objectives = [{ id: `draft-objective-${crypto.randomUUID()}`, text: "", targetAt: "", completed: false }];
+      objectives = [{ id: `draft-objective-${crypto.randomUUID()}`, text: "", targetAt: "", completed: false, kind: "task" }];
       people = [{ id: `draft-person-${crypto.randomUUID()}`, personId: "", role: "", context: "" }];
     } else if (kind === "project-edit" && item) {
       const nativeProject = snapshot.nativeState.projects.find((project) => project.id === item.project.id);
@@ -1383,7 +1389,8 @@ export default function ProjectsWorkspace({
         id: objective.id,
         text: objective.text,
         targetAt: objective.targetAt || "",
-        completed: false
+        completed: Boolean(objective.completedAt),
+        kind: objective.kind || "objective"
       }));
     } else if (kind === "legacy-promote" && item) {
       values = { objective: item.project.objective || "" };
@@ -1453,6 +1460,7 @@ export default function ProjectsWorkspace({
 
   function closeEditor() {
     setEditor(null);
+    setDraftPhotoOpen(false);
     if (initialDetail) setInspectorOpen(false);
     setEditorDirty(false);
     setEditorError("");
@@ -1697,7 +1705,7 @@ export default function ProjectsWorkspace({
         }
         const objectives = (editor.objectives || [])
           .filter((objective) => objective.text.trim())
-          .map((objective) => ({ id: objective.id, text: objective.text.trim(), targetAt: objective.targetAt || undefined, completed: false }));
+          .map((objective) => ({ id: objective.id, text: objective.text.trim(), kind: objective.kind || "objective", targetAt: objective.targetAt || undefined, completed: false }));
         const personRows = (editor.people || []).filter((person) => person.personId || person.role.trim() || person.context.trim());
         if (personRows.some((person) => !person.personId)) {
           setEditorError("Choose a People identity for each person row, or remove the unused row.");
@@ -1707,29 +1715,53 @@ export default function ProjectsWorkspace({
           setEditorError("Each person can only be added to the project once.");
           return;
         }
-        const result = await repository.create("projects", {
-          name: value("name"),
-          description: value("description"),
-          objectives,
-          people: personRows.map((person) => ({
-            personRef: peopleIdentityRef(initialPeople.find((candidate) => candidate.id === person.personId)!),
-            role: person.role.trim() || undefined,
-            context: person.context.trim() || undefined
-          })),
-          completionTarget: optional("completionTarget"),
-          defaultCadence: optional("defaultCadence"),
-          lifecycle: value("lifecycle") as Exclude<Project["lifecycle"], "complete" | "archived">
-        });
-        if (!result.ok) {
-          setEditorError(result.error.message);
-          return;
+        let createdProject = editor.createdProject;
+        if (!createdProject) {
+          const result = await repository.create("projects", {
+            name: value("name"),
+            description: value("description"),
+            objectives,
+            people: personRows.map((person) => ({
+              personRef: peopleIdentityRef(initialPeople.find((candidate) => candidate.id === person.personId)!),
+              role: person.role.trim() || undefined,
+              context: person.context.trim() || undefined
+            })),
+            completionTarget: optional("completionTarget"),
+            defaultCadence: optional("defaultCadence"),
+            lifecycle: value("lifecycle") as Exclude<Project["lifecycle"], "complete" | "archived">
+          });
+          if (!result.ok) {
+            setEditorError(result.error.message);
+            return;
+          }
+          applyMutationEnvelope(result.data);
+          result.data.linkedPeople?.forEach(applyLink);
+          createdProject = result.data.project;
+          setEditor(current => current ? { ...current, createdProject } : current);
         }
-        applyMutationEnvelope(result.data);
-        result.data.linkedPeople?.forEach(applyLink);
-        setSelectedProjectId(result.data.project.id);
-        setNotice(`${result.data.project.name} was created and is now tracked natively.`);
+        if (editor.picture) {
+          try {
+            const form = new FormData();
+            form.append("source", editor.picture.source, "project-source.webp");
+            form.append("crop", JSON.stringify(editor.picture.crop));
+            const headers = new Headers(buildJsonHeadersWithCsrf());
+            headers.delete("Content-Type");
+            const response = await fetch(`/api/projects/photos/${encodeURIComponent(createdProject.id)}`, { method: "POST", headers, body: form });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok || !payload.photo) throw new Error(payload.error || "Picture upload failed.");
+            const photoResult = await repository.update("projects", createdProject.id, { photoUpdatedAt: payload.photo.updatedAt }, createdProject.updatedAt);
+            if (!photoResult.ok) throw new Error(photoResult.error.message);
+            applyMutationEnvelope(photoResult.data);
+          } catch (error) {
+            setEditorError(`Your project and tasks are saved. ${error instanceof Error ? error.message : "The picture could not be saved."} Retry the picture to finish; it will not create another project.`);
+            return;
+          }
+        }
+        setSelectedProjectId(createdProject.id);
+        setNotice(`${createdProject.name} was created.`);
         window.dispatchEvent(new Event("projects:changed"));
-        updateUrl({ item: result.data.project.id, tab: "overview" }, "push");
+        window.dispatchEvent(new Event("tasks:changed"));
+        updateUrl({ item: createdProject.id, tab: "overview" }, "push");
       } else if (editor.kind === "project-edit") {
         const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
         if (!item || !item.project.editable || !item.project.updatedAt) {
@@ -1745,7 +1777,7 @@ export default function ProjectsWorkspace({
           description: value("description"),
           objectives: (editor.objectives || [])
             .filter((objective) => objective.text.trim())
-            .map((objective) => ({ id: objective.id, text: objective.text.trim(), targetAt: objective.targetAt || undefined, completed: false })),
+            .map((objective) => ({ id: objective.id, text: objective.text.trim(), kind: objective.kind || "objective", targetAt: objective.targetAt || undefined, completed: objective.completed })),
           completionTarget: optional("completionTarget"),
           defaultCadence: optional("defaultCadence"),
           lifecycle: value("lifecycle") as Project["lifecycle"]
@@ -2046,7 +2078,9 @@ export default function ProjectsWorkspace({
   }
 
   const [photoProjectId, setPhotoProjectId] = useState<string | null>(null);
+  const [draftPhotoOpen, setDraftPhotoOpen] = useState(false);
   const photoItem = snapshot.projects.find(item => item.project.id === photoProjectId);
+  const draftPhotoDialog = editor?.kind === "project-create" && <PeopleProfilePhotoDialog open={draftPhotoOpen} projectLogo personId="new-project" personName={String(editor.values.name || "New project")} hasPhoto={Boolean(editor.picture)} currentPhotoUrl={editor.picture?.preview} preparedPhoto={editor.picture} cropDescription="Choose your project picture and crop. It will be saved when you create the project." onClose={() => setDraftPhotoOpen(false)} onPrepared={(preview, upload) => { setEditor(current => current ? { ...current, picture: preview && upload ? { preview, ...upload } : undefined } : current); setEditorDirty(true); }} onSaved={async () => true} onRemoved={async () => { setEditor(current => current ? { ...current, picture: undefined } : current); setEditorDirty(true); return true; }} />;
 
   async function saveProjectPhoto(item: ProjectDirectoryItem, updatedAt: string) {
     if (!item.project.updatedAt) return false;
@@ -2926,39 +2960,46 @@ export default function ProjectsWorkspace({
           ? "Add a dated progress note, problem, or blocker update to the project timeline."
         : editor?.kind === "interaction-edit"
           ? "Update the title, details, or occurrence time for this project update."
-      : "Choose Save to keep your changes. The project history records each update.";
+      : "";
 
   function renderEditorFields() {
     if (!editor) return null;
     const value = (name: string) => String(editor.values[name] ?? "");
     if (editor.kind === "project-create" || editor.kind === "project-edit") {
       return (
-        <div className={styles.formGrid}>
+        <fieldset className={`${styles.formGrid} ${styles.projectDraft}`} disabled={Boolean(editor.createdProject)}>
+          {editor.kind === "project-create" && <div className={styles.draftPicture} data-wide="true">
+            <button type="button" className={styles.draftPictureButton} aria-label="Add project picture" onClick={() => setDraftPhotoOpen(true)}>
+              {editor.picture ? <img src={editor.picture.preview} alt="Project picture preview" /> : <UnigentamosIcon role="photo-upload" size={28} />}
+            </button>
+            <div><button type="button" className={styles.addRowButton} onClick={() => setDraftPhotoOpen(true)}><UnigentamosIcon role={editor.picture ? "edit" : "plus"} size={16} />{editor.picture ? "Change picture" : "Add picture"}</button>
+              {editor.picture && <button type="button" className={styles.addRowButton} onClick={() => { setEditor(current => current ? { ...current, picture: undefined } : current); setEditorDirty(true); }}>Remove</button>}</div>
+          </div>}
           <label className={styles.field} data-wide="true">Project name<input name="name" value={value("name")} onChange={(event) => changeEditorValue("name", event.target.value)} required data-editor-autofocus /></label>
           <label className={styles.field} data-wide="true">Description<textarea name="description" value={value("description")} onChange={(event) => changeEditorValue("description", event.target.value)} /></label>
           <fieldset className={styles.repeatableField} data-wide="true">
-            <legend>Objectives</legend>
+            <legend>Tasks</legend>
             <ul>
-              {(editor.objectives || []).map((objective, index) => <li key={objective.id}>
-                <span aria-hidden="true">•</span>
-                <input value={objective.text} onChange={(event) => updateEditorObjective(objective.id, { text: event.target.value })} aria-label={`Objective ${index + 1}`} placeholder="Describe an objective" />
-                <input className={styles.objectiveDate} type="date" value={objective.targetAt} onChange={(event) => updateEditorObjective(objective.id, { targetAt: event.target.value })} aria-label={`Objective ${index + 1} target date`} title="Objective target date" />
+              {(editor.objectives || []).map((objective, index) => <li className={styles.projectTaskRow} key={objective.id}>
+                <SelectField aria-label={`Task ${index + 1} type`} value={objective.kind || "objective"} optionIcons={{task:"check",objective:"goal",goal:"goal",routine:"routine",obligation:"check",decision:"decision",follow_up:"follow-up"}} onChange={event => updateEditorObjective(objective.id, { kind: event.target.value as TaskKind })}>{Object.entries(TASK_KINDS).map(([kind, label]) => <option value={kind} key={kind}>{label}</option>)}</SelectField>
+                <input value={objective.text} onChange={(event) => updateEditorObjective(objective.id, { text: event.target.value })} aria-label={`Task ${index + 1}`} placeholder="What needs to happen?" />
+                <div className={styles.taskDueDate}><DateField compact insetLabel required={false} label="Due date" value={objective.targetAt} onChange={date => updateEditorObjective(objective.id, { targetAt: date })} /></div>
                 <button type="button" className={styles.removeObjectiveButton} onClick={() => {
                   setEditor((current) => current ? { ...current, objectives: current.objectives?.filter((item) => item.id !== objective.id) } : current);
                   setEditorDirty(true);
-                }} aria-label={`Delete objective ${index + 1}`} title="Delete objective" data-icon-button="compact"><ObjectiveDeleteIcon /></button>
+                }} aria-label={`Remove task ${index + 1}`} title="Remove task" data-icon-button="compact"><ObjectiveDeleteIcon /></button>
               </li>)}
             </ul>
             <button type="button" className={styles.addRowButton} onClick={() => {
-              setEditor((current) => current ? { ...current, objectives: [...(current.objectives || []), { id: `draft-objective-${crypto.randomUUID()}`, text: "", targetAt: "", completed: false }] } : current);
+              setEditor((current) => current ? { ...current, objectives: [...(current.objectives || []), { id: `draft-objective-${crypto.randomUUID()}`, text: "", targetAt: "", completed: false, kind: "task" }] } : current);
               setEditorDirty(true);
-            }}><UnigentamosIcon role="plus" size={16} /> Add objective</button>
+            }}><UnigentamosIcon role="plus" size={16} /> Add task</button>
           </fieldset>
           {editor.kind === "project-create" && <fieldset className={styles.repeatableField} data-wide="true">
             <legend>People</legend>
             <div className={styles.peopleEditorRows}>
               {(editor.people || []).map((person, index) => <div className={styles.personEditorRow} key={person.id}>
-                <label>Person<SelectField value={person.personId} onChange={(event) => updateEditorPerson(person.id, { personId: event.target.value })} aria-label={`Person ${index + 1}`}>
+                <label>Person<SelectField searchable value={person.personId} onChange={(event) => updateEditorPerson(person.id, { personId: event.target.value })} aria-label={`Person ${index + 1}`}>
                   <option value="">Choose a People profile</option>
                   {initialPeople.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.profile?.fullName || candidate.title}</option>)}
                 </SelectField></label>
@@ -2985,7 +3026,7 @@ export default function ProjectsWorkspace({
             {PROJECT_REVIEW_CADENCES.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
           </SelectField></label>
           <label className={styles.field} data-wide="true">Completion target<textarea name="completionTarget" value={value("completionTarget")} onChange={(event) => changeEditorValue("completionTarget", event.target.value)} placeholder="What does done look like?" /></label>
-        </div>
+        </fieldset>
       );
     }
     if (editor.kind === "legacy-promote") {
@@ -3269,7 +3310,7 @@ export default function ProjectsWorkspace({
       <EditorSurface
         open
         title={editorTitle}
-        submitLabel={editor.kind === "project-create" ? "Create project" : editor.kind === "milestone-create" ? "Add milestone" : "Save changes"}
+        submitLabel={editor.createdProject ? "Retry picture" : editor.kind === "project-create" ? "Create project" : editor.kind === "milestone-create" ? "Add milestone" : "Save changes"}
         description={editorDescription}
         busy={mutationBusy}
         error={editorError}
@@ -3339,6 +3380,7 @@ export default function ProjectsWorkspace({
         else setInspectorOpen(false);
       }} aria-label="Close open Projects panel" />}
 
+      {draftPhotoDialog}
       {photoItem && <PeopleProfilePhotoDialog open projectLogo personId={photoItem.project.id} personName={photoItem.project.name} hasPhoto={Boolean(photoItem.project.photoUpdatedAt)} photoEndpoint={`/api/projects/photos/${encodeURIComponent(photoItem.project.id)}`} cropDescription="Drag to reposition or adjust the zoom. This crop appears wherever the project is linked." onClose={() => setPhotoProjectId(null)} onSaved={photo => saveProjectPhoto(photoItem, photo.updatedAt)} onRemoved={() => saveProjectPhoto(photoItem, "")} />}
       <ConfirmationSheet
         open={discardOpen}

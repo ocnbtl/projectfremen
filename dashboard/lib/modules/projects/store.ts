@@ -298,10 +298,12 @@ function normalizeObjectives(
       ? optionalDate(candidate.completedAt, `${field}.${index}.completedAt`) || prior?.completedAt || now
       : undefined;
     const targetAt = optionalDate(candidate.targetAt, `${field}.${index}.targetAt`);
-    const unchanged = prior && prior.text === text && prior.targetAt === targetAt && prior.completedAt === completedAt;
+    const kind = enumValue(candidate.kind, ["task", "objective", "goal", "routine", "obligation", "decision", "follow_up"] as const, prior?.kind || "objective", `${field}.${index}.kind`);
+    const unchanged = prior && prior.text === text && prior.targetAt === targetAt && prior.completedAt === completedAt && (prior.kind || "objective") === kind;
     return {
       id,
       text,
+      kind,
       ...(targetAt ? { targetAt } : {}),
       ...(completedAt ? { completedAt } : {}),
       createdAt: prior?.createdAt || optionalDate(candidate.createdAt, `${field}.${index}.createdAt`) || now,

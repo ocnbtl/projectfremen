@@ -52,7 +52,7 @@ export function taskCatalog(plans: TaskPlan[], ops: PersonalOpsState | null, pro
   }
   for (const project of projects?.projects || []) {
     if (project.archivedAt || ["archived","complete"].includes(project.lifecycle)) continue;
-    for (const objective of project.objectives) add({family:"objectives",id:objective.id,projectId:project.id}, {title:objective.text,description:"",kind:"objective",createdAt:objective.createdAt,updatedAt:project.updatedAt,dueAt:objective.targetAt,completed:!!objective.completedAt,
+    for (const objective of project.objectives) add({family:"objectives",id:objective.id,projectId:project.id}, {title:objective.text,description:"",kind:objective.kind || "objective",createdAt:objective.createdAt,updatedAt:project.updatedAt,dueAt:objective.targetAt,completed:!!objective.completedAt,
       ownerRef:createNativeObjectRef({module:"projects",objectType:"project",objectId:project.id,label:project.name})});
   }
   // Existing Calendar tasks are included without copying or changing their IDs.

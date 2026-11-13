@@ -2258,3 +2258,46 @@
 @media(max-width:1050px) {.projectBody .timelineLayout {grid-template-columns:minmax(0,1fr);}.timelineSide {grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:700px) {.timelineSide {grid-template-columns:minmax(0,1fr);}.milestoneForm .formGrid {grid-template-columns:minmax(0,1fr);}.milestoneList > li{padding:10px;}}
 @media(prefers-reduced-motion:reduce) {.milestoneList > li,.projectBody .activityFilters button {transition:none;}}
+
+/* Project creation shares the task model and the existing picture editor. */
+.projectDraft { min-width: 0; margin: 0; padding: 0; border: 0; }
+.draftPicture { display: flex; align-items: center; gap: 12px; }
+.draftPictureButton { width: 64px; height: 64px; flex: 0 0 64px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 12px; background: transparent; color: var(--action-primary); overflow: hidden; cursor: pointer; }
+.draftPictureButton img { width: 100%; height: 100%; object-fit: contain; }
+.projectDraft .addRowButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; border: 1px solid var(--border); border-radius: 9px; padding: 0 10px; transition: background 160ms ease; }
+.projectDraft .addRowButton:hover { background: var(--panel-bg-subtle); }
+.projectDraft .addRowButton svg { flex: 0 0 16px; }
+.projectDraft .projectTaskRow { grid-template-columns: 140px minmax(0, 1fr) 140px 36px; }
+.projectDraft .personEditorRow { grid-template-columns: minmax(0, 1.1fr) minmax(0, .8fr) minmax(0, 1.2fr) 36px; align-items: end; }
+.projectDraft .personEditorRow label { min-width: 0; }
+.projectDraft .personEditorRow input, .projectDraft .personEditorRow :global(.app-select-trigger), .projectTaskRow :global(.app-select-trigger) { height: 40px; min-height: 40px; box-sizing: border-box; }
+.projectDraft .personEditorRow .iconButton, .projectDraft .removeObjectiveButton { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-width: 36px; height: 40px; margin: 0; }
+@media (max-width: 640px) {
+  .projectDraft .projectTaskRow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; }
+  .projectTaskRow > input:not([type="date"]) { grid-column: 1 / -1; grid-row: 1; }
+  .projectDraft .projectTaskRow .objectiveDate { grid-column: 2; grid-row: 2; width: 100%; }
+  .projectDraft .projectTaskRow .removeObjectiveButton { grid-column: 3; grid-row: 2; }
+  .projectDraft .personEditorRow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; }
+  .projectDraft .personEditorRow label:first-child { grid-column: 1 / 3; grid-row: 1; }
+  .projectDraft .personEditorRow .iconButton { grid-column: 3; grid-row: 1; }
+  .projectDraft .personEditorRow label:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .projectDraft .personEditorRow label:nth-child(3) { grid-column: 2 / 4; grid-row: 2; }
+}
+
+.projectDraft .repeatableField input { margin: 0 !important; }
+.projectDraft .addRowButton { width: fit-content; align-self: start; }
+
+.projectTaskRow :global(.app-select-trigger) { font-size: 13px; padding-inline: 8px; }
+.taskDueDate { min-width: 0; }
+.projectDraft .taskDueDate :global(.people-date-field[data-inset-label] .people-date-trigger) { min-height: 40px; height: 40px; font-size: 12px; padding: 3px 8px; }
+.taskDueDate :global(.people-date-field) { margin: 0; }
+@media(max-width:640px) {
+ .projectDraft .projectTaskRow { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 36px; }
+ .taskDueDate { grid-column: 2; grid-row: 2; }
+}
+.projectDraft .taskDueDate :global(.people-date-field[data-inset-label] .people-date-trigger) { display: grid; grid-template-columns: minmax(0, 1fr) 16px; grid-template-rows: 12px 16px; align-content: center; gap: 0 4px; width: 100%; min-width: 0; min-height: 40px !important; height: 40px !important; margin: 0; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--panel-bg) !important; background-image: none !important; box-shadow: none; color: var(--text-strong); font: 500 12px var(--font-body); text-align: left; }
+.taskDueDate :global(.people-date-inset-label) { position: static; grid-column: 1; grid-row: 1; color: var(--text-muted); font: 500 10px var(--font-body); }
+.taskDueDate :global(.people-date-display-wide) { display: block; grid-column: 1; grid-row: 2; }
+.taskDueDate :global(.people-date-display-narrow) { display: none; }
+.projectDraft .taskDueDate :global(.people-date-field[data-inset-label] .people-date-trigger) > svg { grid-column: 2; grid-row: 1 / 3; align-self: center; width: 16px; height: 16px; }
+.projectDraft .taskDueDate :global(.people-date-field[data-inset-label] .people-date-trigger) { box-sizing: border-box; padding: 3px 8px !important; }

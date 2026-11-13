@@ -179,6 +179,7 @@ export default function PeopleProfilePhotoDialog({
   onSaved,
   onRemoved,
   onPrepared,
+  preparedPhoto,
   photoEndpoint,
   projectLogo = false,
   cropDescription = "Drag to reposition and adjust the zoom. Your saved crop is used across People, Calendar, and Map."
@@ -191,7 +192,8 @@ export default function PeopleProfilePhotoDialog({
   onClose: () => void;
   onSaved: (photo: PhotoMetadata) => Promise<boolean>;
   onRemoved: () => Promise<boolean>;
-  onPrepared?: (dataUrl: string) => void;
+  onPrepared?: (dataUrl: string, upload?: { source: Blob; crop: { zoom: number; panX: number; panY: number; outputSize: number; fit?: "contain" | "cover"; clearMatte?: true } }) => void;
+  preparedPhoto?: { source: Blob; crop: Record<string, unknown> };
   photoEndpoint?: string;
   projectLogo?: boolean;
   cropDescription?: string;
@@ -308,7 +310,9 @@ export default function PeopleProfilePhotoDialog({
     setLoading(true);
     setError("");
     try {
-      if (onPrepared && currentPhotoUrl) {
+      if (onPrepared && preparedPhoto) {
+        await beginEditing(preparedPhoto.source, preparedPhoto.crop as Pick<PhotoEditorDraft, "zoom" | "panX" | "panY" | "outputSize" | "fit" | "clearMatte">);
+      } else if (onPrepared && currentPhotoUrl) {
         const response = await fetch(currentPhotoUrl);
         if (!response.ok) throw new Error("The current picture could not be loaded.");
         const blob = await response.blob();
@@ -331,14 +335,14 @@ export default function PeopleProfilePhotoDialog({
     setError("");
     try {
       if (onPrepared) {
-        const photo = await prepareProfilePhoto(photoDraft);
+        const photo = await prepareProfilePhoto(projectLogo ? { ...photoDraft, source: await logoPreview(photoDraft.source, photoDraft.clearMatte) } : photoDraft);
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
           reader.onerror = () => reject(new Error("The picture could not be prepared."));
           reader.readAsDataURL(photo);
         });
-        onPrepared(dataUrl);
+        onPrepared(dataUrl, { source: photoDraft.source, crop: { zoom: photoDraft.zoom, panX: photoDraft.panX, panY: photoDraft.panY, outputSize: photoDraft.outputSize, fit: photoDraft.fit, clearMatte: photoDraft.clearMatte } });
         closeDialog(true);
         return;
       }

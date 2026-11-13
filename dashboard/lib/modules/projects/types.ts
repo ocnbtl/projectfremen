@@ -58,6 +58,7 @@ export type LegacyProjectSource = {
 export type ProjectObjective = {
   id: string;
   text: string;
+  kind?: import("../planning/task-model").TaskKind;
   targetAt?: string;
   completedAt?: string;
   createdAt: string;
@@ -67,6 +68,7 @@ export type ProjectObjective = {
 export type ProjectObjectiveInput = {
   id?: string;
   text: string;
+  kind?: import("../planning/task-model").TaskKind;
   targetAt?: string;
   completed?: boolean;
   completedAt?: string;
