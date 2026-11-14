@@ -1,6 +1,6 @@
 "use client";
 import type { TaskItem, TaskDetails } from "../../lib/modules/planning/task-model";
-import EventDateTimePicker from "./EventDateTimePicker";
+import EventDateSegments from "./EventDateSegments";
 import SelectField from "../ui/SelectField";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import styles from "./TaskWorkspace.module.css";
@@ -14,4 +14,4 @@ export default function TaskDetailFields({draft,update,zone}:{draft:TaskItem;upd
  </section>;
 }
 
-export function TaskDueDateField({draft,update,zone}:{draft:TaskItem;update:(patch:Partial<TaskItem>)=>void;zone:string}){return <>{draft.source?.family!=="events"&&draft.source?.family!=="routines"&&<div className={styles.dueControl}><span>Due date</span>{draft.dueAt?<><EventDateTimePicker label="Due date" value={draft.dueAt.slice(0,10)} allDay dateOnly compact timeZone={zone} onChange={dueAt=>update({dueAt})}/><Button icon="close" aria-label="Clear due date" onClick={()=>update({dueAt:""})}/></>:<Button icon="calendar" onClick={()=>update({dueAt:new Date().toLocaleDateString("en-CA",{timeZone:zone})})}>Add due date</Button>}</div>}</>;}
+export function TaskDueDateField({draft,update,zone}:{draft:TaskItem;update:(patch:Partial<TaskItem>)=>void;zone:string}){return <>{draft.source?.family!=="events"&&draft.source?.family!=="routines"&&<div className={styles.dueControl}><span>Due date</span>{draft.dueAt?<><EventDateSegments label="Due date" hideLabel value={draft.dueAt.slice(0,10)} allDay timeZone={zone} onChange={dueAt=>update({dueAt})}/><Button icon="close" aria-label="Clear due date" onClick={()=>update({dueAt:""})}/></>:<Button icon="calendar" onClick={()=>update({dueAt:new Date().toLocaleDateString("en-CA",{timeZone:zone})})}>Add due date</Button>}</div>}</>;}

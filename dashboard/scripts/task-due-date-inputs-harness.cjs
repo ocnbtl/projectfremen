@@ -1,0 +1,28 @@
+// Synthetic local test server. Production calls and external browser requests are blocked.
+const fs=require('fs'),path=require('path'),os=require('os'),crypto=require('crypto'),assert=require('assert/strict'),{spawn}=require('child_process');
+const {webkit,expect}=require('@playwright/test');
+const app=path.resolve(__dirname,'..'),out=process.env.TASK_QA_OUTPUT||path.join(app,'output/task-due-date-inputs');fs.mkdirSync(out,{recursive:true});
+const data=fs.mkdtempSync(path.join(os.tmpdir(),'tasks-browser-')),port=String(20000+crypto.randomInt(20000)),base='http://localhost:'+port,secret=crypto.randomBytes(24).toString('hex');
+const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port',port],{cwd:app,env:{...process.env,ADMIN_PASSWORD:'test',ADMIN_SESSION_SECRET:secret,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',RESEND_API_KEY:'',VERCEL:'',MORGEN_API_KEY:''},stdio:['ignore','pipe','pipe']});
+const ready=new Promise((resolve,reject)=>{let log='';const timer=setTimeout(()=>reject(Error('Local server did not start')),20000);server.stdout.on('data',d=>{log+=d;if(log.includes('Ready in')){clearTimeout(timer);resolve();}});server.stderr.on('data',()=>{});server.on('exit',code=>{clearTimeout(timer);reject(Error('Server exited '+code));});});
+let browser,page;
+(async()=>{
+ await ready;browser=await webkit.launch({executablePath:process.env.WEBKIT_EXECUTABLE});const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1440,height:1000},timezoneId:'America/New_York'});
+ const payload='v1.'+(Date.now()+3600000)+'.qa';await context.addCookies([{name:'admin_session',value:payload+'.'+crypto.createHmac('sha256',secret).update(payload).digest('base64url'),url:base},{name:'admin_csrf',value:'fixture-csrf',url:base}]);await context.route(/^https:\/\//,r=>r.request().url().startsWith('https://task-fixture.test/')?r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#d9b093"/><circle cx="32" cy="25" r="12" fill="#243940"/><path d="M10 64v-9a22 22 0 0 1 44 0v9" fill="#243940"/></svg>'}):r.abort());
+ const headers={origin:base,'x-csrf-token':'fixture-csrf'},post=async(route,data)=>{const response=await context.request.post(base+route,{headers,data});assert(response.ok(),await response.text());return response.json();};
+
+ page=await context.newPage();page.setDefaultTimeout(12000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const snapshot=async()=>(await(await context.request.get(base+'/api/planning')).json());
+ async function type(label,value){const input=page.getByRole('textbox',{name:label,exact:true});await input.fill(value);await input.press('Tab');}
+
+ for(const width of [1440,390,320]){
+  await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/admin/calendar');await page.getByRole('button',{name:'Tasks',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Tasks',exact:true});await page.setViewportSize({width,height:1000});await dialog.getByRole('button',{name:'New task',exact:true}).click();const title='Due date QA '+width;await page.getByRole('textbox',{name:'Task name',exact:true}).fill(title);
+  await page.getByRole('button',{name:'Add due date',exact:true}).click();await type('Due date year','2028');await type('Due date month','02');await type('Due date day','29');await expect(page.getByRole('textbox',{name:'Due date day',exact:true})).toHaveValue('29');
+  await type('Due date year','2027');await expect(page.getByRole('textbox',{name:'Due date day',exact:true})).toHaveValue('28');
+  await page.getByRole('button',{name:'Choose due date',exact:true}).click();await page.locator('button[data-date="2027-02-25"]').click();await page.keyboard.press('Escape');await expect(page.getByRole('textbox',{name:'Due date day',exact:true})).toHaveValue('25');
+  const schedule=dialog.locator('section').filter({has:page.getByRole('heading',{name:'Schedule',exact:true})});assert(await schedule.evaluate(e=>e.scrollWidth<=e.clientWidth+1),'schedule header fits');assert(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1),'dialog fits');await page.waitForTimeout(250);await page.screenshot({path:path.join(out,'due-date-'+width+'.png')});
+  await page.getByRole('button',{name:'Save updates',exact:true}).click();await expect(dialog.getByRole('button',{name:'New task',exact:true})).toBeVisible();let saved=(await snapshot()).taskItems.find(t=>t.title===title);assert.equal(saved.dueAt,'2027-02-25');assert.equal(saved.start,'');assert.equal(Boolean(saved.completed),false);
+  await dialog.getByRole('button',{name:'Edit '+title,exact:true}).click();await expect(page.getByRole('textbox',{name:'Due date day',exact:true})).toHaveValue('25');await page.getByRole('button',{name:'Clear due date',exact:true}).click();await expect(page.getByRole('textbox',{name:'Due date day',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'Save updates',exact:true}).click();await expect(dialog.getByRole('button',{name:'New task',exact:true})).toBeVisible();saved=(await snapshot()).taskItems.find(t=>t.title===title);assert.equal(saved.dueAt,'');assert.equal(saved.start,'');assert.equal(Boolean(saved.completed),false);
+ }
+ assert.deepEqual(errors,[]);console.log('PASS: typed due dates, leap-day normalization, calendar selection, save/reopen/clear; schedule and status unchanged; desktop/mobile 1440/390/320px.');
+})().catch(async e=>{console.error(e);if(page)await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

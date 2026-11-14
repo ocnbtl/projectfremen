@@ -55,7 +55,7 @@ export default function EventDateSegments({ label, value, allDay, timeZone, onCh
       }} />;
   }
   return <div className={styles.dateRow} role="group" aria-label={label}>
-    <EventDateTimePicker iconOnly dateOnly label={label} value={value.slice(0,10)} allDay timeZone={timeZone} onChange={next => onChange(allDay ? next : `${next}T${pad(hour)}:${pad(minute)}`)} />
+    <EventDateTimePicker iconOnly dateOnly label={label.replace(/\s+date$/i, "")} value={value.slice(0,10)} allDay timeZone={timeZone} onChange={next => onChange(allDay ? next : `${next}T${pad(hour)}:${pad(minute)}`)} />
     {!hideLabel && <span className={styles.dateLabel}>{label}</span>}
     <div className={styles.segments}>{field("month")}<span>/</span>{field("day")}<span>/</span>{field("year")}
       {!allDay && <><span className={styles.comma}>,</span>{field("hour")}<span>:</span>{field("minute")}{field("period")}</>}

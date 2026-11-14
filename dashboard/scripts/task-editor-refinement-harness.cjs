@@ -76,7 +76,7 @@ let browser,page;
   await page.setViewportSize({width,height:1000});const dialog=page.getByRole('dialog',{name:'Tasks',exact:true});await dialog.getByRole('button',{name:'New task',exact:true}).click();await page.getByRole('textbox',{name:'Task name',exact:true}).fill('Editor QA '+width);
   await expect(page.getByRole('button',{name:'Back to tasks',exact:true})).toBeVisible();
   const due=page.getByRole('button',{name:'Add due date',exact:true});const a=await due.locator('svg').boundingBox(),b=await due.locator('span').boundingBox();assert(Math.abs(a.y+a.height/2-b.y-b.height/2)<2,'due icon/text aligned');
-  await due.click();await expect(page.getByRole('button',{name:'Due date',exact:true})).toBeVisible();
+  await due.click();await expect(page.getByRole('group',{name:'Due date',exact:true})).toBeVisible();
   for(const mode of ['Choose a day','Choose a time']){
    await page.getByRole('button',{name:mode,exact:true}).click();await page.waitForTimeout(300);
    const start=await page.getByRole('group',{name:'Start',exact:true}).boundingBox(),tz=await page.getByRole('combobox',{name:'Task time zone',exact:true}).boundingBox();
