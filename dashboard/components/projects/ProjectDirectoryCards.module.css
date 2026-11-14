@@ -41,6 +41,13 @@
 .objectives li button:disabled {cursor:default;}
 .objectiveToggle:disabled:not([aria-busy=true]) {opacity:.55;}
 .objectiveToggle[aria-busy=true] .objectiveCheck {box-shadow:0 0 0 3px var(--module-primary-100);}
+.objectives .moreTasks { justify-content: flex-start; color: var(--module-action); gap: 5px; font-weight: 550; }
+.taskHint { font-size: 11px; color: var(--text-muted); }
+.objectives .taskError { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; background: var(--state-danger-soft); color: var(--state-danger-text); border: 0; border-radius: 5px; pointer-events: auto; font-size: 11px; cursor: pointer; }
+.taskLoadError { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px; color: var(--state-danger-text); }
+.taskLoadError button { border: 1px solid var(--border); border-radius: 8px; padding: 8px; cursor: pointer; background: white; }
+.taskPreview { width: min(1000px, calc(100vw - 32px)) !important; height: min(840px, calc(100dvh - 32px)); }
+.taskPreview > :global(.work-sheet-body) { flex: 1; min-height: 0; scrollbar-gutter: stable; }
 @media(pointer:coarse) {.objectives li .objectiveToggle {flex-basis:28px;width:28px;}}
 @media(prefers-reduced-motion:reduce) {.objectiveCheck,.objectiveCheck svg {transition:none;}}
 .directory[data-directory-view="compact"] .card {grid-template-columns:48px minmax(0,1fr) minmax(130px,30%);height:190px;gap:2px 10px;}

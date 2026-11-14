@@ -6,8 +6,12 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { ProjectDirectoryItem } from "../../lib/modules/projects/view-model";
 import type { ProjectLifecycleState } from "../../lib/modules/projects/types";
 import styles from "./ProjectDirectoryCards.module.css";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import useProjectCardTasks from "./useProjectCardTasks";
+import ProjectCardTaskList from "./ProjectCardTaskList";
+import { projectCardTasks } from "../../lib/modules/projects/card-tasks";
+import type { Project } from "../../lib/modules/projects/types";
 import ProjectStarButton from "./ProjectStarButton";
 import ProjectObjectivePreview, { type ObjectivePreviewTarget } from "./ProjectObjectivePreview";
 import type { ProjectsUpdateResult } from "../../lib/modules/projects/types";
@@ -34,7 +38,9 @@ function objectivePreview(item: ProjectDirectoryItem) {
   return objectives.slice(0, 3);
 }
 
-export default function ProjectDirectoryCards({ items, view, selectedId, busy, timeZone, onSelect, onToggleStar, onObjectiveOpen, onObjectiveSaved, onGoalSaved, onObjectiveToggle, pendingObjective }: {
+export default function ProjectDirectoryCards({ items, view, selectedId, busy, timeZone, onSelect, onToggleStar, onObjectiveOpen, onObjectiveSaved, onGoalSaved, onObjectiveToggle, pendingObjective, active, onProject }: {
+  active: boolean;
+  onProject: (project:Project)=>void;
   items: ProjectDirectoryItem[];
   view: "comfortable" | "compact" | "grid";
   selectedId?: string;
@@ -49,10 +55,12 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
   pendingObjective: string;
 }) {
   const reducedMotion = useReducedMotion();
+  const taskData = useProjectCardTasks(active,timeZone,onProject);
+  const linkedTasks = useMemo(()=>taskData.data ? projectCardTasks(taskData.data,timeZone) : new Map(),[taskData.data,timeZone]);
   const [preview, setPreview] = useState<{ project: ProjectDirectoryItem["project"]; objective: ObjectivePreviewTarget; triggerId: string }>();
   const date = (value?: string) => value && Number.isFinite(Date.parse(value))
     ? new Intl.DateTimeFormat("en-US", { timeZone, month: "2-digit", day: "2-digit", year: "2-digit" }).format(new Date(value)) : "—";
-  return <DirectoryLayout view={view} className={styles.directory} data-has-objectives={items.some(item => objectivePreview(item).length > 0)} role="list" aria-label="Projects">
+  return <>{taskData.error&&<div role="alert" className={styles.taskLoadError}>{taskData.error}<button type="button" onClick={()=>void taskData.refresh(true)}>Retry tasks</button></div>}<DirectoryLayout view={view} className={styles.directory} data-has-objectives={items.some(item => objectivePreview(item).length > 0)} role="list" aria-label="Projects">
     {items.map(item => {
       const project = item.project;
       const titleId = `project-card-${project.id}-title`;
@@ -82,7 +90,7 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
         </MorphingDiv>
         <MorphingDiv className={`resource-card-description ${styles.description}`}>{project.description || <span aria-hidden="true">&nbsp;</span>}</MorphingDiv>
         <MorphingDiv className={styles.objectives}>
-          {objectives.length > 0 && <><ul aria-label="Project objectives preview">{objectives.map((objective,index) => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}>
+          {project.editable && !["complete","archived"].includes(project.lifecycle) ? <ProjectCardTaskList project={project} rows={linkedTasks.get(project.id)||[]} loading={!taskData.data&&!taskData.error} onProject={onProject} onInteraction={onObjectiveOpen} onSaved={taskData.settle}/> : objectives.length > 0 && <><ul aria-label="Project objectives preview">{objectives.map((objective,index) => <li key={objective.id} title={objective.text} data-completed={objective.completed || undefined}>
             {objective.id !== "current-objective" && (!objective.source || (objective.source.module === "personal_ops" && objective.source.objectType === "goal")) ? <button id={`objective-toggle-${project.id}-${objective.id}`} className={styles.objectiveToggle} type="button" role="checkbox" aria-checked={objective.completed} aria-label={`${objective.completed ? "Reopen" : "Complete"} objective: ${objective.text}`} title={objective.completed ? "Reopen objective" : "Mark complete"} aria-busy={pendingObjective === `${project.id}:${objective.id}`} disabled={busy || !project.editable || ["complete","archived"].includes(project.lifecycle)} onPointerDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();onObjectiveToggle(item,objective);}}><span className={styles.objectiveCheck}><UnigentamosIcon role="check" size={12}/></span></button> : <UnigentamosIcon role="goal" size={13}/>}
             <button id={`objective-preview-${project.id}-${index}`} type="button" disabled={pendingObjective.startsWith(`${project.id}:`)} aria-label={`Edit objective: ${objective.text}`} aria-haspopup="dialog" onPointerDown={event=>event.stopPropagation()} onClick={event=>{
             event.stopPropagation(); onObjectiveOpen();
@@ -92,5 +100,5 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
       </MorphingArticle>;
     })}
     {preview && <ProjectObjectivePreview key={`${preview.project.id}:${preview.objective.id}`} {...preview} onClose={()=>setPreview(undefined)} onSaved={onObjectiveSaved} onGoalSaved={onGoalSaved} />}
-  </DirectoryLayout>;
+  </DirectoryLayout></>;
 }

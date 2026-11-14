@@ -59,6 +59,23 @@ export function taskCatalog(plans: TaskPlan[], ops: PersonalOpsState | null, pro
   for (const original of events) {const event=effectiveEvent(original);if (event.isTask && !event.archivedAt && !event.source?.cancelled) {
     result.push({id:taskKey({family:"events",id:event.id}),source:{family:"events",id:event.id},kind:event.taskAssignment?.kind||"task",title:event.title,description:event.description,start:event.taskAssignment?.floating?"":event.start,end:event.taskAssignment?.floating?"":event.end,allDay:event.allDay,timeZone:event.timeZone,recurrence:event.recurrence,calendarIds:event.taskAssignment?.calendarIds || [event.calendarId],peopleIds:event.taskAssignment?.peopleIds || [],linkedRefs:event.linkedRefs,exceptions:event.exceptions,completed:event.completed,createdAt:event.createdAt,updatedAt:event.updatedAt,sourceUpdatedAt:event.updatedAt});
   }}
+  // Project-side links are another view of the same task, not a second task record.
+  // Retain older linked goals/decisions when displaying the unified task catalogue.
+  const taskOwners = new Map<string, TaskItem[]>();
+  for (const item of result) if (item.ownerRef?.module === "personal_ops") {
+    const key = taskRefKey(item.ownerRef);
+    taskOwners.set(key, [...(taskOwners.get(key) || []), item]);
+  }
+  const projectById = new Map((projects?.projects || []).map(project => [project.id, project]));
+  for (const link of projects?.links || []) {
+    if (link.linkState === "removed" || link.removedAt) continue;
+    const project = projectById.get(link.projectId);
+    if (!project || project.archivedAt || project.lifecycle === "archived") continue;
+    for (const item of taskOwners.get(taskRefKey(link.source)) || []) {
+      const ref = createNativeObjectRef({module:"projects",objectType:"project",objectId:project.id,label:project.name});
+      if (!taskLinks(item).some(existing => taskRefKey(existing) === taskRefKey(ref))) item.sourceLinkedRefs = [...(item.sourceLinkedRefs || []), ref];
+    }
+  }
   return result;
 }
 

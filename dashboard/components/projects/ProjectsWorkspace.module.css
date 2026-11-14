@@ -2316,3 +2316,15 @@
 .projectTasks :global(.work-object-links .work-links) { flex: 1 1 100%; }
 .projectTasks :global(.work-links > span) { max-width: 100%; }
 .projectTasks :global(.work-links > span > a) { line-height: 1.5; }
+.projectBody .button, .projectHero .button, .inlineProperties .button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; width: auto; padding: 8px 12px; box-sizing: border-box;
+  border: 1px solid transparent; border-radius: 8px;
+  background: var(--module-action, #754420); color: var(--module-action-contrast, #fff);
+  font: 500 13px/1.4 var(--font-body); text-decoration: none;
+  transition: background .18s, transform .12s;
+}
+.projectBody .button:hover:not(:disabled), .projectHero .button:hover:not(:disabled), .inlineProperties .button:hover:not(:disabled) { background: var(--module-primary-700, #533012); color: white; }
+.projectBody .button:active:not(:disabled), .projectHero .button:active:not(:disabled) { transform: translateY(1px); }
+.projectBody .button svg, .inlineProperties .button svg { flex: none; width: 16px; height: 16px; }
+.projectBody .activityList .activityActions { justify-self: end; }

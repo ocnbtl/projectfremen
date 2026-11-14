@@ -2174,13 +2174,8 @@ export default function ProjectsWorkspace({
               <strong>{event.title}</strong>
               <small>{event.summary}</small>
             </span>
-            <RowActionIcons
-              inspectLabel={`Inspect ${event.title}`}
-              onInspect={() => selectChild(event.id, "timeline")}
-              openHref={event.openHref || undefined}
-              openLabel={`Open ${event.title}`}
-            />
             <time className={styles.timelineMeta}>{formatTimestamp(event.occurredAt)}</time>
+            <span className={styles.activityActions}><RowActionIcons inspectLabel={`Inspect ${event.title}`} onInspect={()=>selectChild(event.id,"timeline")} openHref={event.openHref||undefined} openLabel={`Open ${event.title}`}/></span>
           </motion.li>
         ))}
         </AnimatePresence>
@@ -2296,11 +2291,11 @@ export default function ProjectsWorkspace({
           <aside className={styles.overviewAside} aria-label="Project context">
             <section className={styles.panel} aria-label="Project progress"><div className={styles.panelHeader}><h2>Progress</h2></div><span className={styles.targetLabel}>Completion target</span><p>{item.project.completionTarget || "No completion target set."}</p></section>
             <section className={styles.panel}>
-              <div className={styles.panelHeader}><h2>About this project</h2>{!readOnly && <button type="button" className={styles.iconButton} aria-label="Edit project description" onClick={() => openEditor("project-edit", item)}><UnigentamosIcon role="edit" size={16} /></button>}</div>
+              <div className={styles.panelHeader}><h2>About this project</h2></div>
               <p>{item.project.description || "Add a description to explain what you’re working toward."}</p>
             </section>
             <section className={styles.panel}>
-              <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.iconButton} aria-label="Add milestone" disabled={readOnly} onClick={() => openEditor("milestone-create", item)}><UnigentamosIcon role="plus" size={16} /></button></div>
+              <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("milestone-create", item)}><UnigentamosIcon role="plus" size={16}/>Add milestone</button></div>
               {item.milestones.some(m=>m.state!=="archived") ? <ul className={styles.milestoneList}>{milestoneHistory(item).slice(0,4).map(milestone=>renderMilestone(item,milestone,readOnly))}</ul> : <p>No milestones yet.</p>}
               {milestoneHistory(item).length > 4 && <button type="button" className={styles.button} onClick={()=>selectTab("activity")}>View all milestones</button>}
             </section>
@@ -2335,7 +2330,7 @@ export default function ProjectsWorkspace({
             {item.milestones.length ? <ul className={styles.milestoneList}>{milestoneHistory(item,true).map(milestone=>renderMilestone(item,milestone,readOnly))}</ul> : <p>No milestones yet.</p>}
           </section>
           <section className={styles.panel}>
-            <div className={styles.panelHeader}><h2>Blockers</h2><button type="button" className={styles.button} onClick={() => openEditor("blocker-create", item)} disabled={readOnly}>Add blocker</button></div>
+            <div className={styles.panelHeader}><h2>Blockers</h2><button type="button" className={styles.button} onClick={() => openEditor("blocker-create", item)} disabled={readOnly}><UnigentamosIcon role="plus" size={16}/>Add blocker</button></div>
             {item.blockers.length ? <ul className={styles.objectList}>{item.blockers.map((blocker) => <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}><span className={styles.itemBody}><strong>{blocker.title}</strong><small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)}</small></span><span className={styles.inlineActions}><RowActionIcons inspectLabel={`Inspect ${blocker.title}`} onInspect={() => selectChild(blocker.id, "timeline")} openLabel={`Open ${blocker.title}`} />{blocker.state === "open" && <button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}</span></li>)}</ul> : <p>No blockers.</p>}
           </section>
         </aside>
@@ -3059,6 +3054,8 @@ export default function ProjectsWorkspace({
         </WorkspaceToolbar>
         {visibleProjects.length ? (
           <ProjectDirectoryCards
+            active={!initialDetail && !inspectorOpen && !editor}
+            onProject={applyProject}
             items={visibleProjects}
             view={grid ? "grid" : compact ? "compact" : "comfortable"}
             selectedId={selectedProjectId}
