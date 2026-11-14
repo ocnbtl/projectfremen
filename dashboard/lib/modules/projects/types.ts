@@ -400,7 +400,9 @@ export type ProjectMilestoneCreateInput = {
   title: string;
   description?: string;
   dueAt?: string;
-  state?: Exclude<ProjectMilestoneState, "complete" | "archived">;
+  state?: Exclude<ProjectMilestoneState, "archived">;
+  completedAt?: string;
+  completionNote?: string;
   owner?: string;
   ownerRef?: NativeObjectRef;
   completionCriteria?: string[];
@@ -418,6 +420,7 @@ export type ProjectMilestoneUpdateInput = Partial<
     | "ownerRef"
     | "completionCriteria"
     | "completionNote"
+    | "completedAt"
     | "linkedRefs"
   >
 > & {

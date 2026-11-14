@@ -51,6 +51,7 @@ export type ProjectDisplayRecord = {
   review: ProjectReviewState;
   cadence: ProjectCadenceState;
   objective?: string;
+  completionTarget?: string;
   objectives: ProjectObjective[];
   defaultCadence?: string;
   lifecycleBeforeArchive?: Project["lifecycleBeforeArchive"];
@@ -131,6 +132,7 @@ function displayFromNative(project: Project): ProjectDisplayRecord {
     cadence: project.cadence,
     objective: project.objective,
     objectives: project.objectives,
+    completionTarget: project.completionTarget,
     defaultCadence: project.defaultCadence,
     lifecycleBeforeArchive: project.lifecycleBeforeArchive,
     starred: project.starred,

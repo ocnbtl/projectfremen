@@ -900,7 +900,9 @@ function buildMilestone(
     title: requiredText(raw.title, "title", 240),
     description: optionalText(raw.description, "description") || "",
     dueAt: optionalDate(raw.dueAt, "dueAt") || "",
-    state: enumValue(raw.state, ["planned", "open", "active", "due", "blocked"] as const, "planned", "state"),
+    state: enumValue(raw.state, ["planned", "open", "active", "due", "blocked", "complete"] as const, "planned", "state"),
+    completedAt: raw.state === "complete" ? optionalDate(raw.completedAt, "completedAt") || now : undefined,
+    completionNote: optionalText(raw.completionNote, "completionNote", 4000),
     owner: optionalText(raw.owner, "owner", 160),
     ownerRef: optionalNativeRef(raw.ownerRef, "ownerRef"),
     completionCriteria: stringList(raw.completionCriteria, "completionCriteria"),
@@ -1362,9 +1364,9 @@ function applyMilestonePatch(
   }
   if (hasOwn(patch, "linkedRefs")) next.linkedRefs = normalizeNativeRefs(patch.linkedRefs, "linkedRefs");
 
-  if (requestedState === "complete" && current.state !== "complete") {
-    next.completedAt = now;
-  } else if (current.state === "complete" && requestedState !== "complete") {
+  if (requestedState === "complete") {
+    next.completedAt = (hasOwn(patch, "completedAt") ? optionalDate(patch.completedAt, "completedAt") : undefined) || current.completedAt || now;
+  } else if (current.state === "complete") {
     next.completedAt = undefined;
   }
   if (requestedState === "archived" && current.state !== "archived") {

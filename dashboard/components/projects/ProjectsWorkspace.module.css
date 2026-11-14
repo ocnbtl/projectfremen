@@ -2231,7 +2231,7 @@
 .projectBody .timelineLayout .panelHeader h2 {display:flex;align-items:center;gap:7px;font-size:16px;font-weight:550;}
 .milestoneList {list-style:none;margin:0;padding:0;display:grid;gap:8px;}
 .milestoneList > li {display:grid;gap:7px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-panel);transition:background-color .2s ease,border-color .2s ease;}
-.milestoneList > li:hover,.milestoneList > li[aria-current=true] {background:var(--module-primary-50);border-color:var(--module-primary-200);}
+.milestoneList > li[aria-current=true] {background:var(--module-primary-50);border-color:var(--module-primary-200);}
 .milestoneOpen {display:grid;grid-template-columns:18px minmax(0,1fr) 15px;gap:8px;align-items:start;width:100%;border:0;padding:0;background:transparent;color:var(--text-strong);text-align:left;cursor:pointer;}
 .milestoneOpen strong {font:550 14px/1.45 var(--font-body);overflow-wrap:anywhere;}
 .milestoneOpen > svg {margin-top:2px;color:var(--module-icon);}
@@ -2301,3 +2301,18 @@
 .taskDueDate :global(.people-date-display-narrow) { display: none; }
 .projectDraft .taskDueDate :global(.people-date-field[data-inset-label] .people-date-trigger) > svg { grid-column: 2; grid-row: 1 / 3; align-self: center; width: 16px; height: 16px; }
 .projectDraft .taskDueDate :global(.people-date-field[data-inset-label] .people-date-trigger) { box-sizing: border-box; padding: 3px 8px !important; }
+.milestoneTitle { display: flex; align-items: flex-start; gap: 8px; min-width: 0; color: var(--text-strong); }
+.milestoneTitle svg { flex: none; margin-top: 2px; color: var(--module-icon); }
+.milestoneTitle strong { font: 550 14px/1.45 var(--font-body); overflow-wrap: anywhere; }
+.projectBody .activityFilters button:first-child { min-width: 64px; justify-content: center; }
+.targetLabel { font: 500 12px/1.5 var(--font-body); color: var(--text-muted); }
+.overviewPrimary > .projectTasks { padding: 16px; }
+.projectTasks { min-width: 0; container-type: inline-size; }
+.projectTasks :global([data-task-surface=sheet]) { min-height: 0; }
+.projectTasks :global(.work-toolbar) { flex-wrap: wrap; }
+@media(max-width:640px) { .overviewPrimary > .projectTasks { padding: 12px; } }
+.projectTasks .panelHeader h2, .timelineSide .panelHeader h2 { display: flex; align-items: center; gap: 7px; }
+.projectTasks :global(.work-object-links) { flex-wrap: wrap; }
+.projectTasks :global(.work-object-links .work-links) { flex: 1 1 100%; }
+.projectTasks :global(.work-links > span) { max-width: 100%; }
+.projectTasks :global(.work-links > span > a) { line-height: 1.5; }

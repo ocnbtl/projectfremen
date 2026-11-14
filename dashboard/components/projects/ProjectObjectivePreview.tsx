@@ -70,7 +70,7 @@ export default function ProjectObjectivePreview({project,objective,triggerId,onC
         if(!result.ok)throw new Error(result.error.message);
         setGoal(result.data);onGoalSaved(result.data);
       }else if(base){
-        const patch=legacy?{objective:draft.text.trim()}:{objectives:base.objectives.map(row=>row.id===objective.id?{id:row.id,text:draft.text.trim(),targetAt:draft.date===originalDate(row.targetAt)?row.targetAt:(draft.date||undefined),completed:draft.completed}:{id:row.id,text:row.text,targetAt:row.targetAt,completedAt:row.completedAt})};
+        const patch=legacy?{objective:draft.text.trim()}:{objectives:base.objectives.map(row=>row.id===objective.id?{id:row.id,kind:row.kind,text:draft.text.trim(),targetAt:draft.date===originalDate(row.targetAt)?row.targetAt:(draft.date||undefined),completed:draft.completed}:{id:row.id,kind:row.kind,text:row.text,targetAt:row.targetAt,completedAt:row.completedAt})};
         const result=await projects.update("projects",base.id,patch,base.updatedAt);
         if(!result.ok)throw new Error(result.error.message);
         setBase(result.data.project);onSaved(result.data);

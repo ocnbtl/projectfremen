@@ -8,6 +8,7 @@ import type { ProjectLifecycleState } from "../../lib/modules/projects/types";
 import styles from "./ProjectDirectoryCards.module.css";
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import ProjectStarButton from "./ProjectStarButton";
 import ProjectObjectivePreview, { type ObjectivePreviewTarget } from "./ProjectObjectivePreview";
 import type { ProjectsUpdateResult } from "../../lib/modules/projects/types";
 import type { PersonalOpsGoal } from "../../lib/modules/personal-ops/types";
@@ -70,7 +71,7 @@ export default function ProjectDirectoryCards({ items, view, selectedId, busy, t
         <MorphingDiv className={`resource-card-tags ${styles.controls}`}>
           <span className={styles.status} title={status}><span className="resource-card-status"><UnigentamosIcon role={STATUS_ICONS[project.lifecycle]} size={16} /></span><span>{status}</span></span>
           <span className={styles.count} title={`${objectCount} linked object${objectCount === 1 ? "" : "s"}, including people`}><UnigentamosIcon role="object" size={14} /><span>{objectCount}<span className={styles.countLabel}> object{objectCount === 1 ? "" : "s"}</span></span></span>
-          <span className={`resource-card-pin ${styles.star}`}><button type="button" onClick={() => onToggleStar(item)} disabled={!project.editable || busy || ["complete", "archived"].includes(project.lifecycle)} aria-label={project.starred ? "Remove star" : "Star project"} aria-pressed={project.starred} data-active={project.starred || undefined}><UnigentamosIcon role="star" size={16} /></button></span>
+          <span className={`resource-card-pin ${styles.star}`}><ProjectStarButton starred={project.starred} onClick={()=>onToggleStar(item)} disabled={!project.editable || busy || ["complete", "archived"].includes(project.lifecycle)} size={16}/></span>
         </MorphingDiv>
         <MorphingDiv className={`resource-card-details ${styles.dates}`}>
           <span title={project.createdAt || "Created date not recorded"}><UnigentamosIcon role="calendar" size={13} /><span>Created <time dateTime={project.createdAt}>{date(project.createdAt)}</time></span></span>

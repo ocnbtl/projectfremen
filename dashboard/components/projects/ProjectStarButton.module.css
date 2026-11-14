@@ -1,0 +1,9 @@
+.button { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 34px; width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-muted); cursor: pointer; transition: color .18s, background .18s; }
+.button[aria-pressed="true"] { color: #9a5e28; }
+.button[aria-pressed="true"] svg, .button[aria-pressed="true"] svg use { fill: currentColor !important; }
+.button:hover { background: #efe0ce; }
+.button:focus-visible { outline: 2px solid #9a5e28; outline-offset: 2px; }
+.button:disabled { cursor: default; opacity: .6; }
+.button > span { display: inline-flex; align-items: center; justify-content: center; pointer-events: none; }
+.button .sparks { position: absolute; inset: 0; overflow: visible; }
+.sparks i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #bc7d48; }
