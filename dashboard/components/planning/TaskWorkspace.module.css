@@ -194,3 +194,11 @@
 .scheduleFields input[data-segment]:focus{outline:none;outline-offset:0}
 @container(max-width:720px){.scheduleFields,.scheduleFields[data-timed]{grid-template-columns:minmax(100px,.7fr) minmax(175px,1fr)}.scheduleFields [data-task-start],.scheduleFields [data-task-end]{grid-column:1/-1}.scheduleFields .timeZoneField{grid-column:1;grid-row:3}.scheduleFields .repeatField,.scheduleFields .repeatField:has(input){grid-column:2;grid-row:3}.scheduleFields .repeatField:has(input[aria-label="Custom repeat rule"]){grid-column:1/-1;grid-row:4}}
 @container(max-width:360px){.scheduleFields,.scheduleFields[data-timed]{grid-template-columns:minmax(0,1fr)}.scheduleFields .timeZoneField{grid-column:1;grid-row:3}.scheduleFields .repeatField,.scheduleFields .repeatField:has(input){grid-column:1;grid-row:4}}
+/* Periods remain available even when opened from a Calendar day summary. */
+.scopeTools{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
+.scopeTools .scopes{flex:none}
+@media(max-width:600px){.visibilityControls[data-task-navigation]{flex-wrap:wrap}.scopeTools .scopes button{padding:7px 6px;font-size:11px}.workspace[data-task-surface=sheet] .taskToolbar>.visibilityControls{grid-column:1/-1}}
+.workspace[data-task-surface=sheet] .taskToolbar{display:grid;grid-template-columns:minmax(0,1fr) auto}
+.workspace[data-task-surface=sheet] .taskToolbar>:global(.work-toolbar){grid-column:1;grid-row:1;min-width:0}
+.workspace[data-task-surface=sheet] .taskToolbar>:global(.work-button){grid-column:2;grid-row:1}
+.workspace[data-task-surface=sheet] .taskToolbar>.visibilityControls{grid-column:1/-1;grid-row:2;flex-wrap:wrap;min-width:0}

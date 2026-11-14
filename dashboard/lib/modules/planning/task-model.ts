@@ -3,7 +3,7 @@ import { effectiveEvent, type Calendar, type CalendarEvent, type EventOccurrence
 import type { PersonalOpsState } from "../personal-ops/types";
 import type { ProjectsState } from "../projects/types";
 import { createNativeObjectRef } from "../../native-objects/routes";
-import { addDays, localDate, instantFor, localFor } from "./calendar-model";
+import { addDays, instantFor, localFor } from "./calendar-model";
 import { parseRepeatLanguage } from "./repeat-language";
 
 export const TASK_KINDS = { task: "Task", goal: "Goal", routine: "Routine", obligation: "Obligation", decision: "Decision", follow_up: "Follow-up", objective: "Objective" } as const;
@@ -62,10 +62,10 @@ export function taskCatalog(plans: TaskPlan[], ops: PersonalOpsState | null, pro
   return result;
 }
 
-export function taskEvents(items: TaskItem[], calendars: Calendar[], zone: string, now = new Date()): CalendarEvent[] {
-  const today = localDate(now, zone);
-  return items.filter(item => item.source?.family !== "events").map(item => {
-    const start = item.start || (item.completed ? ([item.sourceUpdatedAt,item.updatedAt,item.createdAt].find(value=>value && /^\d{4}-/.test(value)) || today).slice(0,10) : today);
+export function taskEvents(items: TaskItem[], calendars: Calendar[], zone: string, _now = new Date()): CalendarEvent[] {
+  // General tasks stay in the catalogue, never projected onto a calendar day.
+  return items.filter(item => item.source?.family !== "events" && !!item.start).map(item => {
+    const start = item.start;
     const profiles = item.calendarIds.map(id=>calendars.find(c=>c.id===id && !c.archivedAt)).filter((c):c is Calendar=>!!c);
     return { id:`task:${item.id}`,title:item.title,description:item.description,start,end:item.end || addDays(start,1),allDay:item.start ? item.allDay : true,timeZone:item.timeZone || zone,
       calendarId:profiles[0]?.id || "personal-work",isTask:true,completed:item.completed,recurrence:item.start ? item.recurrence : "",exceptions:item.exceptions,createdAt:item.createdAt,updatedAt:item.updatedAt,location:"",linkedRefs:taskLinks(item),reminderMinutes:null,kind:"event" as const,
@@ -74,14 +74,12 @@ export function taskEvents(items: TaskItem[], calendars: Calendar[], zone: strin
 }
 
 /** Old Calendar tasks keep their event identity and any existing links/import metadata. */
-export function calendarTaskRecords(events:CalendarEvent[],calendars:Calendar[],zone:string,now=new Date()):CalendarEvent[]{
-  const today=localDate(now,zone);
-  return events.map(original=>{
+export function calendarTaskRecords(events:CalendarEvent[],calendars:Calendar[],_zone:string,_now=new Date()):CalendarEvent[]{
+  return events.filter(original=>{const event=effectiveEvent(original);return !event.isTask || !event.taskAssignment?.floating;}).map(original=>{
     const event=effectiveEvent(original),assignment=event.taskAssignment;
     if(!event.isTask || !assignment)return original;
-    const start=assignment.floating?(event.completed?event.updatedAt.slice(0,10):today):event.start;
     const profiles=assignment.calendarIds.map(id=>calendars.find(c=>c.id===id&&!c.archivedAt)).filter((c):c is Calendar=>!!c);
-    return {...original,...(assignment.floating?{start,end:addDays(start,1),allDay:true,recurrence:""}:{}),taskContext:{id:taskKey({family:"events",id:event.id}),kind:assignment.kind,planUpdatedAt:original.updatedAt,sourceUpdatedAt:original.updatedAt,floating:assignment.floating,calendarIds:profiles.map(c=>c.id),peopleIds:assignment.peopleIds,colors:[...profiles.map(c=>c.color),...assignment.peopleIds.map(personTaskColor)]}};
+    return {...original,taskContext:{id:taskKey({family:"events",id:event.id}),kind:assignment.kind,planUpdatedAt:original.updatedAt,sourceUpdatedAt:original.updatedAt,floating:assignment.floating,calendarIds:profiles.map(c=>c.id),peopleIds:assignment.peopleIds,colors:[...profiles.map(c=>c.color),...assignment.peopleIds.map(personTaskColor)]}};
   });
 }
 
