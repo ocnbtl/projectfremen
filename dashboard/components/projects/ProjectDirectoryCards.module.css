@@ -42,6 +42,11 @@
 .objectiveToggle:disabled:not([aria-busy=true]) {opacity:.55;}
 .objectiveToggle[aria-busy=true] .objectiveCheck {box-shadow:0 0 0 3px var(--module-primary-100);}
 .objectives .moreTasks { justify-content: flex-start; color: var(--module-action); gap: 5px; font-weight: 550; }
+.objectives li .taskOpen { flex: 1; width: 0; gap: 4px; }
+.taskTitle { flex: 1; min-width: 0; }
+.taskDue { display: inline-flex; align-items: center; justify-content: center; gap: 2px; flex: none; padding: 1px 3px; border-radius: 4px; background: var(--module-quiet); color: var(--text-muted); font-size: 10px; line-height: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .18s ease, background-color .18s ease; }
+.taskDue[data-overdue] { background: var(--state-danger-soft, #fbeaec); color: var(--state-danger-text, #9f2f34); }
+.objectives li .taskDue svg { color: inherit; }
 .taskHint { font-size: 11px; color: var(--text-muted); }
 .objectives .taskError { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; background: var(--state-danger-soft); color: var(--state-danger-text); border: 0; border-radius: 5px; pointer-events: auto; font-size: 11px; cursor: pointer; }
 .taskLoadError { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px; color: var(--state-danger-text); }
