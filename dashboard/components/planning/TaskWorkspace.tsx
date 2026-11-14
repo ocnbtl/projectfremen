@@ -1,7 +1,7 @@
 "use client";
 import { memo, useContext, useMemo, useState, type ReactNode, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import TaskDetailFields, { TaskDueDateField } from "./TaskDetailFields";
+import TaskDetailFields from "./TaskDetailFields";
 import TaskConfetti from "./TaskConfetti";
 import TaskKindPicker,{taskTypeIcons} from "./TaskKindPicker";
 import { WorkspaceButton as Button, WorkspaceHeader, WorkspaceToolbar } from "../admin-shell/WorkspaceKit";
@@ -12,8 +12,8 @@ import SearchField from "../ui/SearchField";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventDateTimePicker from "./EventDateTimePicker";
-import EventDateSegments from "./EventDateSegments";
-import EventRepeatField from "./EventRepeatField";
+import TaskScheduleFields from "./TaskScheduleFields";
+import TaskSchedulePopover from "./TaskSchedulePopover";
 import RecordLinks from "./RecordLinks";
 import { EventObjectIdentity } from "./EventObjects";
 import { EventObjectPreview } from "./EventLinksPreview";
@@ -22,9 +22,8 @@ import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import { writeTask } from "./task-client";
 export { writeTask } from "./task-client";
 import { TASK_KINDS, taskEvents, calendarTaskRecords, personTaskColor, taskLinks, taskRefKey, taskMatchesPerson, type TaskItem } from "../../lib/modules/planning/task-model";
-import { addDays, eventOccurrences, localDate, localFor, instantFor } from "../../lib/modules/planning/calendar-model";
+import { addDays, eventOccurrences, localDate } from "../../lib/modules/planning/calendar-model";
 import type { PlanningSnapshot } from "../../lib/modules/planning/repository";
-import type { EventFields } from "../../lib/modules/planning/types";
 import styles from "./TaskWorkspace.module.css";
 
 export const taskIcon=(kind:string)=>({task:"check",goal:"goal",routine:"routine",obligation:"check",decision:"decision",follow_up:"follow-up",objective:"goal"}[kind]||"check");
@@ -84,30 +83,21 @@ export default function TaskWorkspace({snapshot,zone,onSaved,initialId,initialOc
 <motion.div inert={focus} aria-hidden={focus||undefined} className={styles.contextControls} initial={false} animate={{opacity:focus?0:1}} style={{height:focus?0:"auto",width:focus?0:"auto",overflow:focus?"hidden":"visible"}} transition={{duration:reduced?0:.24,ease:[.22,1,.36,1]}}><TaskCardControls item={item} calendars={calendars} busy={busy} onSaved={onSaved}/></motion.div>
 {hasLinks&&<motion.div layout={reduced?false:"position"} transition={{layout:{duration:reduced?0:.24,ease:[.22,1,.36,1]}}} className={styles.contextLinks} data-task-objects>{linked.map(ref=><span className={styles.linked} key={taskRefKey(ref)} title={ref.label}>{ref.objectType==="person"||ref.objectType==="project"?<EventObjectPreview record={ref} showName/>:<><EventObjectIdentity record={ref}/><span>{ref.label}</span></>}</span>)}{assignedPeople.map(person=><span className={styles.linked} key={person.objectId}><EventObjectPreview record={person} showName/></span>)}</motion.div>}
 </motion.div></motion.div>}</AnimatePresence>
-<motion.div layout={reduced?false:"position"} className={styles.rowActions} data-task-footer>{(!focus||item.start)&&<span className={styles.schedule} data-task-date><UnigentamosIcon role={item.start?"calendar":"today"} size={13}/><span>{item.start&&date?taskDateLabel(date):"Today until done"}{item.dueAt&&<span className={styles.dueDate}>Due {taskDateLabel(item.dueAt.slice(0,10))}</span>}</span></span>}<div className={styles.actionButtons}><Button icon={hiddenIds.has(item.id)?"show":"hide"} className={styles.hideButton} aria-label={(hiddenIds.has(item.id)?"Show on Calendar ":"Hide from Calendar ")+item.title} title={item.recurrence?"Hide or restore this repeating task on Calendar; its schedule stays saved.":"Hide or restore on Calendar; the task stays saved."} disabled={busy} onClick={()=>void run({operation:"visibility",id:item.id,timeZone:zone,expectedUpdatedAt:item.updatedAt,sourceUpdatedAt:item.sourceUpdatedAt,expectedHidden:hiddenIds.has(item.id),hidden:!hiddenIds.has(item.id)})}/><Button icon="edit" aria-label={"Edit "+item.title} onClick={()=>{setEditing(item);setOccurrence(key);}}/><Button icon="check" aria-label={(completed?"Reopen ":"Complete ")+item.title} disabled={busy} title={completed?"Reopen task":"Mark complete"} onClick={event=>void completeCard(item,key,completed,event.currentTarget)}/></div></motion.div>
+<motion.div layout={reduced?false:"position"} className={styles.rowActions} data-task-footer>{(!focus||item.start)&&<TaskSchedulePopover item={item} zone={zone} onSaved={onSaved} disabled={busy}><UnigentamosIcon role={item.start?"calendar":"today"} size={13}/><span>{item.start&&date?taskDateLabel(date):"Today until done"}{item.dueAt&&<span className={styles.dueDate}>Due {taskDateLabel(item.dueAt.slice(0,10))}</span>}</span></TaskSchedulePopover>}<div className={styles.actionButtons}><Button icon={hiddenIds.has(item.id)?"show":"hide"} className={styles.hideButton} aria-label={(hiddenIds.has(item.id)?"Show on Calendar ":"Hide from Calendar ")+item.title} title={item.recurrence?"Hide or restore this repeating task on Calendar; its schedule stays saved.":"Hide or restore on Calendar; the task stays saved."} disabled={busy} onClick={()=>void run({operation:"visibility",id:item.id,timeZone:zone,expectedUpdatedAt:item.updatedAt,sourceUpdatedAt:item.sourceUpdatedAt,expectedHidden:hiddenIds.has(item.id),hidden:!hiddenIds.has(item.id)})}/><Button icon="edit" aria-label={"Edit "+item.title} onClick={()=>{setEditing(item);setOccurrence(key);}}/><Button icon="check" aria-label={(completed?"Reopen ":"Complete ")+item.title} disabled={busy} title={completed?"Reopen task":"Mark complete"} onClick={event=>void completeCard(item,key,completed,event.currentTarget)}/></div></motion.div>
 </motion.article>})}</AnimatePresence></DirectoryLayout>{!rows.length&&<div className={styles.empty}><UnigentamosIcon role="check" size={26}/><h3>{showHidden?"No hidden tasks" : query||kind!=="all"||assignee!=="all"?"No matching tasks":"You're clear now"}</h3><Button icon="plus" onClick={create}>Add task</Button></div>}</motion.div>}</AnimatePresence></div></WorkspaceTopbarContext.Provider>;
 }
 
 function TaskEditor({item,occurrence,zone,snapshot,busy,onBack,onSave,onComplete}:{item:TaskItem;occurrence:string;zone:string;snapshot:PlanningSnapshot;busy:boolean;onBack:()=>void;onSave:(input:Record<string,unknown>,completeAfter?:boolean)=>Promise<void>;onComplete:(completed:boolean,skip?:boolean)=>Promise<void>}){
   const occurrenceComplete=item.recurrence ? item.exceptions[occurrence || item.start]?.completed === true : !!item.completed;
-  const today=localDate(new Date(),zone),[draft,setDraft]=useState(item),[personQuery,setPersonQuery]=useState(""),[repeatError,setRepeatError]=useState("");
+  const [draft,setDraft]=useState(item),[personQuery,setPersonQuery]=useState(""),[repeatError,setRepeatError]=useState("");
   const people=(snapshot.refs as (PlanningSnapshot["refs"][number] & {preview?:{imageUrl?:string}})[]).filter(p=>p.objectType==="person"&&p.module==="people"),calendars=snapshot.state.calendars.filter(c=>!c.archivedAt&&!c.connectionId);
   const update=(patch:Partial<TaskItem>)=>setDraft(d=>({...d,...patch}));
-  function schedule(date:string,allDay=draft.allDay){const start=date?(allDay?date.slice(0,10):date.includes("T")?date:date+"T09:00"):"";update({start,end:start?(allDay?addDays(start,1):localFor(instantFor(start,draft.timeZone)+3600000,draft.timeZone)):"",allDay,recurrence:date?draft.recurrence:""});}
-  const fields={...draft,start:draft.start||today,end:draft.end||addDays(today,1),calendarId:"native",isTask:true,kind:"event",location:"",linkedRefs:[],reminderMinutes:null} as EventFields;
   return <form className={styles.editor} onSubmit={e=>{e.preventDefault();if(!repeatError)void onSave(draft);}}>
     <div className={styles.top}><Button className={styles.backButton} onClick={onBack}><span className={styles.backLabel}><UnigentamosIcon role="chevron-right" size={16} style={{transform:"rotate(180deg)"}}/>Back to tasks</span></Button></div>
     <div className={styles.identityFields}><label>Task<input aria-label="Task name" required maxLength={240} value={draft.title} onChange={e=>update({title:e.target.value})}/></label><label>Type<SelectField contained aria-label="New task type" optionIcons={taskTypeIcons} value={draft.kind} onChange={e=>update({kind:e.target.value as TaskItem["kind"]})}>{Object.entries(TASK_KINDS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</SelectField></label></div>
     <label>Notes<textarea aria-label="Task notes" rows={2} value={draft.description} onChange={e=>update({description:e.target.value})}/></label>
     <TaskDetailFields draft={draft} update={update} zone={zone}/>
-    <section className={styles.scheduleSection}><div className={styles.sectionHeading}><h3><UnigentamosIcon role="calendar" size={17}/>Schedule</h3><TaskDueDateField draft={draft} update={update} zone={zone}/></div><div className={styles.choices}>{[["floating","Today until done"],["day","Choose a day"],["time","Choose a time"]].map(([value,label])=><button type="button" key={value} aria-pressed={value===(!draft.start?"floating":draft.allDay?"day":"time")} onClick={()=>value==="floating"?schedule(""):schedule(draft.start||today,value==="day")}>{label}</button>)}</div>
-      {!draft.start?<p className={styles.hint}>Appears in Today’s tasks until complete.</p>:<div className={styles.scheduleFields} data-timed={!draft.allDay||undefined}>
-        <div data-task-start><EventDateSegments label="Start" value={draft.start} allDay={draft.allDay} timeZone={draft.timeZone} onChange={value=>schedule(value)}/></div>
-        {!draft.allDay&&<div data-task-end><EventDateSegments label="End" value={draft.end} allDay={false} timeZone={draft.timeZone} onChange={value=>update({end:value})}/></div>}
-        <div className={styles.timeZoneField}><SelectField contained searchable autoFocusSearch={false} triggerContent={<span className={styles.taskZone}><UnigentamosIcon role="clock" size={15}/>{draft.timeZone.split("/").pop()?.replaceAll("_"," ")}<UnigentamosIcon role="chevron-down" size={12}/></span>} aria-label="Task time zone" value={draft.timeZone} onChange={e=>update({timeZone:e.target.value})}>{[...new Set([draft.timeZone,"UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}</SelectField></div>
-        <div className={styles.repeatField}><EventRepeatField standalone fields={fields} update={(key,value)=>{if(key==="recurrenceAnchor")setRepeatError(value?"Choose a repeat schedule based on days, weeks, months, or years.":"");if(key==="recurrence")update({recurrence:value as string});}}/></div>
-      </div>}
-    </section>
+    <TaskScheduleFields draft={draft} update={update} zone={zone} onRepeatError={setRepeatError}/>
     {repeatError&&<p role="alert">{repeatError}</p>}
     <div className={styles.editorAssociations}>
     <section><h3><UnigentamosIcon role="object" size={17}/>Linked objects</h3><RecordLinks refs={draft.linkedRefs||[]} available={snapshot.refs} onChange={linkedRefs=>update({linkedRefs})} objectPicker pickerLabel="Link an object"/>{item.sourceLinkedRefs?.length ? <RecordLinks refs={item.sourceLinkedRefs} available={snapshot.refs}/> : null}</section>

@@ -1,0 +1,27 @@
+.trigger{cursor:pointer;border:1px solid transparent;box-shadow:none;text-align:left;transition:background-color .18s,border-color .18s}
+.trigger:hover,.trigger[data-state=open]{border-color:var(--module-primary-300);background:var(--module-primary-100)!important}
+.trigger:focus-visible{outline:2px solid var(--module-action);outline-offset:2px}
+.trigger:disabled{cursor:wait;opacity:.6}
+.panel{container-type:inline-size;z-index:1700;width:480px;max-width:calc(100vw - 24px);max-height:var(--radix-popover-content-available-height);overflow:visible;box-sizing:border-box;padding:14px;border:1px solid var(--border,#d7e1e5);border-radius:14px;background:white;color:#243940;box-shadow:0 8px 28px #24394025;font:400 13px/1.4 var(--font-body);transform-origin:var(--radix-popover-content-transform-origin);animation:unfurl .2s cubic-bezier(.22,1,.36,1)}
+.panel[data-state=closed]{animation:fold .14s ease-in}
+.panel>header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.panel>header>svg{flex:none}
+.panel>header>strong{font:600 14px/1.4 var(--font-body);overflow-wrap:anywhere}
+.panel>header>button{display:grid;place-items:center;flex:none;margin-left:auto;width:28px;height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:inherit;cursor:pointer;box-shadow:none}
+.panel>header>button:hover{background:var(--module-primary-100)}
+.panel .form{gap:10px;max-width:none;margin:0;padding:0;max-height:calc(var(--radix-popover-content-available-height) - 70px);overflow:auto;scrollbar-gutter:stable}
+.form fieldset{border:0;padding:0;margin:0;min-width:0}
+.panel .form section{border:0;padding:0;background:transparent}
+.panel .form footer{position:static;padding:0;display:flex;justify-content:flex-end;gap:8px;background:transparent}
+.panel .form footer :global(.work-button){display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;min-height:34px;padding:6px 10px}
+.panel .form footer :global(.work-button--primary){background:var(--module-action);border-color:var(--module-action);color:#fff}
+.hint,.error{margin:0;font:400 12px/1.5 var(--font-body)}.hint{color:#637780}.error{color:#9b351f}
+@keyframes unfurl{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes fold{to{opacity:0;transform:translateY(-3px) scale(.98)}}
+@media(prefers-reduced-motion:reduce){.panel,.panel[data-state=closed]{animation:none}.trigger{transition:none}}
+/* The compact surface uses its own two-column schedule layout at every viewport. */
+.panel .form [data-task-schedule-fields]{grid-template-columns:minmax(100px,.7fr) minmax(175px,1fr)}
+.panel .form [data-task-schedule-fields] [data-task-time-zone]{grid-column:1;grid-row:3}
+.panel .form [data-task-schedule-fields] [data-task-repeat]{grid-column:2;grid-row:3}
+.panel .form [data-task-schedule-fields] [data-task-repeat]:has(input[aria-label="Custom repeat rule"]){grid-column:1/-1;grid-row:4}
+@container(max-width:360px){.panel .form [data-task-schedule-fields]{grid-template-columns:minmax(0,1fr)}.panel .form [data-task-schedule-fields] [data-task-repeat]{grid-column:1;grid-row:4}}
