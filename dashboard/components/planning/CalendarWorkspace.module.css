@@ -2841,7 +2841,8 @@
 
 .taskBandLabel{align-self:center;font-size:10px;color:#526771;text-align:center;min-width:0;padding:3px}
 
-.shell :global([data-outlined-task]){position:relative;background:transparent!important}
+/* Each calendar surface owns positioning; timed tasks must stay absolutely placed. */
+.shell :global([data-outlined-task]){background:transparent!important}
 .shell :global([data-outlined-task])::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;background:var(--task-border,transparent);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none}
 
 .toolbar.navigationBar .tasksButton{order:5;width:auto;min-width:0}
