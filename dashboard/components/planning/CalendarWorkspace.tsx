@@ -1,4 +1,5 @@
 "use client";
+import { subscribeTaskChanges } from "../../lib/modules/planning/task-changes";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import dynamic from "next/dynamic";
 import { CalendarLinkedWorkContext } from "./CalendarLinkedWorkContext";
@@ -286,12 +287,14 @@ export default function CalendarWorkspace() {
     const timer = setInterval(() => setNow(Date.now()), 60000);
     const wellnessChanged = (event: StorageEvent) => { if (!document.hidden && (event.key === WELLNESS_CHANGE_KEY || event.key === PET_CHANGE_KEY)) void refresh(); };
     const refreshFromEvent = () => { void refresh(); };
+    const unsubscribeTasks = subscribeTaskChanges(refreshFromEvent, false);
     window.addEventListener("storage", wellnessChanged);
     window.addEventListener("online", refreshFromEvent);
     window.addEventListener("focus", refreshFromEvent);
     window.addEventListener("unigentamos-planning-changed", refreshFromEvent);window.addEventListener("unigentamos-tasks-restored", refreshFromEvent);
     return () => {
       clearInterval(timer);
+      unsubscribeTasks();
       window.removeEventListener("storage", wellnessChanged);
       window.removeEventListener("online", refreshFromEvent);
       window.removeEventListener("focus", refreshFromEvent);

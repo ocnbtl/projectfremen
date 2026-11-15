@@ -1,4 +1,5 @@
 "use client";
+import { subscribeTaskChanges } from "../../lib/modules/planning/task-changes";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WorkspaceButton, WorkspaceSheet } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -14,6 +15,7 @@ export default function PersonTasks({personId,compact=false}:{personId:string;co
  const zone=Intl.DateTimeFormat().resolvedOptions().timeZone,today=localDate(new Date(),zone);
  const refresh=useCallback(async()=>{const response=await fetch("/api/planning/tasks?person="+encodeURIComponent(personId)+"&zone="+encodeURIComponent(zone));const next=await response.json();if(!response.ok)throw new Error(next.error||"Tasks could not load.");setData(next);setError("");},[personId,zone]);
  useEffect(()=>{void refresh().catch(e=>setError(e.message));},[refresh]);
+ useEffect(()=>subscribeTaskChanges(()=>{void refresh().catch(e=>setError(e.message));if(open)void planningRequest<PlanningSnapshot>().then(setSnapshot).catch(e=>setError(e.message));},false),[refresh,open]);
  useEffect(()=>{const reload=()=>{void refresh().catch(e=>setError(e.message));if(open)void planningRequest<PlanningSnapshot>().then(setSnapshot).catch(e=>setError(e.message));};window.addEventListener("focus",reload);window.addEventListener("unigentamos-tasks-restored",reload);return()=>{window.removeEventListener("focus",reload);window.removeEventListener("unigentamos-tasks-restored",reload);};},[refresh,open]);
  const rows=useMemo(()=>data?.items.flatMap(item=>{if(item.completed)return [];const event=item.source?.family==="events"?calendarTaskRecords(data.events.filter(e=>e.id===item.source?.id),data.calendars,zone)[0]:taskEvents([item],data.calendars,zone)[0];const next=item.recurrence&&event?eventOccurrences([event],today,addDays(today,90),zone).find(e=>!e.completed):undefined;if(item.recurrence&&!next)return [];return [{item,key:item.start?next?.occurrenceKey||item.start:"",date:next?.start||item.start}];}).sort((a,b)=>(a.date||today).localeCompare(b.date||today))||[],[data,today,zone]);
  async function show(row?:{item:TaskItem;key:string}){setTarget(row?{id:row.item.id,key:row.key}:undefined);setOpen(true);try{setSnapshot(await planningRequest<PlanningSnapshot>());}catch(e){setError((e as Error).message);}}

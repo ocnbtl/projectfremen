@@ -1,4 +1,5 @@
 "use client";
+import { notifyTaskChange } from "./task-changes";
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
 import type { NativeObjectRef } from "../../native-objects/types";
 import {
@@ -147,6 +148,7 @@ export async function planningRequest<T>(
       { status: response.status },
     );
   if (input) {
+    if (input.collection === "events" && body.item?.isTask) notifyTaskChange();
     window.dispatchEvent(new Event("unigentamos-planning-changed"));
     return body.item as T;
   }

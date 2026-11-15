@@ -1,4 +1,5 @@
 "use client";
+import { subscribeTaskChanges } from "../../lib/modules/planning/task-changes";
 
 import { useEffect, useRef, useState } from "react";
 import TaskWorkspace from "../planning/TaskWorkspace";
@@ -42,8 +43,7 @@ export default function ProjectTasksPanel({ project, objectives, active, readOnl
     if (!active) return;
     void refresh();
     const changed = () => { void refresh(); };
-    window.addEventListener("unigentamos-tasks-changed", changed);
-    return () => window.removeEventListener("unigentamos-tasks-changed", changed);
+    return subscribeTaskChanges(changed);
   }, [active, project.objectId]);
   const linked = snapshot?.taskItems?.filter(task => taskLinks(task).some(ref => ref.module === "projects" && ref.objectType === "project" && ref.objectId === project.objectId)) || [];
   return <section className={`${styles.panel} ${styles.projectTasks}`} aria-label="Project tasks">

@@ -1,4 +1,5 @@
 "use client";
+import { subscribeTaskChanges } from "../../lib/modules/planning/task-changes";
 import { useEffect, useRef, useState } from "react";
 import { createProjectsRepository } from "../../lib/modules/projects/repository";
 import type { Project } from "../../lib/modules/projects/types";
@@ -43,8 +44,7 @@ export default function useProjectCardTasks(active: boolean, zone: string, onPro
     if (!active) return;
     void refresh();
     const changed=()=>{void refresh(true);};
-    window.addEventListener("unigentamos-tasks-changed",changed);
-    return()=>window.removeEventListener("unigentamos-tasks-changed",changed);
+    return subscribeTaskChanges(changed);
   },[active,zone]);
   return { data, error, refresh, settle: () => pending.current || refresh(true) };
 }
