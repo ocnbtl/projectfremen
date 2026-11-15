@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+require.extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,file);
+const {canUndoTaskTime,taskTimeChange}=require('../lib/modules/planning/task-time-history.ts');
+const item={id:'test',title:'Task',timeZone:'America/New_York',recurrence:'',allDay:false,start:'2026-11-15T16:00',end:'2026-11-15T17:00',exceptions:{}};
+const occurrence={start:item.start,end:item.end,occurrenceKey:item.start};
+const change=taskTimeChange(item,occurrence,'2026-11-16T16:00','2026-11-16T17:00');
+const moved={...item,...change.after};
+assert(canUndoTaskTime(moved,change));assert(canUndoTaskTime({...moved,start:moved.start+':00',description:'New note',completed:true},change));
+for(const patch of [{start:'2026-11-16T15:00'},{end:'2026-11-16T18:00'},{allDay:true},{timeZone:'UTC'},{recurrence:'FREQ=DAILY'},{start:''}])assert(!canUndoTaskTime({...moved,...patch},change));
+const repeat={...item,recurrence:'FREQ=DAILY'},repeatChange=taskTimeChange(repeat,occurrence,'2026-11-15T18:00','2026-11-15T19:00');
+const updated={...repeat,exceptions:{[item.start]:{...repeatChange.after,completed:true},'2026-11-16T16:00':{cancelled:true}}};
+assert(canUndoTaskTime(updated,repeatChange));assert(!canUndoTaskTime({...updated,exceptions:{[item.start]:{...repeatChange.after,cancelled:true}}},repeatChange));
+assert.deepEqual(change.before,{start:item.start,end:item.end});
+console.log('PASS Undo guard: normalized time, unrelated edits allowed, moved/resized/general/all-day/timezone/recurrence changes rejected, occurrence scope and cancellation preserved.');

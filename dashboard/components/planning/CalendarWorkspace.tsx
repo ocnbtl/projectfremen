@@ -37,6 +37,7 @@ import TaskEventCard from "./TaskEventCard";
 import { CalendarDisplayContext, useCalendarDisplayPreferences } from "./CalendarDisplayPreferences";
 import { taskCompletionPatch, resizedEventTime } from "../../lib/modules/planning/calendar-tasks";
 import { timeChange, timeChangePatch, canUndoTimeChange, type EventTimeChange } from "../../lib/modules/planning/event-time-history";
+import { taskTimeChange, canUndoTaskTime, type TaskTimeChange } from "../../lib/modules/planning/task-time-history";
 import { calendarDateLabel } from "./CalendarMiniMonth";
 import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
 import { calendarObservances, defaultObservances, observanceAppearance, type HolidayCatalog } from "../../lib/modules/planning/observances";
@@ -536,7 +537,7 @@ export default function CalendarWorkspace() {
     )
       finishEditing(editor);
   }
-  const [timeHistory, setTimeHistory] = useState<EventTimeChange[]>([]);
+  const [timeHistory, setTimeHistory] = useState<(EventTimeChange | TaskTimeChange)[]>([]);
   const [undoNoticeOpen, setUndoNoticeOpen] = useState(false);
   const changingTime = useRef(false);
   async function commitTime(change: EventTimeChange, undo = false) {
@@ -575,7 +576,9 @@ export default function CalendarWorkspace() {
       void refresh();
     }
   }
-  const undoLatest = () => { const change = timeHistory.at(-1); if (change) void commitTime(change, true); };
+  const undoLatest = () => { const change = timeHistory.at(-1); if (change) { if ("taskId" in change) void undoTaskTime(change); else void commitTime(change, true); } };
+  const latestTimeChange = timeHistory.at(-1);
+  const undoIsTask = !!latestTimeChange && ("taskId" in latestTimeChange || latestTimeChange.isTask);
   useEffect(() => {
     const undoKey = (event: KeyboardEvent) => {
       const target = event.target instanceof Element ? event.target : null;
@@ -605,7 +608,26 @@ export default function CalendarWorkspace() {
     if (item.wellnessSource || item.petSource) { await updateWellnessTime(item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)); return; }
     if (original) await commitTime(timeChange(original, item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)));
   }
-  async function updateTaskTime(item:EventOccurrence,start:string,end:string){const task=snapshot?.taskItems?.find(t=>t.id===item.taskContext?.id);if(!task||busy)return;await action(()=>writeTask({operation:task.recurrence?"move-occurrence":"schedule",id:task.id,expectedUpdatedAt:task.updatedAt,sourceUpdatedAt:task.sourceUpdatedAt,timeZone:task.timeZone,occurrenceKey:item.occurrenceKey,input:{...task,start,end,allDay:false}}),"Task rescheduled");}
+  async function updateTaskTime(item:EventOccurrence,start:string,end:string){
+    const task=confirmed.current?.taskItems?.find(t=>t.id===item.taskContext?.id);
+    if(!task||busy||changingTime.current)return;
+    changingTime.current=true;
+    const change=taskTimeChange(task,item,start,end);
+    try { await action(async()=>{
+      await writeTask({operation:task.recurrence?"move-occurrence":"schedule",id:task.id,expectedUpdatedAt:task.updatedAt,sourceUpdatedAt:task.sourceUpdatedAt,timeZone:task.timeZone,occurrenceKey:item.occurrenceKey,input:{...task,start,end,allDay:false}});
+      setTimeHistory(history=>[...history.slice(-19),change]);setUndoNoticeOpen(true);
+    },""); } finally { changingTime.current=false; }
+  }
+  async function undoTaskTime(change:TaskTimeChange){
+    if(busy||changingTime.current)return;
+    const task=confirmed.current?.taskItems?.find(t=>t.id===change.taskId);
+    if(!task||!canUndoTaskTime(task,change)){setError("This task's schedule changed since your move. Open it to review its current time.");return;}
+    changingTime.current=true;
+    try { await action(async()=>{
+      await writeTask({operation:change.occurrenceKey?"move-occurrence":"schedule",id:task.id,expectedUpdatedAt:task.updatedAt,sourceUpdatedAt:task.sourceUpdatedAt,timeZone:task.timeZone,occurrenceKey:change.occurrenceKey,input:{...task,...change.before,allDay:false}});
+      setTimeHistory(history=>history.slice(0,-1));setUndoNoticeOpen(false);
+    },"Previous task time restored"); } finally { changingTime.current=false; }
+  }
   async function updateWellnessTime(item: EventOccurrence, start: string, end: string) {
     if(item.petSource){if(busy)return;const source=item.petSource;await action(async()=>{await updatePetCare(source.id,source.updatedAt,{schedule:{start,end,calendarId:item.calendarId,timeZone:item.timeZone}});setPreviewOpen(false);},"Care schedule updated");return;}
     const source = item.wellnessSource; if (!source || busy) return;
@@ -758,8 +780,8 @@ export default function CalendarWorkspace() {
         message={notice}
         onRetry={error || holidayError ? () => { void refresh(); setHolidayRetry(value => value + 1); } : undefined}
       />
-      {undoNoticeOpen && !!timeHistory.length && <aside className={styles.undoTime} aria-label="Event move saved">
-        <UnigentamosIcon role="check" size={18} /><div role="status"><strong>Event moved</strong><span>{timeHistory.at(-1)?.title}</span></div>
+      {undoNoticeOpen && !!timeHistory.length && <aside className={styles.undoTime} aria-label={undoIsTask?"Task time saved":"Event move saved"}>
+        <UnigentamosIcon role="check" size={18} /><div role="status"><strong>{undoIsTask?"Task time updated":"Event moved"}</strong><span>{latestTimeChange?.title}</span></div>
         <button type="button" className={styles.undoAction} disabled={busy} onClick={undoLatest} title="Undo last move (Ctrl+Z / Cmd+Z)">Undo</button>
         <button type="button" className={styles.undoDismiss} onClick={()=>setUndoNoticeOpen(false)} aria-label="Dismiss move notification"><UnigentamosIcon role="close" size={17}/></button>
       </aside>}

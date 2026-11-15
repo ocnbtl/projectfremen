@@ -4,13 +4,14 @@ import { Temporal } from "@js-temporal/polyfill";
 export type EventTimeChange = {
   eventId: string;
   title: string;
+  isTask?: boolean;
   occurrenceKey?: string;
   timeZone: string;
   before: { start: string; end: string };
   after: { start: string; end: string };
 };
 export function timeChange(event: CalendarEvent, occurrence: EventOccurrence, start: string, end: string): EventTimeChange {
-  return { eventId: event.id, title: occurrence.title, occurrenceKey: event.recurrence || event.recurrenceDates?.length ? occurrence.occurrenceKey : undefined,
+  return { eventId: event.id, title: occurrence.title, isTask: occurrence.isTask, occurrenceKey: event.recurrence || event.recurrenceDates?.length ? occurrence.occurrenceKey : undefined,
     timeZone: occurrence.timeZone, before: { start: occurrence.start, end: occurrence.end }, after: { start, end } };
 }
 export function timeChangePatch(event: CalendarEvent, change: EventTimeChange, undo = false): Partial<CalendarEvent> {
