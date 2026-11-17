@@ -42,11 +42,6 @@ export default function EventEditorFields({ fields, update, snapshot }: {
             update("start",checked ? start : `${start}T09:00`);
             update("end",checked ? (fields.end.endsWith("T00:00") && end > start ? end : addDays(end,1)) : `${addDays(end,-1)}T10:00`);
           }} />
-          <EventCheckbox label="Task" checked={Boolean(fields.isTask)} onChange={checked => {
-            update("isTask",checked);
-            if (checked) { update("reminderMinutes",60); setReminderDraft(60); setReminderUnit(60); setReminderEmpty(false); }
-            else update("completed",false);
-          }} />
           <SelectField searchable autoFocusSearch={false} aria-label="Event time zone" value={fields.timeZone} onChange={e => update("timeZone",e.target.value)} triggerContent={<span className={styles.zone}><UnigentamosIcon role="clock" size={15} />{fields.timeZone.split("/").pop()?.replaceAll("_"," ")}<UnigentamosIcon role="chevron-down" size={12} /></span>}>
             {[...new Set([fields.timeZone,"UTC",...Intl.supportedValuesOf("timeZone")])].map(zone => <option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
           </SelectField>
@@ -61,7 +56,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
           }} />
           <SelectField aria-label="Reminder unit" value={String(reminderUnit)} disabled={fields.reminderMinutes === null} onChange={e => { const next=Number(e.target.value); reminder(Math.min(43200,Math.round(reminderDraft/reminderUnit*next))); setReminderUnit(next); }}><option value="1">minutes before</option><option value="60">hours before</option><option value="1440">days before</option><option value="10080">weeks before</option></SelectField>
         </div>
-<label>Interaction<SelectField aria-label="Event interaction type" value={fields.interactionKind||"auto"} onChange={e=>update("interactionKind",e.target.value==="auto"?undefined:e.target.value as EventFields["interactionKind"])}><option value="auto">Meeting when people are linked</option><option value="none">No interaction</option>{INTERACTION_KINDS.map(kind=><option key={kind.value} value={kind.value}>{kind.label}</option>)}</SelectField></label>
+
         <EventRepeatField fields={fields} update={update} birthdays={snapshot?.birthdays} />
         <EventDateSegments label="Starts" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.start} onChange={value => update("start",value)} />
         <EventDateSegments label="Ends" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.allDay ? addDays(fields.end,-1) : fields.end} onChange={value => update("end",fields.allDay ? addDays(value,1) : value)} />
@@ -81,6 +76,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
         </div>
       </section>
       <div className={styles.locationSlot}><EventLocationField fields={fields} update={update} snapshot={snapshot} /></div>
+      <label className={styles.interaction}>Interaction type<SelectField columns={2} menuClassName={styles.interactionMenu} aria-label="Event interaction type" value={fields.interactionKind||"auto"} onChange={e=>update("interactionKind",e.target.value==="auto"?undefined:e.target.value as EventFields["interactionKind"])}><option value="auto">Automatic</option><option value="none">No interaction</option>{INTERACTION_KINDS.map(kind=><option key={kind.value} value={kind.value}>{kind.label}</option>)}</SelectField><small>Automatic logs a meeting when people are linked.</small></label>
       <section className={styles.links} aria-label="Linked objects"><RecordLinks objectPicker pickerLabel="Link an object" refs={linked} available={snapshot?.refs} onChange={refs => {
         update("linkedRefs",refs); const place=refs.find(r => r.module === "map" && r.objectType === "place"); update("placeId",place?.objectId || "");
         if (place && place.objectId !== fields.placeId) update("location",snapshot?.state.places.find(p => p.id === place.objectId)?.address || place.label);

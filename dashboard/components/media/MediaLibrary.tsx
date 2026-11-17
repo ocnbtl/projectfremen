@@ -1,6 +1,6 @@
 "use client";
 import { DirectoryLayout } from "../ui/DirectoryLayout";
-import * as Popover from "@radix-ui/react-popover";
+import MediaUploadSheet from "./MediaUploadSheet";
 import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
 import SelectField from "../ui/SelectField";
 import DirectoryCard from "../operational/DirectoryCard";
@@ -132,7 +132,6 @@ export default function MediaLibrary({
   initialSelected?: string;
 }) {
   const params = useSearchParams(),
-    fileInput = useRef<HTMLInputElement>(null),
     controller = useRef<AbortController | null>(null);
   const [transfers, setTransfers] = useState<
     Array<{
@@ -150,6 +149,7 @@ export default function MediaLibrary({
   const [undoBatch, setUndoBatch] = useState<
     Array<{ id: string; previous: string; applied: string }>
   >([]);
+  const [uploadOpen,setUploadOpen]=useState(false);
   const [readLocation, setReadLocation] = useState(false);
   const [objects, setObjects] = useState<VaultObjectSnapshot[]>([]),
     [unlocked, setUnlocked] = useState(false),
@@ -272,7 +272,7 @@ export default function MediaLibrary({
       if (url) URL.revokeObjectURL(url);
     };
   }, [selected?.objectId, selected && accountFile(selected)?.id, unlocked]);
-  async function upload(files: FileList | null) {
+  async function upload(files: FileList | File[] | null) {
     if (!files?.length) return;
     setBusy(true);
     setError("");
@@ -513,27 +513,19 @@ export default function MediaLibrary({
         count={visible.length + legacy.length}
       >
         {<>
-            <Popover.Root><Popover.Trigger asChild><Button icon="settings" aria-label="Upload options" title="Upload options"><span className="workspace-action-label">Upload options</span></Button></Popover.Trigger><Popover.Portal><Popover.Content className="app-select-menu workspace-filter-menu workspace-actions-submenu" align="end" sideOffset={8} collisionPadding={12}><strong>Upload options</strong><label className="work-check"><input type="checkbox" checked={readLocation} onChange={e=>setReadLocation(e.target.checked)}/>Read embedded JPEG locations on upload</label><p>Off by default. Only new uploads are affected.</p></Popover.Content></Popover.Portal></Popover.Root>
+
             <Button
               intent="primary"
               icon="photo-upload"
               disabled={busy || !catalogueLoaded}
-              onClick={() => fileInput.current?.click()}
+              onClick={() => setUploadOpen(true)}
             >
               Add files
             </Button>
-            <input
-              ref={fileInput}
-              type="file"
-              multiple
-              hidden
-              onChange={(e) => {
-                void upload(e.target.files);
-                e.target.value = "";
-              }}
-            />
+
           </>}
       </WorkspaceHeader>
+      <MediaUploadSheet open={uploadOpen} onClose={()=>setUploadOpen(false)} onUpload={files=>void upload(files)} readLocation={readLocation} onReadLocation={setReadLocation}/>
       <WorkspaceToolbar
         query={query}
         onQuery={(value) => {
@@ -541,7 +533,7 @@ export default function MediaLibrary({
           setChecked(new Set());
         }}
         placeholder="Search media"
-        actions={<Button icon="check" title={selectionMode?"Finish selecting":"Select files"} aria-label={selectionMode?"Finish selecting":"Select files"} aria-pressed={selectionMode} onClick={()=>{setSelectionMode(!selectionMode);setChecked(new Set());}}/>}
+        actions={<Button className={styles.selectToggle} title={selectionMode?"Finish selecting":"Select files"} aria-label={selectionMode?"Finish selecting":"Select files"} aria-pressed={selectionMode} onClick={()=>{setSelectionMode(!selectionMode);setChecked(new Set());}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m7 12 3 3 7-7" strokeLinecap="round" strokeLinejoin="round" style={{opacity:selectionMode?1:0,transition:"opacity 160ms ease"}}/></svg></Button>}
         filters={<div className={styles.filters}>
           <div className={styles.filterHeading}><strong>Filter media</strong><Button onClick={()=>{setFilters(EMPTY_MEDIA_FILTERS);setArchive(false);setChecked(new Set());}} disabled={!filterCount}>Reset</Button></div>
           <fieldset><legend>Show</legend><div className={styles.filterOptions}>{[false,true].map(value=><Button key={String(value)} aria-pressed={archive===value} onClick={()=>{setArchive(value);setChecked(new Set());}}>{value?"Archive":"Library"}</Button>)}</div></fieldset>

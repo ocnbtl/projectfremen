@@ -80,7 +80,8 @@ export default function PersonAutofill({ name, values, onApply, organizations = 
     <button type="button" className="people-organization-autofill-button" aria-label="Autofill person from links" aria-busy={busy}
       title={name.trim() && urls.length ? "Autofill person from links" : "Enter a name and a public profile link to enable autofill"}
       disabled={disabled || busy || !name.trim() || !urls.length} onClick={() => void autofill()} data-icon-button="standard"><UnigentamosIcon role="sparkles" size={17} /></button>
-    {(busy || notice || result || linkedinUrl) && <div className="people-autofill-feedback">
+    {linkedinUrl && <button type="button" className="people-profile-text-toggle" aria-expanded={pasteOpen} aria-controls={pasteId} onClick={() => setPasteOpen((current) => !current)}>Paste profile text</button>}
+    {(busy || notice || result || pasteOpen) && <div className="people-autofill-feedback">
       {(busy || notice) && <p role="status" aria-live="polite">{busy ? progress || "Finding public profile details, employers, and schools…" : notice}</p>}
       {result && result.sources.length > 0 && <details className="people-autofill-sources"><summary>Autofill sources</summary><p>{result.message}</p>
         <ul>{result.suggestions.map((item) => <li key={item.field}><strong>{PERSON_AUTOFILL_LABELS[item.field]}</strong>: {item.value}<small>{item.evidence}. <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small></li>)}
@@ -91,7 +92,7 @@ export default function PersonAutofill({ name, values, onApply, organizations = 
       </details>}
       {result?.sources.length ? result.unavailableSources?.map((item) => <p key={item.url}>{item.message} <a href={item.url} target="_blank" rel="noopener noreferrer">View profile</a></p>) : null}
       {linkedinUrl && <div className="people-profile-text-import">
-        <button type="button" className="people-profile-text-toggle" aria-expanded={pasteOpen} aria-controls={pasteId} onClick={() => setPasteOpen((current) => !current)}>Paste profile text</button>
+
         {pasteOpen && <div id={pasteId} className="people-profile-text-panel">
           <p><a href={linkedinUrl} target="_blank" rel="noopener noreferrer">Open LinkedIn profile</a> and copy Experience, Education, or About. Keep the headings and dates; the person's name isn't needed.</p>
           <label htmlFor={`${pasteId}-text`}>Profile text for {name || "this person"}</label>

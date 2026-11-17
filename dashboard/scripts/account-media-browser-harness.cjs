@@ -7,15 +7,17 @@ let browser;
 (async()=>{
  for(let i=0;i<100;i++){try{if((await fetch(base)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
  assert.equal((await fetch(base+'/api/media/files?record=none&chunk=0')).status,401);
- browser=await chromium.launch({headless:true});
- for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{width:390,height:844}]]){
-  const context=await browser.newContext({viewport}),payload='v1.'+(Date.now()+3600000)+'.'+crypto.randomBytes(12).toString('base64url');
+ browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE});
+ for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{width:390,height:844}]].filter(([name])=>!process.env.MEDIA_QA_MOBILE_ONLY||name==='mobile')){
+  const context=await browser.newContext({viewport});await context.route(/^https:\/\//,route=>route.abort());const payload='v1.'+(Date.now()+3600000)+'.'+crypto.randomBytes(12).toString('base64url');
   await context.addCookies([{name:'admin_session',value:payload+'.'+crypto.createHmac('sha256',secret).update(payload).digest('base64url'),url:base},{name:'admin_csrf',value:'isolated-csrf-token',url:base}]);
   const headers={'x-csrf-token':'isolated-csrf-token',origin:base},page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('response',async r=>{if(r.url().includes('/api/media/files')&&r.status()>=400) console.log('Media response',r.status(),await r.text());});
   assert.equal((await context.request.post(base+'/api/media/files',{data:{action:'chunk'}})).status(),403);
   await page.goto(base+'/admin/media');await page.locator('.work-surface[aria-busy=false]').waitFor();
   const buffer=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#c9ded1"/><circle cx="400" cy="250" r="100" fill="#183d53"/></svg>');
-  await page.locator('input[type=file]').setInputFiles({name:'Account '+name+'.svg',mimeType:'image/svg+xml',buffer});
+  await page.getByRole('button',{name:'Add files',exact:true}).click();
+  await page.locator('input[aria-label="Choose upload files"]').setInputFiles({name:'Account '+name+'.svg',mimeType:'image/svg+xml',buffer});
+  await page.getByRole('button',{name:'Upload 1 file',exact:true}).click();
   const row=page.getByRole('button',{name:new RegExp('Account '+name+'\\.svg')});await row.waitFor({timeout:30000}).catch(async e=>{console.log(await page.locator('body').innerText());throw e;});await row.click();
   await page.locator('.media-detail-page img').waitFor();
   await page.getByRole('textbox',{name:'Description',exact:true}).fill('Available while Vault is locked');
@@ -33,7 +35,7 @@ let browser;
   const invalid=await context.request.post(base+'/api/media/files',{headers,data:{action:'chunk',id:'../../escape',index:0,data:'YQ=='}});assert.equal(invalid.status(),400);
   const missing=await context.request.post(base+'/api/media/files',{headers,data:{action:'finish',name:'Incomplete',file:{id:crypto.randomUUID(),sha256:'a'.repeat(64),byteLength:1,chunkSize:1048576,totalChunks:1}}});assert.equal(missing.status(),400);
   await page.getByRole('button',{name:'Archive',exact:true}).click();await page.waitForTimeout(250);assert.equal(await page.getByRole('button',{name:new RegExp('Account '+name+'\\.svg')}).count(),0);
-  await page.getByRole('button',{name:'Filter',exact:true}).click();await page.getByRole('button',{name:'Archive',exact:true}).click();
+  await page.getByRole('button',{name:'Filter',exact:true}).click();await page.getByRole('button',{name:'Archive',exact:true}).click();await page.keyboard.press('Escape');
   await page.getByRole('button',{name:new RegExp('Account '+name+'\\.svg')}).click();await page.getByRole('button',{name:'Restore',exact:true}).click();
   assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   console.log('PASS '+name+' locked-Vault upload, preview, edit, reload, byte-identical download, archive/restore, authentication, CSRF, bounds and stale-write protection');

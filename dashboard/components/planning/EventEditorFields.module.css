@@ -189,3 +189,9 @@
 @media(prefers-reduced-motion:reduce) { .editor .groups button {transition:none;} }
 
 .standalone .optionRow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.standalone .optionRow>label{display:inline-flex;align-items:center;gap:7px}.standalone .repeatControl{flex:1 1 220px}.standalone .customRepeat{margin:8px 0 0}.standalone .repeatInput input{flex:1;min-width:0;min-height:38px;font:400 14px var(--font-body)}.standalone .repeatInput button{font:500 13px var(--font-body);min-height:38px;padding:7px 10px;border-radius:9px;border:1px solid var(--module-action);background:var(--module-action);color:white;box-shadow:none}.standalone .repeatInput .repeatChoices{flex:none;width:30px;padding:4px;background:transparent;color:var(--module-icon);border-color:transparent}.standalone .customRepeat small{font-size:12px;color:var(--text-secondary)}
+
+.interaction{display:grid;gap:6px}.interaction small{font:400 12px/1.4 var(--font-body);color:var(--text-subtle)}
+.interactionMenu{width:380px!important;max-width:calc(100vw - 24px)!important;max-height:var(--radix-popover-content-available-height)!important}
+.interactionMenu :global(.app-choice-options){max-height:none!important;overflow:visible!important;gap:4px}
+.interactionMenu :global([role=option]){min-height:32px;padding:6px 9px}
+@media(max-width:700px){.interaction{order:5}.links{order:6}}

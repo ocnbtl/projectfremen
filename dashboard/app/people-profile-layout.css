@@ -414,3 +414,12 @@
 .workspace-people-pages .people-education-overview-list>article{border:1px solid #24394050!important;padding:10px 12px!important;background:transparent!important}.workspace-people-pages .people-overview-facts .people-work-organization{background:transparent!important;color:var(--text-strong)!important}.workspace-people-pages .people-overview-facts .people-work-organization:hover{color:var(--module-icon)!important}
 
 .workspace-people-pages .people-overview-facts .people-education-overview{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:10px}.workspace-people-pages .people-education-overview>h4{display:flex;align-items:center;gap:8px;margin:0}
+
+/* Balance longer work and education entries against concise contact fields. */
+@media(min-width:1900px){.workspace-people-pages .people-properties-columns{grid-template-columns:minmax(0,1fr) minmax(0,.85fr) minmax(0,1.5fr)}}
+.people-redesign-shell .people-properties-column :is(.people-profile-section-heading,.people-repeatable-heading) :is(h4,.people-repeatable-title){font-weight:650!important}
+.people-redesign-shell .people-place-card-heading{display:flex!important;flex-wrap:nowrap!important;align-items:center;gap:8px}.people-redesign-shell .people-place-card-heading>.people-place-card-remove{flex:0 0 32px;width:32px!important;margin:0 0 0 auto!important;align-self:center;grid-column:auto!important}
+.people-redesign-shell .people-properties-column .people-profile-text-toggle{width:auto;flex:none;min-height:30px;padding:4px 7px;margin:0;font:500 12px/1.4 var(--font-body);border:1px solid var(--border-soft);border-radius:8px;background:white;color:var(--text-strong)}
+.people-redesign-shell .people-properties-column .people-profile-text-toggle:hover{background:var(--module-quiet)}
+@container(min-width:480px){.people-redesign-shell .people-properties-column [data-profile-section=cadence] .people-cadence-fields{grid-template-columns:repeat(3,minmax(0,1fr))!important}.people-redesign-shell .people-properties-column [data-profile-section=cadence] .people-cadence-fields>*{grid-column:auto!important}}
+.workspace-people-pages [data-profile-tasks]>header .work-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:6px 10px;border:1px solid var(--module-border);border-radius:9px;background:var(--module-quiet);color:var(--module-action);font:500 12px/1.4 var(--font-body)}

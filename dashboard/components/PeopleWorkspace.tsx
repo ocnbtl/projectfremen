@@ -4880,7 +4880,7 @@ export default function PeopleWorkspace({
                           <div className="people-info-row" key={label} title={label}>
                             <span className="people-info-icon"><PeopleIcon name={icon} /></span>
                             <span className="people-info-copy">
-                              <strong>{label}</strong>
+                              <strong className={icon === "birthday" ? "sr-only" : undefined}>{label}</strong>
                               {organization
                                 ? <PeopleProfilePreview className="people-inline-object-link" person={organization} onOpen={selectPerson}>{value || organization.title}</PeopleProfilePreview>
                                 : <span>{value || "-"}</span>}

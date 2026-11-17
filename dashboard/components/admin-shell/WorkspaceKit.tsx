@@ -4,6 +4,7 @@ import ViewCycleButton, { type DirectoryViewMode } from "../ui/ViewCycleButton";
 import SearchField from "../ui/SearchField";
 import {
   Children,
+  createContext,
   cloneElement,
   isValidElement,
   useEffect,
@@ -16,6 +17,7 @@ import {
   type ReactNode,
   type ButtonHTMLAttributes,
 } from "react";
+import { createPortal } from "react-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -163,6 +165,11 @@ export function WorkspaceEmpty({
     </div>
   );
 }
+const SheetHeaderSlotContext = createContext<HTMLElement | null>(null);
+export function WorkspaceSheetHeaderSlot({children}:{children:ReactNode}) {
+  const target=useContext(SheetHeaderSlotContext);
+  return target ? createPortal(children,target) : <>{children}</>;
+}
 export function WorkspaceSheet({
   open,
   onClose,
@@ -192,6 +199,7 @@ export function WorkspaceSheet({
   focusInput?: boolean;
   returnFocusSelector?: string;
 }) {
+  const [headerSlot,setHeaderSlot]=useState<HTMLDivElement|null>(null);
   const [anchorStyle, setAnchorStyle] = useState<CSSProperties>();
   useLayoutEffect(() => {
     if (!open || !anchorSelector) return;
@@ -253,7 +261,7 @@ export function WorkspaceSheet({
           <div className="work-sheet-header">
             <Dialog.Title>{titleIcon && <UnigentamosIcon role={titleIcon} candidate={titleIcon === "sliders" ? "settings" : undefined} size={22} />}{title}</Dialog.Title>
             <div className="work-sheet-header-actions">
-            {headerActions}
+            <div className="work-sheet-header-slot" ref={setHeaderSlot}/>{headerActions}
             <Dialog.Close asChild>
               <WorkspaceButton aria-label="Close details" icon="close">
                 Close
@@ -266,7 +274,7 @@ export function WorkspaceSheet({
               {description}
             </Dialog.Description>
           )}
-          <div className="work-sheet-body">{children}</div>
+          <SheetHeaderSlotContext.Provider value={headerSlot}><div className="work-sheet-body">{children}</div></SheetHeaderSlotContext.Provider>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
