@@ -1,6 +1,9 @@
 "use client";
 import { DirectoryLayout } from "../ui/DirectoryLayout";
-import MediaUploadSheet from "./MediaUploadSheet";
+import MediaUploadSheet, {type MediaUploadEntry} from "./MediaUploadSheet";
+import MediaReviewSheet from "./MediaReviewSheet";
+import MediaDetailsFields from "./MediaDetailsFields";
+import {MEDIA_PURPOSES,mediaSearchText} from "../../lib/modules/media/organization";
 import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
 import SelectField from "../ui/SelectField";
 import DirectoryCard from "../operational/DirectoryCard";
@@ -33,7 +36,6 @@ import {
   WorkspaceEmpty,
 } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import RecordLinks from "../planning/RecordLinks";
 import styles from "./MediaLibrary.module.css";
 
 type MediaDraft = { title: string; description: string; profile: MediaProfile };
@@ -150,7 +152,10 @@ export default function MediaLibrary({
     Array<{ id: string; previous: string; applied: string }>
   >([]);
   const [uploadOpen,setUploadOpen]=useState(false);
-  const [readLocation, setReadLocation] = useState(false);
+  const [readLocation, setReadLocation] = useState(true);
+  const [uploadedItems,setUploadedItems]=useState<VaultObjectSnapshot[]>([]);
+  const [uploadedFiles,setUploadedFiles]=useState(new Map<string,File>());
+  const [purposeFilter,setPurposeFilter]=useState("all"),[tagFilter,setTagFilter]=useState("all");
   const [objects, setObjects] = useState<VaultObjectSnapshot[]>([]),
     [unlocked, setUnlocked] = useState(false),
     [query, setQuery] = useState(""),
@@ -272,34 +277,12 @@ export default function MediaLibrary({
       if (url) URL.revokeObjectURL(url);
     };
   }, [selected?.objectId, selected && accountFile(selected)?.id, unlocked]);
-  async function upload(files: FileList | File[] | null) {
-    if (!files?.length) return;
-    setBusy(true);
-    setError("");
-    controller.current = new AbortController();
-    try {
-      for (const file of Array.from(files)) {
-        controller.current.signal.throwIfAborted();
-        setProgress({ name: file.name, phase: "Reading", done: 0, total: 1 });
-        const uploaded = await uploadAccountFile(file, (done, total) => setProgress({ name: file.name, phase: "Uploading", done, total }), controller.current.signal);
-        if (readLocation) {
-          const location = await (await import("../../lib/modules/media/exif-gps")).embeddedPhotoLocation(file);
-          if (location) await saveMediaDetails(uploaded, { mediaProfile: { ...profileFor(uploaded), location } });
-        }
-        setNotice("File saved to Media.");
-        await refresh();
-      }
-    } catch (e) {
-      setError(
-        e instanceof DOMException && e.name === "AbortError"
-          ? "Upload stopped. Files already saved remain in Media."
-          : (e as Error).message,
-      );
-    } finally {
-      setBusy(false);
-      setProgress(undefined);
-      controller.current = null;
-    }
+  async function upload(entries:MediaUploadEntry[]):Promise<{savedIds:string[];error?:string}> {
+    if(!entries.length)return {savedIds:[]};setBusy(true);setError("");controller.current=new AbortController();const savedIds:string[]=[],saved:VaultObjectSnapshot[]=[];let failure="";
+    try{for(const entry of entries){controller.current.signal.throwIfAborted();setProgress({name:entry.file.name,phase:"Uploading",done:0,total:1});const object=await uploadAccountFile(entry.file,(done,total)=>setProgress({name:entry.file.name,phase:"Uploading",done,total}),controller.current.signal,undefined,{uploadId:entry.id,details:entry.details});savedIds.push(entry.id);saved.push(object);setUploadedFiles(prior=>new Map(prior).set(object.objectId,entry.file));}}
+    catch(e){failure=e instanceof DOMException&&e.name==="AbortError"?"Upload stopped. Saved files are safe; remaining files are ready to retry.":(e as Error).message;}
+    finally{setUploadedItems(prior=>[...prior,...saved.filter(item=>!prior.some(existing=>existing.objectId===item.objectId))]);try{await refresh();}catch{setError("Files were saved, but the library could not refresh. Reload to see them.");}setBusy(false);setProgress(undefined);controller.current=null;}
+    return {savedIds,...(failure?{error:failure}:{})};
   }
   async function save(archivedAt?: string) {
     if (!selected || !profile) return;
@@ -391,20 +374,20 @@ export default function MediaLibrary({
     }
   }
   const [filters,setFilters]=useState<MediaFilters>(EMPTY_MEDIA_FILTERS);
-  const filterCount=Number(archive)+Number(filters.type!=="all")+Number(filters.links!=="all")+Number(filters.storage!=="all");
+  const filterCount=Number(purposeFilter!=="all")+Number(tagFilter!=="all")+Number(archive)+Number(filters.type!=="all")+Number(filters.links!=="all")+Number(filters.storage!=="all");
+  const allTags=[...new Set(objects.flatMap(object=>profileFor(object).tags||[]))].sort((a,b)=>a.localeCompare(b));
   const visible = objects.filter(
     (object) =>
       Boolean(profileFor(object).archivedAt) === archive && matchesMediaFilters(profileFor(object),filters) &&
-      `${object.fields.title} ${object.fields.body}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+      (purposeFilter==="all"||profileFor(object).purposes?.includes(purposeFilter)) && (tagFilter==="all"||profileFor(object).tags?.includes(tagFilter)) &&
+      mediaSearchText(String(object.fields.title||""),String(object.fields.body||""),profileFor(object)).includes(query.toLocaleLowerCase()),
   );
   const known = new Set(objects.map((o) => String(o.fields.id)));
   const legacy = records.filter(
     (record) =>
       !known.has(record.id) &&
       !record.mediaProfile && matchesMediaFilters(undefined,filters,Object.values(record.relations || {}).some(refs=>Array.isArray(refs)&&refs.length>0)) &&
-      !archive &&
+      !archive && purposeFilter==="all" && tagFilter==="all" &&
       record.title.toLowerCase().includes(query.toLowerCase()),
   );
   const position = selected
@@ -453,44 +436,8 @@ export default function MediaLibrary({
             </div>
             {!accountFile(selected) && unlocked && <Button busy={busy} onClick={async () => { setBusy(true); setError(""); try { const { blob } = await browserVault.openMedia(selected); const copy = await uploadAccountFile(new File([blob], profile.manifest.fileName, { type: profile.manifest.mimeType }), () => {}, undefined, selected); setSelected(copy); setProfile(profileFor(copy)); await refresh(); setNotice("Available through your account. Encrypted original preserved."); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>Enable account access</Button>}
             <WorkspaceFeedback error={error} />
-            <label>
-              Name
-              <input value={title} onChange={(e) => setTitle(e.target.value)} />
-            </label>
-            <label>
-              Description
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-            <label>
-              Image description
-              <input
-                value={profile.altText}
-                onChange={(e) =>
-                  setProfile({ ...profile, altText: e.target.value })
-                }
-              />
-            </label>
-            {profile.location && (
-              <p className="work-muted">
-                Photo location: {profile.location.latitude.toFixed(5)},{" "}
-                {profile.location.longitude.toFixed(5)} ·{" "}
-                <Link
-                  href={`/admin/map?${new URLSearchParams({ latitude: String(profile.location.latitude), longitude: String(profile.location.longitude), name: title })}`}
-                >
-                  Open location in Map
-                </Link>
-              </p>
-            )}
-            <RecordLinks
-              refs={profile.linkedRefs}
-              available={context?.refs.filter(
-                (ref) => ref.objectId !== selected.fields.id,
-              )}
-              onChange={(refs) => setProfile({ ...profile, linkedRefs: refs })}
-            />
+            <MediaDetailsFields value={{...profile,title,description}} context={context?{...context,refs:context.refs.filter(ref=>ref.objectId!==selected.fields.id&&ref.objectId!==selected.objectId)}:undefined} onChange={patch=>{if(patch.title!==undefined)setTitle(patch.title);if(patch.description!==undefined)setDescription(patch.description);const {title:_title,description:_description,...metadata}=patch;setProfile({...profile,...metadata});}}/>
+            <label>Alt text<input value={profile.altText} onChange={e=>setProfile({...profile,altText:e.target.value})}/></label>
             <div className="work-actions">
               <Button intent="primary" busy={busy} onClick={() => void save()}>
                 Save details
@@ -525,7 +472,8 @@ export default function MediaLibrary({
 
           </>}
       </WorkspaceHeader>
-      <MediaUploadSheet open={uploadOpen} onClose={()=>setUploadOpen(false)} onUpload={files=>void upload(files)} readLocation={readLocation} onReadLocation={setReadLocation}/>
+      <MediaUploadSheet open={uploadOpen} onClose={()=>setUploadOpen(false)} onUpload={upload} readLocation={readLocation} onReadLocation={setReadLocation} context={context}/>
+      {!uploadOpen&&uploadedItems.length>0&&<MediaReviewSheet key={uploadedItems.map(item=>item.objectId).join(":")} items={uploadedItems} files={uploadedFiles} context={context} onClose={()=>{setUploadedItems([]);setUploadedFiles(new Map());}} onSaved={refresh} onOpen={open}/>}
       <WorkspaceToolbar
         query={query}
         onQuery={(value) => {
@@ -535,10 +483,12 @@ export default function MediaLibrary({
         placeholder="Search media"
         actions={<Button className={styles.selectToggle} title={selectionMode?"Finish selecting":"Select files"} aria-label={selectionMode?"Finish selecting":"Select files"} aria-pressed={selectionMode} onClick={()=>{setSelectionMode(!selectionMode);setChecked(new Set());}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m7 12 3 3 7-7" strokeLinecap="round" strokeLinejoin="round" style={{opacity:selectionMode?1:0,transition:"opacity 160ms ease"}}/></svg></Button>}
         filters={<div className={styles.filters}>
-          <div className={styles.filterHeading}><strong>Filter media</strong><Button onClick={()=>{setFilters(EMPTY_MEDIA_FILTERS);setArchive(false);setChecked(new Set());}} disabled={!filterCount}>Reset</Button></div>
+          <div className={styles.filterHeading}><strong>Filter media</strong><Button onClick={()=>{setFilters(EMPTY_MEDIA_FILTERS);setPurposeFilter("all");setTagFilter("all");setArchive(false);setChecked(new Set());}} disabled={!filterCount}>Reset</Button></div>
           <fieldset><legend>Show</legend><div className={styles.filterOptions}>{[false,true].map(value=><Button key={String(value)} aria-pressed={archive===value} onClick={()=>{setArchive(value);setChecked(new Set());}}>{value?"Archive":"Library"}</Button>)}</div></fieldset>
           <fieldset><legend>File type</legend><div className={styles.filterOptions}>{MEDIA_TYPES.map(type=><Button key={type.id} aria-pressed={filters.type===type.id} onClick={()=>{setFilters({...filters,type:type.id});setChecked(new Set());}}>{type.label}</Button>)}</div></fieldset>
           <label>Linked objects<SelectField value={filters.links} onChange={e=>{setFilters({...filters,links:e.target.value as MediaFilters["links"]});setChecked(new Set());}}><option value="all">Any</option><option value="linked">With links</option><option value="unlinked">Without links</option></SelectField></label>
+          <label>Purpose<SelectField aria-label="Filter media purpose" value={purposeFilter} onChange={e=>{setPurposeFilter(e.target.value);setChecked(new Set());}}><option value="all">Any purpose</option>{MEDIA_PURPOSES.map(purpose=><option key={purpose} value={purpose}>{purpose}</option>)}</SelectField></label>
+          <label>Tag<SelectField searchable aria-label="Filter media tag" value={tagFilter} onChange={e=>{setTagFilter(e.target.value);setChecked(new Set());}}><option value="all">Any tag</option>{allTags.map(tag=><option key={tag} value={tag}>{tag}</option>)}</SelectField></label>
           <label>Storage<SelectField value={filters.storage} onChange={e=>{setFilters({...filters,storage:e.target.value as MediaFilters["storage"]});setChecked(new Set());}}><option value="all">All storage</option><option value="account">Account files</option><option value="encrypted">Encrypted files</option><option value="references">File references</option></SelectField></label>
           <p>{visible.length+legacy.length} matching {(visible.length+legacy.length)===1?"file":"files"}</p>
         </div>}
@@ -717,7 +667,7 @@ export default function MediaLibrary({
             statusIcon={profileFor(object).archivedAt ? "archive" : pending ? "information" : "active"}
             tag={manifest.mimeType.split("/")[0].replace(/^./, letter => letter.toUpperCase()) || "File"}
             description={String(object.fields.body || "") || undefined}
-            metadata={<><span>{size(manifest.byteLength)}</span>{pending && <span>Saved on this device</span>}</>}
+            metadata={<><span>{size(manifest.byteLength)}</span>{profileFor(object).purposes?.slice(0,1).map(purpose=><span key={purpose}>{purpose}</span>)}{profileFor(object).tags?.slice(0,2).map(tag=><span key={tag}>#{tag}</span>)}{pending && <span>Saved on this device</span>}</>}
             selected={checked.has(object.objectId)} onSelect={() => void open(object)}
             checkbox={selectionMode ? {label:`Select ${String(object.fields.title || manifest.fileName)}`,checked:checked.has(object.objectId),onCheckedChange: value => setChecked(prior => {const next = new Set(prior);if(value)next.add(object.objectId);else next.delete(object.objectId);return next;})} : undefined}
           />;

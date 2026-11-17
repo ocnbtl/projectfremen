@@ -3,7 +3,9 @@ import type { NativeObjectRef } from "../../native-objects/types";
 import { isModuleId } from "../../native-objects/types";
 import { createNativeObjectRef } from "../../native-objects/routes";
 
-export type MediaProfile = {
+import { normalizeMediaOrganization, mergeMediaLinks, type MediaOrganization } from "./organization";
+
+export type MediaProfile = MediaOrganization & {
   version: 1;
   manifest: VaultMediaManifest | (Omit<VaultMediaManifest, "format" | "digestAlgorithm"> & { format: "unigentamos-account-media-v1"; digestAlgorithm: "sha256" });
   accountFile?: { id: string; sha256: string; byteLength: number; chunkSize: number; totalChunks: number };
@@ -60,7 +62,7 @@ export function normalizeMediaProfile(
   const file = raw.accountFile;
   if (file && (!/^[a-f\d-]{36}$/i.test(file.id) || !/^[a-f\d]{64}$/i.test(file.sha256) || file.byteLength !== m.byteLength || file.chunkSize !== 1048576 || file.totalChunks !== Math.ceil(file.byteLength / file.chunkSize))) throw new Error("Invalid account media file");
   if (m.format === "unigentamos-account-media-v1" && !file) throw new Error("Account file is required");
-  const linkedRefs = raw.linkedRefs.map((ref) => {
+  const linkedRefs = mergeMediaLinks(raw.linkedRefs.map((ref) => {
     if (
       !ref ||
       !isModuleId(ref.module) ||
@@ -79,7 +81,7 @@ export function normalizeMediaProfile(
       objectType: ref.objectType,
       label: ref.label,
     });
-  });
+  }));
   if (
     raw.location &&
     (!Number.isFinite(raw.location.latitude) ||
@@ -89,6 +91,7 @@ export function normalizeMediaProfile(
   )
     throw new Error("Invalid photo coordinates");
   return {
+    ...normalizeMediaOrganization(raw),
     version: 1,
     manifest: {
       format: m.format,

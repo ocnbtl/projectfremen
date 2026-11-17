@@ -3,6 +3,7 @@ import { buildJsonHeadersWithCsrf } from "../../client-csrf";
 import { browserVault } from "../../local-first/browser-engine";
 import type { VaultObjectSnapshot } from "../../local-first/types";
 import type { PersonalRecord } from "../../personal-records-store";
+import type { UploadDetails } from "./organization";
 import type { MediaProfile } from "./profile";
 export function mediaSnapshot(record: PersonalRecord): VaultObjectSnapshot {
   return { objectId: record.mediaProfile!.manifest.objectId, objectKind: "media", versionId: record.updatedAt, updatedAt: record.updatedAt, tombstone: false,
@@ -16,7 +17,7 @@ async function post(body: unknown, signal?: AbortSignal): Promise<{ record: Pers
   if (!response.ok) throw new Error(result.error || "Media could not be saved");
   return result;
 }
-export async function uploadAccountFile(file: File, progress: (done: number, total: number) => void, signal?: AbortSignal, original?: VaultObjectSnapshot) {
+export async function uploadAccountFile(file: File, progress: (done: number, total: number) => void, signal?: AbortSignal, original?: VaultObjectSnapshot, options?: {details?:UploadDetails;uploadId?:string}) {
   if (!file.size || file.size > 268435456) throw new Error("Choose a file up to 256 MB");
   let expectedUpdatedAt: string | undefined;
   if (original) {
@@ -29,14 +30,14 @@ export async function uploadAccountFile(file: File, progress: (done: number, tot
   }
   const bytes = await file.arrayBuffer();
   const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b => b.toString(16).padStart(2, "0")).join("");
-  const chunkSize = 1048576, totalChunks = Math.ceil(file.size / chunkSize), id = crypto.randomUUID();
+  const chunkSize = 1048576, totalChunks = Math.ceil(file.size / chunkSize), id = options?.uploadId || crypto.randomUUID();
   for (let index = 0; index < totalChunks; index++) {
     signal?.throwIfAborted();
     const chunk = new Uint8Array(bytes.slice(index * chunkSize, (index + 1) * chunkSize));
     let binary = ""; for (let p = 0; p < chunk.length; p += 8192) binary += String.fromCharCode(...chunk.subarray(p, p + 8192));
     await post({ action: "chunk", id, index, data: btoa(binary) }, signal); progress(index + 1, totalChunks);
   }
-  const result = await post({ action: "finish", file: { id, sha256, byteLength: file.size, chunkSize, totalChunks }, name: file.name, mimeType: file.type, recordId: original?.fields.id, expectedUpdatedAt }, signal);
+  const result = await post({ action: "finish", file: { id, sha256, byteLength: file.size, chunkSize, totalChunks }, name: file.name, mimeType: file.type, recordId: original?.fields.id, expectedUpdatedAt, details:options?.details }, signal);
   return mediaSnapshot(result.record);
 }
 export async function openMediaFile(object: VaultObjectSnapshot) {

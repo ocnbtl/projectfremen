@@ -37,7 +37,13 @@ export async function POST(request: Request) {
       if (typeof body.data !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.data)) throw new Error("Invalid upload");
       const bytes = Buffer.from(body.data, "base64");
       if (bytes.toString("base64") !== body.data) throw new Error("Invalid upload");
-      await accountChunk(body.id, body.index, bytes);
+      try { await accountChunk(body.id, body.index, bytes); }
+      catch (writeError) {
+        // A lost response may retry an immutable chunk. Never overwrite different bytes.
+        let existing: Buffer;
+        try { existing = await accountChunk(body.id, body.index); } catch { throw writeError; }
+        if (!existing.equals(bytes)) throw new Error("This upload identity already contains different file data. Choose the file again.");
+      }
       return json({ ok: true });
     }
     const records = await readPersonalRecords();
@@ -80,10 +86,10 @@ export async function POST(request: Request) {
     if (body.recordId && !existing?.mediaProfile) throw new Error("Original file not found");
     if (existing?.mediaProfile && existing.mediaProfile.manifest.byteLength !== file.byteLength) throw new Error("Original file size changed");
     const id = existing?.id || `personal-${file.id}`;
-    const profile = normalizeMediaProfile({ ...(existing?.mediaProfile || { version: 1, linkedRefs: [], altText: "", manifest: {
+    const profile = normalizeMediaProfile({ ...(existing?.mediaProfile || { version: 1, linkedRefs: body.details?.linkedRefs || [], altText: body.details?.altText || "", tags:body.details?.tags, purposes:body.details?.purposes, metadata:body.details?.metadata, location:body.details?.location, manifest: {
       format: "unigentamos-account-media-v1", mediaId: file.id, objectId: file.id, contentRoot: file.sha256, digestAlgorithm: "sha256", fileName: String(body.name || "File").slice(0, 240), mimeType: String(body.mimeType || "application/octet-stream").slice(0, 200), byteLength: file.byteLength, chunkSize: file.chunkSize, totalChunks: file.totalChunks, createdAt: new Date().toISOString()
     } }), accountFile: file })!;
-    const items = existing ? await updatePersonalRecord(id, { mediaProfile: profile }, { expectedUpdatedAt: String(body.expectedUpdatedAt || "") }) : await createPersonalRecord({ domain: "notes-docs", className: "file", title: String(body.name || "File"), mediaProfile: profile }, { requestedId: id });
+    const items = existing ? await updatePersonalRecord(id, { mediaProfile: profile }, { expectedUpdatedAt: String(body.expectedUpdatedAt || "") }) : await createPersonalRecord({ domain: "notes-docs", className: "file", title: String(body.details?.title || body.name || "File").slice(0,240), body: String(body.details?.description || "").slice(0,20000), mediaProfile: profile }, { requestedId: id });
     return json({ ok: true, record: items.find(item => item.id === id) });
   } catch (error) { return json({ error: error instanceof Error ? error.message : "Media could not be saved" }, 400); }
 }
