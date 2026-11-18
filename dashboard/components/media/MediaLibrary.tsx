@@ -2,6 +2,8 @@
 import { DirectoryLayout } from "../ui/DirectoryLayout";
 import MediaUploadSheet, {type MediaUploadEntry} from "./MediaUploadSheet";
 import MediaReviewSheet from "./MediaReviewSheet";
+import MediaBulkEditSheet from "./MediaBulkEditSheet";
+import {applyMediaBulkEdit,type MediaBulkEdit} from "../../lib/modules/media/bulk-edit";
 import MediaDetailsFields from "./MediaDetailsFields";
 import {MEDIA_PURPOSES,mediaSearchText} from "../../lib/modules/media/organization";
 import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
@@ -152,6 +154,7 @@ export default function MediaLibrary({
     Array<{ id: string; previous: string; applied: string }>
   >([]);
   const [uploadOpen,setUploadOpen]=useState(false);
+  const [bulkItems,setBulkItems]=useState<VaultObjectSnapshot[]>([]);
   const [readLocation, setReadLocation] = useState(true);
   const [uploadedItems,setUploadedItems]=useState<VaultObjectSnapshot[]>([]);
   const [uploadedFiles,setUploadedFiles]=useState(new Map<string,File>());
@@ -321,6 +324,28 @@ export default function MediaLibrary({
       setBusy(false);
     }
   }
+  async function editSelection(change:MediaBulkEdit) {
+    // Validate the entire selection before any write; each save keeps the existing conflict guard.
+    const prepared=bulkItems.map(object=>({object,prior:profileFor(object),next:applyMediaBulkEdit(profileFor(object),change,[object.objectId,String(object.fields.id)])}));
+    const failures:{title:string;message:string}[]=[],remaining:VaultObjectSnapshot[]=[];
+    let updated=0,unchanged=0;
+    setBusy(true);setError("");
+    try {
+      for(const {object,prior,next} of prepared){
+        if(next===prior){unchanged++;continue;}
+        try {
+          if(mediaDrafts.has(object.objectId))throw Error("Save or discard this file’s open draft first.");
+          await saveMediaDetails(object,{mediaProfile:next});
+          updated++;
+        }catch(error){remaining.push(object);failures.push({title:String(object.fields.title||prior.manifest.fileName),message:(error as Error).message});}
+      }
+      setChecked(new Set(remaining.map(item=>item.objectId)));
+      if(remaining.length)setBulkItems(remaining);
+      setNotice(`${updated} ${updated===1?"file":"files"} updated.${unchanged?` ${unchanged} already matched.`:""}`);
+      try{await refresh();}catch{setError("Updates were saved, but the library could not refresh. Reload to see them.");}
+      return {failures};
+    }finally{setBusy(false);}
+  }
   async function archiveSelection(undo = false) {
     setBusy(true);
     setError("");
@@ -472,6 +497,7 @@ export default function MediaLibrary({
 
           </>}
       </WorkspaceHeader>
+      {bulkItems.length>0&&<MediaBulkEditSheet items={bulkItems} context={context} onClose={()=>setBulkItems([])} onApply={editSelection}/>}
       <MediaUploadSheet open={uploadOpen} onClose={()=>setUploadOpen(false)} onUpload={upload} readLocation={readLocation} onReadLocation={setReadLocation} context={context}/>
       {!uploadOpen&&uploadedItems.length>0&&<MediaReviewSheet key={uploadedItems.map(item=>item.objectId).join(":")} items={uploadedItems} files={uploadedFiles} context={context} onClose={()=>{setUploadedItems([]);setUploadedFiles(new Map());}} onSaved={refresh} onOpen={open}/>}
       <WorkspaceToolbar
@@ -519,6 +545,7 @@ export default function MediaLibrary({
       {selectionMode && (
         <aside className={styles.selectionBar} aria-label="Selected files">
           <strong>{checked.size} selected</strong>
+          <Button icon="edit" intent="primary" disabled={!checked.size||busy} onClick={()=>setBulkItems(objects.filter(item=>checked.has(item.objectId)))}>Edit selected</Button>
           <Button
             onClick={() =>
               setChecked(new Set(visible.map((item) => item.objectId)))
