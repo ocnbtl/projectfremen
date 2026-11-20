@@ -13,9 +13,16 @@ export type CanvasNode = {
   color: string;
   group: string;
   used: boolean;
+  appearance?: "plain" | "outline" | "card";
   imageSize?: {width:number;height:number};
   ref?: NativeObjectRef;
 };
+export type CanvasAppearance = NonNullable<CanvasNode["appearance"]>;
+export const canvasAppearances = {plain:"Plain",outline:"Outline",card:"Card"} satisfies Record<CanvasAppearance,string>;
+export function defaultCanvasAppearance(node:CanvasNode): CanvasAppearance {
+  if (node.kind==="text" || node.ref?.module==="media") return "plain";
+  return node.kind==="highlight" ? "outline" : "card";
+}
 export type CanvasEdge = {
   id: string;
   source: string;
@@ -97,6 +104,7 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
       width: number(node.width, 1, 100000), height: number(node.height, 1, 100000),
       title: string(node.title, 500, "item title"), body: string(node.body, 32000, "item text"),
       group: string(node.group, 160, "group"), color, used: node.used,
+      ...(node.appearance !== undefined ? {appearance:option(node.appearance, ["plain","outline","card"] as const)} : {}),
       ...(kind === "object" && node.imageSize ? {imageSize:{width:number(record(node.imageSize).width,1,100000),height:number(record(node.imageSize).height,1,100000)}} : {}),
       ...(kind === "object" ? {ref: reference(node.ref)} : {})
     };

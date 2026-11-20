@@ -66,19 +66,23 @@ async function main(){
  for(const [name,width,height] of [["Ad 39.png",1080,1350],["Ad 40.png",1600,900],["Ad 01.png",240,240]]){
    const n=byTitle[name];assert.deepEqual([n.width,n.height,n.imageSize.width,n.imageSize.height],[width,height,width,height]);
  }
- const art=ad.locator("img"),control=ad.getByRole("button",{name:"Edit Ad 39.png"});
+ const art=ad.locator("img"),control=ad.getByRole("button",{name:"Item actions for Ad 39.png"});
  await expect.poll(()=>art.evaluate(i=>i.naturalWidth)).toBe(1080);
  const imageBox=await art.boundingBox(),controlBox=await control.boundingBox();assert(Math.abs(imageBox.width/imageBox.height-1080/1350)<.01);
  assert(controlBox.y>=imageBox.y+imageBox.height-1);
  await btn("Focus mode").click();await expect(control).toHaveCount(0);await expect(art).toBeVisible();await btn("Focus mode").click();
- await control.click();await page.getByLabel("Caption").fill("Keep the generous margins.");await btn("Apply").click();await btn("Mark used").click();
+ const beforeTabs=context.pages().length;await ad.getByRole("img",{name:"Ad 39.png"}).click();await expect(ad).toHaveClass(/selected/);assert.equal(context.pages().length,beforeTabs);
+ await control.focus();await page.keyboard.press("ArrowDown");await page.keyboard.press("End");await page.keyboard.press("ArrowUp");await page.keyboard.press("Enter");
+ await expect.poll(async()=>(await board()).nodes.find(n=>n.id===last.id).appearance).toBe("outline");
+ await control.click();await page.getByRole("menuitem",{name:"Edit",exact:true}).click();await page.getByLabel("Caption").fill("Keep the generous margins.");await btn("Apply").click();await btn("Mark used").click();
  await btn("Group cards").click();await page.getByLabel("Group name").fill("Shortlist");await page.getByRole("dialog",{name:"Group cards"}).getByRole("button",{name:"Group cards"}).click();
  const group=await btn("Select group Shortlist").boundingBox();assert(group);const assigned=(await board()).nodes.find(n=>n.id===last.id);
  await page.mouse.move(group.x+group.width/2,group.y+group.height/2);await page.mouse.down();await page.mouse.move(group.x+group.width/2+40,group.y+group.height/2+20,{steps:6});await page.mouse.up();
  await expect.poll(async()=>(await board()).nodes.find(n=>n.id===last.id).x).toBeGreaterThan(assigned.x+15);
  console.log("Verified 40 images, duplicate reuse, grouping and captions. Opening original…");
+ await control.click();
  const mediaPromise=context.waitForEvent("page",{timeout:15000});
- await ad.getByRole("link",{name:/^Open media /}).click({noWaitAfter:true});console.log("Clicked original.");
+ await page.getByRole("menuitem",{name:"Open",exact:true}).click({noWaitAfter:true});console.log("Clicked original.");
  const mediaTab=await mediaPromise;console.log("Media tab created.");await mediaTab.waitForURL(/\/admin\/media/, {waitUntil:"commit",timeout:15000});
  assert(mediaTab.url().includes(last.ref.objectId));console.log("Original Media route opened.");await page.bringToFront();
  await btn("Fit board").click();await page.waitForTimeout(350);
@@ -104,6 +108,67 @@ async function main(){
  const put=await context.request.put(base+"/api/personal/canvas",{headers,data:{expectedRevision:legacy.revision,board:{...legacy,nodes:[oldNode]}}});assert.equal(put.ok(),true);
  await page.goto(base+"/admin/personal/canvas?board="+legacyId);
  await expect.poll(async()=>{const res=await context.request.get(base+"/api/personal/canvas?id="+legacyId);return (await res.json()).board.nodes[0].width;},{timeout:15000}).toBe(1080);
+ // Exercise exact geometry and bulk controls in a fresh local board at a known zoom.
+ await page.setViewportSize({width:1366,height:900});
+ const testId=crypto.randomUUID(), fixture=await context.request.post(base+"/api/personal/canvas",{headers,data:{id:testId,title:"Ad layout",folder:""}});
+ const blank=(await fixture.json()).board;
+ const layout=[[95,90,150,90],[301,185,116,105],[679,370,180,120]].map(([x,y,width,height],i)=>({
+   ...byTitle["Ad 0"+(i+1)+".png"],x,y,width,height
+ }));
+ const view={id:"arrange",name:"Arrange",x:60,y:100,zoom:1};
+ const seeded=await context.request.put(base+"/api/personal/canvas",{headers,data:{expectedRevision:blank.revision,board:{...blank,nodes:layout,views:[view]}}});assert(seeded.ok());
+ await page.goto(base+"/admin/personal/canvas?board="+testId+"&view=arrange");
+ const cards=layout.map(n=>page.locator('.react-flow__node[data-id="'+n.id+'"]'));
+ const read=async()=>(await (await context.request.get(base+"/api/personal/canvas?id="+testId)).json()).board.nodes;
+ const b=await cards[1].boundingBox();await page.mouse.move(b.x+50,b.y+30);await page.mouse.down();
+ const dragX=b.x+20,dragY=b.y-20;await page.mouse.move(dragX,dragY,{steps:8});
+ await expect.poll(async()=>(await cards[1].boundingBox()).y).toBeLessThan(b.y-30);
+ await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+ const liveBox=await cards[1].boundingBox(),reference=await cards[0].boundingBox();
+ let pointerY=dragY+reference.y+2-liveBox.y;
+ await page.mouse.move(dragX,pointerY,{steps:8});await page.waitForTimeout(120);
+ for(let attempt=0;attempt<3 && !(await page.locator(".react-flow__viewport-portal line").count());attempt++){
+   const currentBox=await cards[1].boundingBox();console.log("Aligning drag",JSON.stringify({reference:reference.y,actual:currentBox.y,pointerY}));
+   pointerY+=reference.y-currentBox.y;await page.mouse.move(dragX,pointerY);await page.waitForTimeout(120);
+ }
+ await expect.poll(()=>page.locator(".react-flow__viewport-portal line").count()).toBeGreaterThan(0);await page.mouse.up();
+ await expect.poll(async()=>(await read())[1].y).toBe(layout[0].y);
+ await expect(page.locator(".react-flow__viewport-portal line")).toHaveCount(0);
+ await btn("Undo").click();await expect.poll(async()=>(await read())[1].y).toBe(layout[1].y);
+ await btn("Select multiple").click();for(const c of cards)await c.click({position:{x:18,y:20}});
+ await expect(page.getByText("3 selected",{exact:true})).toBeVisible();
+ await cards[1].click({position:{x:18,y:20}});await expect(page.getByText("2 selected",{exact:true})).toBeVisible();
+ await cards[1].click({position:{x:18,y:20}});await btn("Arrange selection").click();
+ await btn("Space horizontally").click();await expect.poll(async()=>{const [a,b,c]=await read();return b.x-a.x-a.width-(c.x-b.x-b.width);}).toBe(0);
+ await btn("Space vertically").click();await expect.poll(async()=>{const [a,b,c]=await read();return b.y-a.y-a.height-(c.y-b.y-b.height);}).toBe(0);
+ assert.deepEqual((await read()).map(n=>[n.width,n.height]),layout.map(n=>[n.width,n.height]));
+ await btn("Close panel").click();await btn("Selection appearance").click();await btn("Card").click();
+ await expect.poll(async()=>(await read()).every(n=>n.appearance==="card")).toBe(true);await btn("Close panel").click();await btn("Undo").click();
+ await expect.poll(async()=>(await read()).some(n=>n.appearance==="card")).toBe(false);
+ const touch=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:"block"});
+ await touch.addCookies(await context.cookies());await touch.route(/^https:\/\//,r=>r.abort());const phone=await touch.newPage();phone.setDefaultTimeout(9000);
+ await phone.goto(base+"/admin/personal/canvas?board="+testId);
+ await phone.getByRole("button",{name:"Fit board",exact:true}).tap();await phone.waitForTimeout(300);
+ await phone.getByRole("button",{name:"Select multiple",exact:true}).tap();
+ for(const n of layout)await phone.locator('.react-flow__node[data-id="'+n.id+'"] [role="img"]').tap();
+ await expect(phone.getByText("3 selected",{exact:true})).toBeVisible();
+ await phone.getByRole("button",{name:"Select cards",exact:true}).tap();
+ await phone.locator(".react-flow__pane").tap({position:{x:20,y:170}});
+ const firstAd=phone.locator('.react-flow__node[data-id="'+layout[0].id+'"]');
+ await firstAd.getByRole("img",{name:layout[0].title}).tap();
+ await expect(firstAd).toHaveClass(/selected/);await expect(phone.locator(".react-flow__node.selected")).toHaveCount(1);
+ const trigger=firstAd.getByRole("button",{name:"Item actions for "+layout[0].title});
+ await trigger.tap();
+ if(!await phone.getByRole("menu",{name:"Item actions"}).count()){
+    await phone.screenshot({path:path.join(output,"phone-menu-check.png")});
+    console.log("Touch menu state",await trigger.evaluate(el=>({expanded:el.getAttribute("aria-expanded"),state:el.dataset.state,focus:document.activeElement?.outerHTML.slice(0,180)})));
+ }
+ const menu=phone.getByRole("menu",{name:"Item actions"}),menuBox=await menu.boundingBox();
+ assert(menuBox && menuBox.x>=0 && menuBox.x+menuBox.width<=391);
+ await menu.getByRole("menuitemradio",{name:"Outline",exact:true}).tap();
+ await expect.poll(async()=>(await read())[0].appearance).toBe("outline");
+ await touch.close();
+ console.log("PASS live drag guides and snap, tap multi-select, equal gaps on both axes, original sizes and bulk style undo.");
  assert.deepEqual(errors,[]);console.log("PASS 40 distinct images, paste/drop/reuse, real Media links and thumbnails, drag, Undo/Redo, notes, typed connections, saved views, group and used state, navigation and mobile controls.");
 }
 main().catch(async e=>{console.error(e);if(page)await page.screenshot({path:path.join(output,"failure.png")}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

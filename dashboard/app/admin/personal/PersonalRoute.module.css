@@ -1,0 +1,29 @@
+.route {
+  display: contents;
+}
+
+.movingLabel {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: nowrap;
+  transform-origin: top left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .movingLabel { display: none; }
+}
+:global(html[data-product-motion="reduce"]) .movingLabel { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  :global(html:not([data-product-motion="reduce"])) .route main {
+    animation: personal-arrive 200ms cubic-bezier(.22, 1, .36, 1);
+  }
+}
+
+@keyframes personal-arrive {
+  from { opacity: .75; }
+  to { opacity: 1; }
+}

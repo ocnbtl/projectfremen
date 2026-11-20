@@ -72,9 +72,56 @@ const ready=new Promise((resolve,reject)=>{
     }
     await page.setViewportSize({width:390,height:850});
     await page.goto(base+"/admin/personal");
-    await page.getByRole("navigation",{name:"Personal spaces"}).getByRole("link",{name:"Canvas"}).click();
+    await page.evaluate(()=>{
+      window.personalArrivals=[];
+      const observer=new MutationObserver(records=>{
+        for(const record of records)for(const node of record.addedNodes){
+          if(node instanceof HTMLElement && node.matches('body > span[aria-hidden="true"]') &&
+            node.getAnimations().some(a=>a.effect.getKeyframes().some(frame=>String(frame.transform).includes("translate")))){
+            window.personalArrivals.push({label:node.textContent.toLowerCase(),path:location.pathname});
+          }
+        }
+      });
+      observer.observe(document.body,{childList:true});
+    });
+    const spaces=page.getByRole("navigation",{name:"Personal spaces"});
+    for(const [label,slug] of [["Car","car"],["Personal Build","personal-build"],["Health","health"],["Pets","pets"],["Canvas","canvas"]]){
+      await spaces.getByRole("link",{name:label,exact:true}).click();
+      await expect(page).toHaveURL(base+"/admin/personal/"+slug);
+      await expect.poll(()=>page.evaluate(()=>window.personalArrivals.at(-1))).toEqual({label:label.toLowerCase(),path:"/admin/personal/"+slug});
+      const parent=page.getByRole("link",{name:"Return to Personal",exact:true});
+      await expect(parent).toBeVisible();
+      if(slug==="canvas")await expect(page.getByRole("button",{name:"Personal views"})).toContainText("Canvas");
+      if (slug==="health") await parent.click();
+      else await page.goBack();
+      await expect(spaces).toBeVisible();
+      await expect.poll(()=>page.evaluate(()=>window.personalArrivals.at(-1))).toEqual({label:label.toLowerCase(),path:"/admin/personal"});
+    }
+    await page.emulateMedia({reducedMotion:"reduce"});
+    const arrivals=await page.evaluate(()=>window.personalArrivals.length);
+    await spaces.getByRole("link",{name:"Canvas",exact:true}).click();
     await expect(page.getByRole("link",{name:"Open Autumn inspiration"})).toBeVisible();
+    assert.equal(await page.evaluate(()=>window.personalArrivals.length),arrivals);
+    assert.equal(await page.getByRole("main",{name:"Canvas library"}).evaluate(el=>getComputedStyle(el).animationName),"none");
+    await page.setViewportSize({width:1366,height:900});
+    await page.goBack();
+    await expect(spaces).toBeVisible();
+    await page.emulateMedia({reducedMotion:"no-preference"});
+    const keyboardShortcut=spaces.getByRole("link",{name:"Car",exact:true});
+    await keyboardShortcut.focus();
+    await keyboardShortcut.press("Enter");
+    await expect.poll(()=>page.evaluate(()=>window.personalArrivals.at(-1))).toEqual({label:"car",path:"/admin/personal/car"});
+    await page.goBack();
+    await expect(spaces).toBeVisible();
+    await page.goForward();
+    await expect(page).toHaveURL(base+"/admin/personal/car");
+    await page.evaluate(()=>localStorage.setItem("unigentamos:motion","reduce"));
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-product-motion","reduce");
+    await page.getByRole("link",{name:"Return to Personal",exact:true}).click();
+    await expect(spaces).toBeVisible();
+    assert.equal(await page.locator("main").first().evaluate(el=>getComputedStyle(el).animationName),"none");
     assert.deepEqual(errors,[]);
-    console.log("PASS Canvas creation, editor return, renaming, folders, sorting, search, persistence and phone/desktop layout.");
+    console.log("PASS Canvas library, editing, persistence, responsive layout, five Personal shortcut transitions, Back and reduced motion.");
   } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>server.kill());

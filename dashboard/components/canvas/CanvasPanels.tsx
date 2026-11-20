@@ -1,22 +1,32 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconX } from "@tabler/icons-react";
-import type { CanvasEdge, CanvasNode } from "../../lib/modules/canvas/model";
+import { canvasAppearances, defaultCanvasAppearance, type CanvasAppearance, type CanvasEdge, type CanvasNode } from "../../lib/modules/canvas/model";
 import SelectField from "../ui/SelectField";
 import { colors } from "./board-layout";
 import css from "./CanvasEditor.module.css";
 
 export function Panel({title,close,children}:{title:string;close:()=>void;children:ReactNode}) {
-  return <section role="dialog" aria-label={title} className={css.panel} onKeyDown={e=>{if(e.key==="Escape"){e.stopPropagation();close();}}}>
+  const panel=useRef<HTMLElement>(null);
+  useEffect(()=>{
+    if (panel.current && !panel.current.contains(document.activeElement)) {
+      panel.current.focus({preventScroll:true});
+    }
+  },[]);
+  return <section ref={panel} role="dialog" tabIndex={-1} aria-label={title} className={css.panel} onKeyDown={e=>{if(e.key==="Escape"){e.stopPropagation();close();}}}>
     <header><h3>{title}</h3><button type="button" onClick={close} aria-label="Close panel"><IconX size={17}/></button></header>{children}
   </section>;
 }
 export function CardFields({node,save,close,restoreSize}:{node:CanvasNode;restoreSize?:()=>void;save:(patch:Partial<CanvasNode>)=>void;close:()=>void}){
   const [title,setTitle]=useState(node.title),[body,setBody]=useState(node.body),[color,setColor]=useState(node.color);
+  const [appearance,setAppearance]=useState(node.appearance);
   return <Panel title={node.kind==="object"?"Edit card":"Edit "+node.kind} close={close}>
-    <form onSubmit={e=>{e.preventDefault();save({title:title.trim()||node.ref?.label||"",body:body.trim(),color});close();}}>
+    <form onSubmit={e=>{e.preventDefault();save({title:title.trim()||node.ref?.label||"",body:body.trim(),color,...(appearance ? {appearance} : {})});close();}}>
       <label>Title<input autoFocus value={title} maxLength={240} onChange={e=>setTitle(e.target.value)}/></label>
       <label>{node.kind==="object"?"Caption":"Text"}<textarea rows={3} value={body} maxLength={4000} onChange={e=>setBody(e.target.value)}/></label>
+      <label>Appearance<SelectField portalToBody value={appearance ?? defaultCanvasAppearance(node)} onChange={e=>setAppearance(e.target.value as CanvasAppearance)}>
+        {Object.entries(canvasAppearances).map(([value,label])=><option key={value} value={value}>{label}</option>)}
+      </SelectField></label>
       {restoreSize && node.imageSize && <button type="button" onClick={()=>{restoreSize();close();}}>Original size · {node.imageSize.width} × {node.imageSize.height}</button>}
       {node.ref?.module!=="media" && <div className={css.swatches} role="group" aria-label="Card color">{Object.entries(colors).map(([name,hex])=><button type="button" key={name} title={name} aria-label={name} aria-pressed={color===name} style={{background:hex}} onClick={()=>setColor(name)}/>)}</div>}
       <button className={css.primary} type="submit">Apply</button>

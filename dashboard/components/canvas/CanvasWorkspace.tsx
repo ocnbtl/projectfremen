@@ -3,10 +3,10 @@
 import * as Popover from "@radix-ui/react-popover";
 import { IconBookmark, IconCalendar, IconFolder } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
-import { WorkspaceButton, WorkspaceSheet } from "../admin-shell/WorkspaceKit";
-import SearchField from "../ui/SearchField";
+import { WorkspaceButton, WorkspaceHeader, WorkspaceSheet, WorkspaceToolbar } from "../admin-shell/WorkspaceKit";
+import { WorkspaceTopbarProvider } from "../admin-shell/WorkspaceTopbar";
+import PersonalOpsSidebar from "../personal-ops/PersonalOpsSidebar";
 import SelectField from "../ui/SelectField";
 import Icon from "../icons/UnigentamosIcon";
 import { boardSummary, type Board, type BoardSummary } from "../../lib/modules/canvas/model";
@@ -243,15 +243,15 @@ export default function CanvasWorkspace() {
   const visible=boards.filter(board=>(!folder || (folder==="unfiled" ? !board.folder : "folder:"+board.folder===folder)) &&
     (board.title+" "+board.folder).toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>
       sort==="Name A–Z" ? a.title.localeCompare(b.title) : sort==="Most items" ? b.nodeCount-a.nodeCount || a.title.localeCompare(b.title) : b.updatedAt.localeCompare(a.updatedAt));
-  return <main className={styles.library} aria-label="Canvas library" ref={library}>
-    <header className={styles.toolbar}>
-      <div className={styles.path}><Link href="/admin/personal" prefetch={false}>Personal</Link><Icon role="chevron-right" size={15}/><h1>Canvas</h1></div>
-      <SearchField aria-label="Search boards" placeholder="Search boards" value={query} onChange={e=>setQuery(e.target.value)} className={styles.search}/>
-      <SelectField aria-label="Sort boards" title="Sort boards" className="toolbar-icon-select" triggerContent={<Icon role="sort" size={19}/>} value={sort} onChange={e=>{
+  return <WorkspaceTopbarProvider><div data-personal-pages>
+    <PersonalOpsSidebar activeView="canvas" filter="" pathname={base} mobileOpen={false} onClose={()=>{}}/>
+    <main className={styles.library} aria-label="Canvas library" ref={library}>
+      <WorkspaceHeader title="Canvas"><WorkspaceButton intent="primary" icon="plus" onClick={()=>launchForm()} disabled={loading || opening}>New board</WorkspaceButton></WorkspaceHeader>
+      <WorkspaceToolbar query={query} onQuery={setQuery} placeholder="Search boards">
+      <SelectField aria-label="Sort boards" value={sort} onChange={e=>{
         const next=e.target.value as Sort;setSort(next);try{localStorage.setItem("unigentamos.canvas.sort",next);}catch{}
       }}>{sorts.map(value=><option key={value}>{value}</option>)}</SelectField>
-      <WorkspaceButton intent="primary" icon="plus" onClick={()=>launchForm()} disabled={loading || opening}>New board</WorkspaceButton>
-    </header>
+      </WorkspaceToolbar>
     <section className={styles.content} aria-label="Boards">
       {error && <div className={styles.notice} role="alert"><span>{error}</span><WorkspaceButton onClick={()=>void loadLibrary()}>Reload boards</WorkspaceButton></div>}
       {(loading || opening) ? <p className={styles.loading} role="status">{opening?"Opening board…":"Loading boards…"}</p> : <>
@@ -287,5 +287,5 @@ export default function CanvasWorkspace() {
         <div><WorkspaceButton disabled={busy} onClick={()=>setForm(null)}>Cancel</WorkspaceButton><WorkspaceButton type="submit" intent="primary" icon={form.original?"check":"plus"} disabled={busy||!form.title.trim()}>{form.original?"Save changes":"Create board"}</WorkspaceButton></div>
       </form>}
     </WorkspaceSheet>
-  </main>;
+  </main></div></WorkspaceTopbarProvider>;
 }

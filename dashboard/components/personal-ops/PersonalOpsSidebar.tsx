@@ -6,7 +6,7 @@ import ModuleSidebar, {
   type ModuleSidebarSection
 } from "../admin-shell/ModuleSidebar";
 import styles from "./PersonalOpsWorkspace.module.css";
-import PersonalOpsIcon, { type PersonalOpsIconName } from "./PersonalOpsIcon";
+import PersonalOpsIcon from "./PersonalOpsIcon";
 
 export type PersonalOpsSidebarView =
   | "command"
@@ -90,41 +90,10 @@ const SMART_VIEWS = [
   ["linked-reviews", "Linked to Reviews"]
 ] as const;
 
-function viewItem({
-  id,
-  label,
-  view,
-  activeView,
-  count,
-  icon,
-  unavailableReason
-}: {
-  id: string;
-  label: string;
-  view: PersonalOpsSidebarView;
-  activeView: PersonalOpsSidebarView;
-  count: number;
-  icon?: PersonalOpsIconName;
-  unavailableReason?: string;
-}): ModuleSidebarItem {
-  return {
-    id,
-    label,
-    href: VIEW_ROUTES[view],
-    active: activeView === view,
-    count,
-    icon: icon ? <PersonalOpsIcon name={icon} /> : undefined,
-    disabled: Boolean(unavailableReason),
-    disabledReason: unavailableReason
-  };
-}
-
 export default function PersonalOpsSidebar({
   activeView,
   filter,
   pathname,
-  counts,
-  unavailableViews,
   mobileOpen,
   onClose,
   onHome,
@@ -133,7 +102,7 @@ export default function PersonalOpsSidebar({
   activeView: PersonalOpsSidebarView;
   filter: string;
   pathname: string;
-  counts: PersonalOpsSidebarCounts;
+  counts?: PersonalOpsSidebarCounts;
   unavailableViews?: Partial<Record<PersonalOpsSidebarView, string>>;
   mobileOpen: boolean;
   onClose: () => void;
@@ -160,66 +129,10 @@ export default function PersonalOpsSidebar({
     active: filter === id
     }));
 
-  const commandSection: ModuleSidebarSection =
-    {
-      id: "command",
-      label: "Command",
-      items: [
-        {
-          id: "today",
-          label: "Today",
-          href: VIEW_ROUTES.command,
-          active: activeView === "command" && filter !== "week",
-          count: counts.command,
-          icon: <PersonalOpsIcon name="today" />
-        },
-        {
-          id: "week",
-          label: "This Week",
-          href: `${VIEW_ROUTES.command}?filter=week`,
-          active: activeView === "command" && filter === "week",
-          icon: <PersonalOpsIcon name="week" />
-        },
-        viewItem({
-          id: "goals",
-          label: "Current Goals",
-          view: "goals",
-          activeView,
-          count: counts.goals,
-          icon: "goal",
-          unavailableReason: unavailableViews?.goals
-        }),
-        viewItem({
-          id: "follow-ups",
-          label: "Follow-ups",
-          view: "follow-ups",
-          activeView,
-          count: counts.followUps,
-          icon: "follow-up",
-          unavailableReason: unavailableViews?.["follow-ups"]
-        }),
-        viewItem({
-          id: "decisions",
-          label: "Decisions",
-          view: "decisions",
-          activeView,
-          count: counts.decisions,
-          icon: "decision",
-          unavailableReason: unavailableViews?.decisions
-        }),
-        viewItem({ id: "obligations", label: "Obligations", view: "obligations", activeView, count: counts.obligations, icon: "check" }),
-        viewItem({
-          id: "routines",
-          label: "Routines",
-          view: "routines",
-          activeView,
-          count: counts.routines,
-          icon: "routine",
-          unavailableReason: unavailableViews?.routines
-        })
-      ]
-    };
-  commandSection.label="Tasks";commandSection.items=[{id:"tasks",label:"Tasks",href:"/admin/personal",icon:<PersonalOpsIcon name="check"/>}];
+  const commandSection: ModuleSidebarSection = {
+    id: "command", label: "Tasks",
+    items: [{ id: "tasks", label: "Tasks", href: VIEW_ROUTES.command, icon: <PersonalOpsIcon name="check"/> }]
+  };
   const sections: ModuleSidebarSection[] = isPersonalSystemView
     ? [commandSection]
     : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }];

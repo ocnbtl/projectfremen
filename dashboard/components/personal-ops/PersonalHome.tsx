@@ -1,15 +1,20 @@
 "use client";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useEffect, useState } from "react";
 import { WorkspaceButton, WorkspaceSheet } from "../admin-shell/WorkspaceKit";
 import { WorkspaceNavSlot } from "../admin-shell/WorkspaceTopbar";
 import SelectField from "../ui/SelectField";
-import PersonalOpsIcon from "./PersonalOpsIcon";
+import PersonalOpsIcon, { type PersonalOpsIconName } from "./PersonalOpsIcon";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { HOME_SHORTCUTS, SECTION_ICONS, emptyHomeSettings, type PersonalHomeSettings, type PersonalSection } from "../../lib/modules/personal-ops/home-settings";
 import type { PersonalOpsState } from "../../lib/modules/personal-ops/types";
 import { PERSONAL_HOME_TYPES, type PersonalHomeType } from "../../lib/modules/personal-ops/agenda";
 import styles from "./PersonalHome.module.css";
+
+function ShortcutContent({ label, icon }: { label: string; icon: PersonalOpsIconName }) {
+  const { pending } = useLinkStatus();
+  return <><span aria-hidden="true" data-pending={pending || undefined}><PersonalOpsIcon name={icon}/></span><strong aria-busy={pending || undefined}>{label}</strong></>;
+}
 
 export default function PersonalHome({ state, projectGoalCount = 0, selectedTypes = [], onToggleType = ()=>{}, hideOperations = false }: { state?: PersonalOpsState; projectGoalCount?: number; selectedTypes?: PersonalHomeType[]; onToggleType?: (type: PersonalHomeType)=>void; hideOperations?:boolean }) {
   const [settings, setSettings] = useState<PersonalHomeSettings>(emptyHomeSettings);
@@ -65,7 +70,11 @@ export default function PersonalHome({ state, projectGoalCount = 0, selectedType
   return <section className={styles.home} aria-label="Your Personal workspace">
     <WorkspaceNavSlot kind="actions"><div className={`${styles.sectionHeader} workspace-space-actions`}><span className="workspace-action-group-label">Spaces</span><WorkspaceButton icon="plus" disabled={!loaded || busy} onClick={() => {setDraft(settings); setOpen(true); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-label="New section name"]')?.focus());}}>Add section</WorkspaceButton></div></WorkspaceNavSlot>
     {error && !open && <p role="alert">{error}</p>}
-    <nav className={styles.shortcuts} aria-label="Personal spaces">{shortcuts.filter(item => !settings.hidden.includes(item.id)).map(item => <Link prefetch={false} href={item.href} key={item.id}><span><PersonalOpsIcon name={item.icon}/></span><strong>{item.label}</strong></Link>)}{loaded && shortcuts.every(item => settings.hidden.includes(item.id)) && <p>Use Add section to choose your spaces.</p>}</nav>
+    <nav className={styles.shortcuts} aria-label="Personal spaces">{shortcuts.filter(item => !settings.hidden.includes(item.id)).map(item =>
+      <Link key={item.id} href={item.href} prefetch={false}>
+        <ShortcutContent label={item.label} icon={item.icon}/>
+      </Link>
+    )}{loaded && shortcuts.every(item => settings.hidden.includes(item.id)) && <p>Use Add section to choose your spaces.</p>}</nav>
     {!hideOperations&&<div className={styles.operations}>{operations.map(item => <button type="button" aria-pressed={selectedTypes.length < PERSONAL_HOME_TYPES.length && selectedTypes.includes(item.type)} onClick={()=>onToggleType(item.type)} key={item.href}><PersonalOpsIcon name={item.icon}/><span><strong>{item.label}</strong></span><b>{item.count}</b></button>)}</div>}
     <WorkspaceSheet open={open} onClose={() => {if (!busy) setOpen(false);}} title="Personal sections" titleIcon="module-personal" presentation="center" className={styles.customizeSheet} focusInput={false}>
       <div className={styles.customize}>
