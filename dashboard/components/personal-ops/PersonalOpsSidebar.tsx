@@ -10,6 +10,7 @@ import PersonalOpsIcon, { type PersonalOpsIconName } from "./PersonalOpsIcon";
 
 export type PersonalOpsSidebarView =
   | "command"
+  | "canvas"
   | "goals"
   | "decisions"
   | "obligations"
@@ -59,6 +60,7 @@ export const PERSONAL_OPS_DOMAIN_LABELS = [
 
 const VIEW_ROUTES: Record<PersonalOpsSidebarView, string> = {
   command: "/admin/personal",
+  canvas: "/admin/personal/canvas",
   goals: "/admin/personal/goals",
   decisions: "/admin/personal/decisions",
   obligations: "/admin/personal/obligations",
@@ -138,7 +140,7 @@ export default function PersonalOpsSidebar({
   onHome?: () => void;
   status?: ReactNode;
 }) {
-  const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car", "style-guide", "dog", "health", "meals", "fitness"].includes(activeView);
+  const isPersonalSystemView = ["canvas", "passwords", "lists", "travel", "personal-build", "car", "style-guide", "dog", "health", "meals", "fitness"].includes(activeView);
   const domainItems: ModuleSidebarItem[] = PERSONAL_OPS_DOMAIN_LABELS.map((domain) => {
     const id = `domain-${domain.toLowerCase().replace(/\s+/g, "-")}`;
     return {
@@ -222,7 +224,7 @@ export default function PersonalOpsSidebar({
     ? [commandSection]
     : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }];
 
-  sections.splice(1, 0, { id: "personal-systems", label: "Personal", items: ([ ["passwords", "Passwords", "password"], ["lists", "Lists", "list"], ["travel", "Travel", "travel"], ["personal-build", "Personal build", "build"], ["car", "Car", "car"], ["style-guide", "Style guide", "style-guide"], ["dog", "Pets", "dog"], ["health", "Health", "health"], ["meals", "Meals", "meals"], ["fitness", "Fitness", "fitness"] ] as const).map(([view, label, icon]) => ({ id: view, label, href: VIEW_ROUTES[view], active: activeView === view, icon: <PersonalOpsIcon name={icon}/> })) });
+  sections.splice(1, 0, { id: "personal-systems", label: "Personal", items: ([ ["canvas", "Canvas", "component"], ["passwords", "Passwords", "password"], ["lists", "Lists", "list"], ["travel", "Travel", "travel"], ["personal-build", "Personal build", "build"], ["car", "Car", "car"], ["style-guide", "Style guide", "style-guide"], ["dog", "Pets", "dog"], ["health", "Health", "health"], ["meals", "Meals", "meals"], ["fitness", "Fitness", "fitness"] ] as const).map(([view, label, icon]) => ({ id: view, label, href: VIEW_ROUTES[view], active: activeView === view, icon: <PersonalOpsIcon name={icon}/> })) });
 
   return (
     <ModuleSidebar

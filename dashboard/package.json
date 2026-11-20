@@ -51,6 +51,7 @@
     "@radix-ui/react-popover": "^1.1.23",
     "@tabler/icons-react": "3.46.0",
     "@vercel/analytics": "^1.6.1",
+    "@xyflow/react": "12.12.1",
     "d3-geo": "3.1.1",
     "date-holidays": "3.37.0",
     "exifr": "7.1.3",

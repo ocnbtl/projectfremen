@@ -2177,6 +2177,12 @@ function createAutofillOrganizationReferences(profile: PersonalContactProfile | 
   return next;
 }
 
+/** Media previews need the file manifest, without resolving unrelated profiles and places. */
+export async function readMediaFileRecords(): Promise<PersonalRecord[]> {
+  const rows = await readJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>>(FILE_NAME, []);
+  return rows.filter(row => (row.className ?? row.kind) === "file").map(normalizeRecord).filter(row => isAllowedDomain(row.domain));
+}
+
 export async function readPersonalRecords(): Promise<PersonalRecord[]> {
   const existing = await readJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>>(FILE_NAME, []);
   const records = existing

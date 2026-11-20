@@ -1,5 +1,5 @@
 import { constants as fsConstants } from "node:fs";
-import { access, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const STATIC_DATA_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), "data");
@@ -396,6 +396,40 @@ export async function mutateJsonFile<T, Result>(
 
 export async function getWritableDataDir(): Promise<string> {
   return getDataDirectory();
+}
+
+/** List summaries written alongside their documents, without fetching document bodies from the provider. */
+export async function listJsonFileSummaries<T>(prefix: string): Promise<T[]> {
+  if (!/^[a-z0-9-]+-$/.test(prefix)) throw new Error("Invalid document prefix");
+  const config = getSupabaseConfig();
+  const results: T[] = [];
+  if (config) {
+    const limit = 100;
+    let after = "";
+    while (true) {
+      const query = new URLSearchParams({ select: "key,summary:value->summary", key: "like." + prefix + "*.json", order: "key.asc", limit: String(limit) });
+      if (after) query.append("key", "gt." + after);
+      const response = await fetch(config.url + "/rest/v1/app_state?" + query, {headers: supabaseHeaders(config), cache: "no-store"});
+      if (!response.ok) throw new Error("Unable to load document summaries");
+      const rows: { key: string; summary: T }[] = await response.json();
+      for (const row of rows) {
+        if (!row.summary || typeof row.key !== "string") throw new Error("Invalid document summary");
+        results.push(row.summary);
+      }
+      if (rows.length < limit) return results;
+      const last = rows[rows.length - 1].key;
+      if (last === after) throw new Error("Invalid summary cursor");
+      after = last;
+    }
+  }
+  const dir = await getDataDirectory();
+  for (const name of await readdir(/* turbopackIgnore: true */ dir)) {
+    if (!name.startsWith(prefix) || !name.endsWith(".json")) continue;
+    const entry = await readJsonFile<{summary: T} | null>(name, null);
+    if (!entry?.summary) throw new Error("Invalid document summary");
+    results.push(entry.summary);
+  }
+  return results;
 }
 
 export async function isEphemeralDataDirActive(): Promise<boolean> {

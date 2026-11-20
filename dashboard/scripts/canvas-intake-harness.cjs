@@ -1,0 +1,99 @@
+/* Isolated account storage, catalogs and private thumbnail routes. No provider calls. */
+const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const Module = require("node:module");
+const sharp = require("sharp");
+const ts = require("typescript");
+const data = fs.mkdtempSync(path.join(os.tmpdir(), "fremen-canvas-intake-"));
+Object.assign(process.env,{FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:"false",SUPABASE_URL:"",SUPABASE_SERVICE_ROLE_KEY:"",VERCEL:""});
+require.extensions[".ts"] = (mod, filename) => mod._compile(ts.transpileModule(fs.readFileSync(filename,"utf8"),{
+  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}
+}).outputText,filename);
+let signedIn = false;
+const load = Module._load;
+Module._load = function(name,...args) {
+  if (name === "server-only") return {};
+  if (name.endsWith("/admin-session")) return {hasAdminSession:async()=>signedIn};
+  if (name.endsWith("/csrf")) return {isCsrfRequestValid:req=>req.headers.get("x-csrf-token")==="fixture"};
+  return load.call(this,name,...args);
+};
+global.fetch = async () => { throw Error("Unexpected network request"); };
+const upload = require("../app/api/media/files/route.ts");
+const modules = require("../app/api/personal/canvas/objects/route.ts");
+const files = require("../lib/personal-records-store.ts");
+const account = require("../lib/modules/media/account-store.ts");
+const thumb = require("../app/api/personal/canvas/thumbnail/route.ts");
+const req = suffix=>new Request("http://localhost/"+suffix);
+const post = body=>upload.POST(new Request("http://localhost/api/media/files",{method:"POST",body:JSON.stringify(body),headers:{"x-csrf-token":"fixture"}}));
+async function run() {
+  const {canvasWorkspaceLink}=require("../lib/modules/canvas/object-link.ts");
+  const origin="https://example.test";
+  assert.equal(canvasWorkspaceLink("/admin/personal/pets/leo",origin).route,"/admin/personal/pets/leo");
+  assert.equal(canvasWorkspaceLink(origin+"/admin/finance/transactions?selected=x",origin).module,"finance");
+  for (const value of ["/admin/personal/passwords/a","//evil.test/admin/notes/x","https://evil.test/admin/notes/x","/admin/notes","/api/notes/x","javascript:foo"]) assert.equal(canvasWorkspaceLink(value,origin),undefined);
+  assert.equal((await modules.GET(req("?module=media"))).status,401);
+  assert.equal((await thumb.GET(req("?id=test"))).status,401);
+  signedIn=true;
+  assert.equal((await modules.GET(req("?module=unknown"))).status,400);
+  const image = await sharp({create:{width:801,height:301,channels:3,background:"#315a53"}}).png().toBuffer();
+  const id=crypto.randomUUID(), hash=crypto.createHash("sha256").update(image).digest("hex");
+  assert.equal((await post({action:"chunk",id,index:0,data:image.toString("base64")})).status,200);
+  const finish={action:"finish",name:"Original ad.png",mimeType:"image/png",file:{id,sha256:hash,byteLength:image.length,chunkSize:1048576,totalChunks:1}};
+  const first=await (await post(finish)).json(),record=first.record;
+  assert.equal(record.id,"personal-"+id);
+  assert.equal((await (await post(finish)).json()).record.id,record.id);
+  const indexed=await (await modules.GET(req("?files=1"))).json();
+  assert.equal(indexed.files.length,1);
+  assert.equal(indexed.files[0].hash,hash);
+  assert.equal(indexed.files[0].ref.route,"/admin/media/"+record.id);
+  assert.equal((await (await modules.GET(req("?module=media"))).json()).items.length,1);
+  let manifestReads=0,originalReads=0;
+  const originalRead=files.readMediaFileRecords,originalChunk=account.accountChunk;
+  files.readMediaFileRecords=async()=>{manifestReads++;return originalRead();};
+  account.accountChunk=async(...args)=>{originalReads++;return originalChunk(...args);};
+  const address="http://localhost/?id="+record.id+"&v="+encodeURIComponent(record.updatedAt);
+  const previews=await Promise.all(Array.from({length:12},()=>thumb.GET(new Request(address))));
+  assert(previews.every(response=>response.ok));
+  assert.equal(manifestReads,1);
+  assert.equal(originalReads,1);
+  const preview=previews[0],headers=preview.headers,bytes=Buffer.from(await preview.arrayBuffer());
+  assert.equal((await sharp(bytes).metadata()).width,400);
+  assert.equal(headers.get("content-type"),"image/webp");
+  assert.match(headers.get("cache-control"),/private, max-age=/);
+  const second=await thumb.GET(new Request(address));
+  assert.equal(originalReads,1);
+  assert(bytes.equals(Buffer.from(await second.arrayBuffer())));
+  assert.equal((await thumb.GET(new Request(address,{headers:{"If-None-Match":headers.get("etag")}}))).status,304);
+  await files.updatePersonalRecord(record.id,{mediaProfile:{...record.mediaProfile,archivedAt:new Date().toISOString()}},{expectedUpdatedAt:record.updatedAt});
+  assert.equal((await thumb.GET(new Request(address))).status,404);
+  assert.equal((await (await modules.GET(req("?module=media"))).json()).items.length,0);
+  assert.equal((await (await modules.GET(req("?files=1"))).json()).files[0].archived,true);
+  const stamp="2026-11-20T11:00:00.000Z",old={archivedAt:stamp};
+  const localFile=path.join(data,"personal-records.json");
+  const existing=JSON.parse(fs.readFileSync(localFile,"utf8"));
+  for(const [className,id,title] of [["person","a","Ari"],["org","b","Alpine"],["note","c","Brief"],["person","d","Old contact"],["interaction","e","Discussion"]]) {
+    existing.push({className,id,title,domain:"notes-docs",createdAt:stamp,updatedAt:stamp,...(id==="d"?old:{})});
+  }
+  fs.writeFileSync(localFile,JSON.stringify(existing));
+  async function catalog(name){const response=await modules.GET(req("?module="+name));assert.equal(response.status,200);return (await response.json()).items;}
+  const people=await catalog("people");
+  assert.deepEqual(people.map(ref=>ref.label).sort(),["Alpine","Ari","Discussion"]);
+  assert.equal(people.find(ref=>ref.objectType==="interaction").route,"/admin/people?sidebar=interactions&interaction=e");
+  assert.equal((await catalog("notes"))[0].route,"/admin/notes/c");
+  const finance=require("../lib/modules/finance/store.ts"),projects=require("../lib/modules/projects/store.ts");
+  const planning=require("../lib/modules/planning/store.ts");
+  finance.readFinanceState=async()=>({accounts:[],bills:[],budgets:[],rules:[],transactions:[{id:"payment-1",merchant:"Rental desk",occurredOn:"2026-11-20",amount:20,currency:"USD",updatedAt:stamp}]});
+  projects.readProjectsState=async()=>({projects:[{id:"p",name:"Launch",updatedAt:stamp,objectives:[{id:"o",text:"Book space",createdAt:stamp}]}],links:[],blockers:[],milestones:[]});
+  planning.readPlanningState=async()=>({events:[],places:[],taskPlans:[{id:"draft",kind:"task",title:"Pack",createdAt:stamp,updatedAt:stamp}]});
+  assert.equal((await catalog("finance"))[0].route,"/admin/finance/transactions?selected=payment-1");
+  assert.equal((await catalog("projects"))[0].route,"/admin/projects/p");
+  const taskRefs=await catalog("personal_ops");
+  assert(taskRefs.some(ref=>ref.route==="/admin/personal?task=draft"));
+  assert(taskRefs.some(ref=>ref.route==="/admin/personal?task=objectives%3Ap%3Ao"));
+  console.log("PASS private Media import identity, duplicate finish, object link, 12 simultaneous previews from one manifest and original read, 400px WebP, durable and browser cache, archived and signed-out behavior.");
+  console.log("PASS native people, organization, interaction, note, payment, project, task and project objective routes.");
+}
+run().catch(error=>{console.error(error);process.exitCode=1;});

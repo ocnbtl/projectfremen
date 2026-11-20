@@ -1,4 +1,5 @@
 export const HOME_SHORTCUTS = [
+  { id: "canvas", label: "Canvas", icon: "component", href: "/admin/personal/canvas" },
   { id: "passwords", label: "Passwords", icon: "password", href: "/admin/personal/passwords" },
   { id: "lists", label: "Lists", icon: "list", href: "/admin/personal/lists" },
   { id: "travel", label: "Travel", icon: "travel", href: "/admin/personal/travel" },

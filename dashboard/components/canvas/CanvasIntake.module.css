@@ -1,0 +1,15 @@
+.trigger{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:35px;padding:0 10px;border:1px solid var(--border,#d5e0e5);border-radius:9px;background:white;color:var(--text,#203741);font:inherit;font-size:13px;cursor:pointer}
+.trigger:hover,.trigger[aria-expanded=true]{background:#edf4fc}
+.panel{z-index:5000;width:min(390px,calc(100vw - 20px));max-height:var(--radix-popover-content-available-height);display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid #d4dfe7;border-radius:15px;padding:12px;background:#fff;color:#203640;box-shadow:0 10px 36px #182c4024;font:14px var(--font-body,system-ui);transform-origin:var(--radix-popover-content-transform-origin)}
+.panel header,.panel footer,.search{display:flex;align-items:center;gap:8px}
+.panel header,.panel footer{justify-content:space-between;flex:none}.panel header button{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
+.search{margin:8px 0}.search>:first-child{max-width:40%;flex:none}.search>:last-child{flex:1;min-width:0}
+.results{overflow-y:auto;overscroll-behavior:contain;max-height:min(38dvh,340px);min-height:48px}
+.linkLabel{border:1px solid #cbd9e3;border-radius:8px;margin-bottom:6px;padding:8px;color:inherit;font:inherit}
+.results p,.panel footer span{color:#50636d;font-size:13px}
+.row{display:flex;align-items:center;gap:9px;width:100%;padding:8px;border:0;border-radius:9px;text-align:left;color:inherit;background:transparent;font:inherit;cursor:pointer}
+.row:hover,.panel header button:hover{background:#f1f5f7}.row[aria-pressed=true]{background:#e7f1ff;color:#174782}
+.row>span{display:grid;gap:2px;flex:1;min-width:0}.row svg{flex:none}.row strong{font-weight:550;overflow-wrap:anywhere}.row small{font-size:11px;color:#526575;text-transform:capitalize}
+.panel footer{margin-top:8px;padding-top:10px;border-top:1px solid #e2e9ee}.more,.panel footer button{border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:13px;cursor:pointer}
+.panel footer button{background:#214f88;color:white}.panel footer button:disabled{opacity:.52;cursor:default}.thumb{width:100%;height:100%;min-height:0;overflow:hidden;display:grid;place-items:center;background:#edf1f4;color:#647988}.thumb img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+@media(prefers-reduced-motion:no-preference){.panel[data-state=open]{animation:enter .16s ease-out}.row,.trigger{transition:background .15s ease-out}@keyframes enter{from{opacity:0;transform:translateY(-3px) scale(.99)}to{opacity:1;transform:none}}}
