@@ -87,6 +87,52 @@ async function main() {
     assert(outcomes.some(o => o.status === 'rejected' && o.reason.code === 'stale'));
     assert.equal((await store.readFinanceState()).transactions.filter(t => !t.reviewed).length, 0);
   });
+  await check('automatic monthly budgets use repeated scoped spending, preserve edits, and commit once', async () => {
+    const month = (offset, day='10') => {
+      const date = new Date(today.slice(0,7)+'-01T12:00:00Z');
+      date.setUTCMonth(date.getUTCMonth()+offset);
+      return date.toISOString().slice(0,7)+'-'+day;
+    };
+    const s = store.createEmptyFinanceState();
+    s.accounts = [account];
+    s.transactions = [
+      txn('coverage', month(-4), 1, {direction:'income'}),
+      ...[100,120,2000].map((amount,i) => txn('food'+i,month(i-3),amount)),
+      txn('other',month(-2),900,{category:'One-off'}),
+      txn('pending2',month(-2),500,{status:'pending'}),
+      txn('xfer',month(-2),1000,{direction:'transfer'}),
+      txn('repay',month(-2),1000,{category:'Loan payments credit card payment'}),
+      txn('repay2',month(-1),1000,{category:'Loan payments credit card payment'}),
+      txn('t0',month(-3),20,{category:'Studio rental'}),
+      txn('t1',month(-2),40,{category:'Studio rental'}),
+      txn('different-scope',month(-1),1000,{entityScope:'business'}),
+      txn('current',month(0,'01'),1000)
+    ];
+    await native.writeJsonFile('finance.json',s);
+    await Promise.all([store.ensureMonthlyBudgets(),store.ensureMonthlyBudgets()]);
+    const saved = await store.readFinanceState();
+    assert.equal(saved.budgets.length,2);
+    const food = saved.budgets.find(b=>b.category==='Groceries');
+    assert.equal(food.limit,120);
+    assert.deepEqual(food.evidence.transactionIds,['food0','food1','food2']);
+    assert(food.evidence.automatic);
+    assert.equal(saved.budgets.find(b=>b.category==='Studio rental').limit,20);
+    assert.deepEqual(saved.transactions,s.transactions);
+    assert.deepEqual(saved.accounts,s.accounts);
+    assert.equal(saved.auditEvents.length,2);
+    await store.updateFinanceRecord({kind:'budget',id:food.id,action:'update',expectedUpdatedAt:food.updatedAt,fields:{limit:91}}, {actorId:'fixture'});
+    let again = await store.ensureMonthlyBudgets();
+    assert.equal(again.budgets.find(b=>b.id===food.id).limit,91);
+    await store.updateFinanceRecord({kind:'budget',id:food.id,action:'archive',expectedUpdatedAt:again.budgets.find(b=>b.id===food.id).updatedAt,reason:'Fixture'}, {actorId:'fixture'});
+    again = await store.ensureMonthlyBudgets();
+    assert.equal(again.budgets.length,2);
+    assert(again.budgets.find(b=>b.id===food.id).archivedAt);
+    s.budgets = [{...food,evidence:undefined,categoryGroup:undefined,category:'Food and drink groceries',limit:32}];
+    await native.writeJsonFile('finance.json',s);
+    again = await store.ensureMonthlyBudgets();
+    assert.equal(again.budgets.filter(b=>b.category==='Groceries').length,0);
+    assert.equal(again.budgets[0].limit,32);
+  });
   console.log(`Finance planning: ${passed} checks passed.`);
 }
 main().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => fs.rmSync(fixture, { recursive: true, force: true }));

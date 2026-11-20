@@ -337,8 +337,8 @@ const FINANCE_TABS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceTab[]>>
   overview: ["overview"],
   accounts: ["overview", "transactions", "reconcile", "transfers", "imports", "properties"],
   transactions: ["overview", "properties", "links", "audit", "rules"],
-  bills: ["overview", "payments", "value", "links", "rules", "properties"],
-  budgets: ["overview", "transactions", "subscriptions", "projects", "rules", "properties"],
+  bills: ["overview", "payments"],
+  budgets: ["overview", "transactions"],
   review: ["overview", "evidence", "decisions", "links", "activity", "properties"],
   rules: ["overview", "conditions", "actions", "tests", "links", "activity", "properties"]
 };

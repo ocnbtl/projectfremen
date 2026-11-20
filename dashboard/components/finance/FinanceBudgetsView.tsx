@@ -22,6 +22,9 @@ const FORECAST_REASON = "Forecasting is unavailable because no approved Finance 
 
 export type FinanceBudgetsViewProps = {
   model: FinanceBudgetsViewModel;
+  months: string[];
+  period: string;
+  onPeriodChange: (month: string) => void;
   filter: FinanceFilter;
   onQueryChange: (query: string) => void;
   onFilterChange: (filter: FinanceFilter) => void;
@@ -41,7 +44,7 @@ function percent(value: number | null): string {
 }
 
 export default function FinanceBudgetsView({
-  model,
+  model, months, period, onPeriodChange,
   filter,
   onQueryChange,
   onFilterChange,
@@ -55,7 +58,6 @@ export default function FinanceBudgetsView({
   return (
     <>
 
-      {model.rows.some(r => r.budget.evidence) && <p className="finance-view-explainer">{model.rows[0]?.budget.period} · Starter limits based on recorded history. Spending includes pending payments; transfers are excluded. Open a category to see its basis and adjust the limit.</p>}
       <MetricStrip
         className={styles.metrics}
         ariaLabel="Budget scope metrics"
@@ -67,6 +69,7 @@ export default function FinanceBudgetsView({
       />
 
       <div className={styles.scopeBar}>
+        <label className={styles.sortLabel}>Month<SelectField aria-label="Budget month" value={period} onChange={event=>onPeriodChange(event.target.value)}>{months.map(m=><option key={m} value={m}>{new Date(m+"-01T12:00:00Z").toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"UTC"})}</option>)}</SelectField></label>
         <div className={styles.filterGroup} role="group" aria-label="Budget filters">
           <button type="button" className={styles.filterButton} data-active={filter === ""} aria-pressed={filter === ""} onClick={() => onFilterChange("")}>All</button>
           <button type="button" className={styles.filterButton} data-active={filter === "over-budget"} aria-pressed={filter === "over-budget"} onClick={() => onFilterChange("over-budget")}>Over budget</button>
@@ -109,7 +112,8 @@ export default function FinanceBudgetsView({
               >
                 <IconTile hue={budget.hue} icon={budget.icon} />
                 <span>
-                  <strong>{budget.category} {over ? <Chip hue="crimson">Over cap</Chip> : null}</strong>
+                  <strong>{budget.category} {budget.evidence && <Chip hue="teal">{budget.evidence.automatic ? "Auto-created" : "From history"}</Chip>} {over ? <Chip hue="crimson">Over cap</Chip> : null}</strong>
+                  <small>{budget.entityScope === "business" ? "Business" : "Personal"}</small>
                   <small>{money(budget.spent, { cents: true })} spent · {money(budget.limit, { cents: true })} monthly limit</small>
                   <small>{money(Math.abs(remaining), { cents: true })} {over ? "over budget" : "remaining"}</small>
                 </span>

@@ -44,7 +44,7 @@ import { bindBankAccounts, reconcileBankBatch, resolveBankReview, unlinkBankAcco
 import type { BankAccount, BankTransaction } from "./banking-types";
 import type { CoinbaseSnapshot } from "./coinbase-types";
 import { applyCoinbasePortfolio, unlinkCoinbasePortfolio } from "./coinbase-ledger";
-import { buildFinancePlan, financeSpendingGroup } from "./planning";
+import { automaticMonthlyBudgets, budgetsOverlap, buildFinancePlan } from "./planning";
 import { linkNewTransactionMerchants } from "./merchant-matching-store";
 
 const FILE_NAME = "finance.json";
@@ -286,6 +286,22 @@ export async function readFinanceState(): Promise<FinanceState> {
 
 function planningFingerprint(state: FinanceState, asOf: string) {
   return createHash("sha256").update(canonicalJson({ asOf, accounts: state.accounts, transactions: state.transactions, budgets: state.budgets, bills: state.bills })).digest("hex");
+}
+
+export async function ensureMonthlyBudgets() {
+  return mutateFinanceState(async state => {
+    const now = new Date().toISOString();
+    const drafts = automaticMonthlyBudgets(state, now.slice(0, 10));
+    let next = state;
+    for (const draft of drafts) {
+      const actor = "automatic-budget";
+      const item = { ...createBudget(draft, actor, now), categoryGroup: draft.categoryGroup, evidence: draft.evidence };
+      ensureNoDuplicateCreate(next, "budget", item);
+      const { stateFields } = appendMutation(next, item, "budget", "finance.budget.auto_created", actor, now, null, undefined, draft.evidence.basis);
+      next = { ...next, budgets: [...next.budgets, item], ...stateFields };
+    }
+    return { state: next, result: next, changed: drafts.length > 0 };
+  });
 }
 
 export async function previewFinancePlan() {
@@ -702,7 +718,7 @@ function ensureNoDuplicateCreate(state: FinanceState, kind: FinanceRecordKind, i
     }
   } else if (kind === "budget") {
     const budget = item as FinanceBudgetRecord;
-    if (state.budgets.some((candidate) => !candidate.archivedAt && candidate.period === budget.period && candidate.entityScope === budget.entityScope && (candidate.category.toLowerCase() === budget.category.toLowerCase() || (budget.categoryGroup && (candidate.categoryGroup || financeSpendingGroup(candidate.category)) === budget.categoryGroup) || (candidate.categoryGroup && (budget.categoryGroup || financeSpendingGroup(budget.category)) === candidate.categoryGroup)))) {
+    if (state.budgets.some(candidate => !candidate.archivedAt && budgetsOverlap(candidate, budget))) {
       throw new FinanceStoreError("conflict", "This budget category already exists for the period and entity scope.", { status: 409 });
     }
   } else if (kind === "close_period") {

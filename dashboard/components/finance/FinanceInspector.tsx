@@ -49,19 +49,11 @@ const ACCOUNT_TABS: readonly DetailTab[] = [
 const BILL_TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
   { id: "payments", label: "Payments" },
-  { id: "value", label: "Value" },
-  { id: "links", label: "Links" },
-  { id: "rules", label: "Rules" },
-  { id: "properties", label: "Properties" }
 ];
 
 const BUDGET_TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
-  { id: "transactions", label: "Transactions" },
-  { id: "subscriptions", label: "Subscriptions" },
-  { id: "projects", label: "Projects" },
-  { id: "rules", label: "Rules" },
-  { id: "properties", label: "Properties" }
+  { id: "transactions", label: "Spending" }
 ];
 
 const REVIEW_TABS: readonly DetailTab[] = [
@@ -129,7 +121,7 @@ function WorkbenchActions({ children }: { children: React.ReactNode }) {
 function WorkbenchAction({ children, primary = false, onClick }: { children: React.ReactNode; primary?: boolean; onClick: () => void }) {
   const label = typeof children === "string" ? children : "";
   const icon = label.startsWith("Edit") || label.startsWith("Update") ? "edit" : label === "Archive" ? "archive" : label.includes("payment") ? "banknote" : "check";
-  return <button type="button" className={`finance-action ${primary ? "is-primary" : ""}`} onClick={onClick}><UnigentamosIcon role={icon} size={16}/>{children}</button>;
+  return <button type="button" className={`finance-action ${primary ? "is-primary" : ""}`} aria-label={label || undefined} title={label || undefined} onClick={onClick}><UnigentamosIcon role={icon} size={16}/><span>{children}</span></button>;
 }
 
 function TransactionProperties({ transaction }: { transaction: FinanceTransaction }) {
@@ -265,48 +257,58 @@ export default function FinanceInspector({
     : transaction
       ? <Chip hue={transaction.status === "pending" ? "yellow" : "green"}>{transaction.status}</Chip>
       : billRow
-        ? <Chip hue={billRow.bill.status === "overdue" ? "crimson" : "orange"}>{billRow.bill.status}</Chip>
+        ? <Chip hue={billRow.bill.status === "overdue" ? "crimson" : billRow.bill.status === "paid" ? "green" : "orange"}>{billRow.bill.status}</Chip>
         : budgetRow
           ? <Chip hue={budgetRow.remaining < 0 ? "crimson" : "green"}>{budgetRow.remaining < 0 ? "over cap" : "within cap"}</Chip>
           : <Chip hue={reviewRow?.isComplete ? "green" : "orange"}>{reviewRow?.isComplete ? "complete" : "open"}</Chip>;
 
+  const budget = budgetRow && financeState.budgets.find(item => item.id === budgetRow.budget.id);
+  const bill = billRow && financeState.bills.find(item => item.id === billRow.bill.id);
+  const periodLabel = budget && new Date(budget.period + "-01T12:00:00Z").toLocaleDateString("en-US", {month:"long", year:"numeric", timeZone:"UTC"});
+  const relatedPayments = bill?.evidence ? financeState.transactions.filter(t => bill.evidence!.transactionIds.includes(t.id)).sort((a,b) => b.occurredOn.localeCompare(a.occurredOn)) : [];
+  const budgetSpending = budget ? financeState.transactions.filter(t => !t.archivedAt && transactionInBudget(t, budget)).sort((a,b) => b.occurredOn.localeCompare(a.occurredOn)) : [];
+
   return (
     <InspectorRail
       id="finance-inspector"
-      title={(
+      title={billRow || budgetRow ? <div className={detailStyles.planHeader}>
+        <div className={detailStyles.planIdentity}>
+          {billRow ? <FinanceMerchantAvatar kind="bill" id={billRow.bill.id} label={objectTitle}/> : <span className={detailStyles.budgetIcon}><Icon name="PiggyBank"/></span>}
+          <div><h2>{objectTitle}</h2><div className={detailStyles.planMeta}>{billRow ? <><span><Icon name="Wallet"/>{billRow.bill.account}</span><span><Icon name="Calendar"/>Due {billRow.bill.due}</span></> : <><span><Icon name="Calendar"/>{periodLabel}</span><span>{budget?.entityScope === "business" ? "Business" : "Personal"}</span></>}</div></div>
+        </div>
+        <div className={detailStyles.planAmount}><strong>{money(billRow ? billRow.bill.amount : budgetRow!.budget.limit, {cents:true})}</strong>{billRow ? stateChip : <span>Monthly limit</span>}</div>
+        <div className={detailStyles.planActions}>
+        {billSelection && <WorkbenchActions>
+          <WorkbenchAction primary onClick={() => onOperation("edit", billSelection)}>Edit bill</WorkbenchAction>
+          {billRow?.bill.status !== "paid" && <WorkbenchAction onClick={() => onOperation("payment", billSelection)}>Record payment</WorkbenchAction>}
+          <WorkbenchAction onClick={() => onOperation("archive", billSelection)}>Archive</WorkbenchAction>
+        </WorkbenchActions>}
+        {budgetSelection && <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", budgetSelection)}>Edit budget</WorkbenchAction><WorkbenchAction onClick={() => onOperation("archive", budgetSelection)}>Archive</WorkbenchAction></WorkbenchActions>}
+        </div>
+      </div> : (
         <ObjectHeader
           headingLevel="h2"
           className={styles.inspectorHeader}
           objectType={accountRow ? "" : objectType}
           title={objectTitle}
           subtitle={subtitle}
-          identity={transaction?<FinanceMerchantAvatar kind="transaction" id={transaction.id} label={transaction.merchant}/>:billRow?<FinanceMerchantAvatar kind="bill" id={billRow.bill.id} label={billRow.bill.name}/>:<Icon name={accountRow ? "Wallet" : transaction ? "Banknote" : billRow ? "Calendar" : budgetRow ? "PiggyBank" : "Check"} />}
+          identity={transaction?<FinanceMerchantAvatar kind="transaction" id={transaction.id} label={transaction.merchant}/>:<Icon name={accountRow ? "Wallet" : "Check"} />}
           states={accountRow ? undefined : stateChip}
           metadata={accountRow
             ? stateChip
             : transaction
               ? money(transaction.amount, { sign: true, cents: true })
-              : billRow
-                ? money(billRow.bill.amount, { cents: true })
-                : budgetRow
-                  ? `${money(budgetRow.budget.spent, { cents: true })} / ${money(budgetRow.budget.limit, { cents: true })}`
-                  : monthlyReviewModel.completion.ratioLabel}
+              : monthlyReviewModel.completion.ratioLabel}
         />
       )}
       actions={<CloseButton onClose={onClose} />}
       showCloseButton={!accountRow}
-      footer={accountRow ? undefined : <div className={styles.inspectorFooter}>
+      footer={accountRow || billRow || budgetRow ? undefined : <div className={styles.inspectorFooter}>
         {transactionSelection && <WorkbenchActions>
           <WorkbenchAction onClick={() => onOperation("edit", transactionSelection)}>Edit transaction</WorkbenchAction>
           <WorkbenchAction primary onClick={() => onOperation("transaction_review", transactionSelection)}>Mark reconciled</WorkbenchAction>
           <WorkbenchAction onClick={() => onOperation("archive", transactionSelection)}>Archive</WorkbenchAction>
         </WorkbenchActions>}
-        {billSelection && <WorkbenchActions>
-          <WorkbenchAction onClick={() => onOperation("edit", billSelection)}>Edit bill</WorkbenchAction>
-          <WorkbenchAction primary onClick={() => onOperation("payment", billSelection)}>Record payment</WorkbenchAction>
-          <WorkbenchAction onClick={() => onOperation("archive", billSelection)}>Archive</WorkbenchAction>
-        </WorkbenchActions>}
-        {budgetSelection && <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", budgetSelection)}>Edit budget</WorkbenchAction><WorkbenchAction onClick={() => onOperation("archive", budgetSelection)}>Archive</WorkbenchAction></WorkbenchActions>}
         {closeSelection && <WorkbenchActions><WorkbenchAction onClick={() => onOperation("close_check", closeSelection)}>Update check</WorkbenchAction><WorkbenchAction primary onClick={() => onOperation(closePeriod?.status === "closed" ? "reopen_close" : "complete_close", closeSelection)}>{closePeriod?.status === "closed" ? "Reopen month" : "Complete month"}</WorkbenchAction></WorkbenchActions>}
       </div>}
       className={`${detailStyles.detail} finance-right-rail ${accountRow ? "finance-account-inspector" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
@@ -376,104 +378,48 @@ export default function FinanceInspector({
       {billRow && (
         <div className={styles.inspectorPanel}>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="overview" active={safeTab === "overview"} className={styles.inspectorPanel}>
-            <FinanceMerchantPanel kind="bill" id={billRow.bill.id} label={billRow.bill.name}/><div className={styles.factGrid}>
-              <div><span>Amount</span><strong>{money(billRow.bill.amount, { cents: true })}</strong></div>
-              <div><span>Payment status</span><strong>{billRow.bill.status}</strong></div>
-              <div><span>Cadence</span><strong>{billRow.bill.recurring || "Not recorded"}</strong></div>
-              <div><span>Autopay</span><strong>{billRow.bill.evidence && !billRow.bill.autopayConfirmed ? "Unconfirmed" : billRow.bill.autopay ? "On" : "Manual"}</strong></div>
-              <div><span>Account</span><strong>{billRow.bill.account}</strong></div>
+            <div className={styles.factGrid}>
+              <div><span>Repeats</span><strong>{billRow.bill.recurring || "One-time"}</strong></div>
+              <div><span>Autopay</span><strong>{billRow.bill.evidence && !billRow.bill.autopayConfirmed ? "Not confirmed" : billRow.bill.autopay ? "On" : "Off"}</strong></div>
               <div><span>Category</span><strong>{billRow.bill.category}</strong></div>
+              {billRow.bill.recurring && billRow.bill.recurring !== "monthly" && <div><span>Monthly equivalent</span><strong>{money(billRow.monthlyEquivalent,{cents:true})}</strong></div>}
             </div>
-            <section className={styles.inspectorSection}>
-              <h3>{billRow.bill.evidence ? "Detected from your transactions" : "Payment"}</h3>
-              {billRow.bill.evidence && <p>{billRow.bill.evidence.basis}</p>}
-              <p>Record a payment once it has been paid. Autopay and estimates do not confirm payment.</p>
+            <FinanceMerchantPanel kind="bill" id={billRow.bill.id} label={billRow.bill.name}/>
+            <div className={detailStyles.relatedLinks}>
+              {bill && <a href={getModuleViewRoute("finance","accounts")+"?selected="+encodeURIComponent(bill.accountId)}>Open account</a>}
+              <a href={getModuleViewRoute("finance","rules")+"?query="+encodeURIComponent(objectTitle)}>Related rules</a>
+              <a href={getModuleViewRoute("finance","review")}>Monthly review</a>
+            </div>
+          </DetailTabPanel>
+          <DetailTabPanel tabsId="finance-object-tabs" tabId="payments" active={safeTab === "payments"} className={styles.inspectorPanel}>
+            <section className={styles.inspectorSection}><h3>Payment history</h3>
+              {bill?.paidAt && <p>Marked paid on {overviewDate(bill.paidAt.slice(0,10))}.{bill.paymentExceptionReason && " " + bill.paymentExceptionReason} {bill.paymentEvidenceRef && <a href={bill.paymentEvidenceRef.route}>{bill.paymentEvidenceRef.label}</a>}</p>}
+              {bill?.evidence && <p>We estimated this bill from earlier payments to {objectTitle}. You can adjust its amount or next due date.</p>}
+              {!relatedPayments.length && !bill?.paidAt && <p>No payments recorded yet.</p>}
+              <div className={styles.compactList}>{relatedPayments.map(t => <a key={t.id} className={styles.compactRow} href={getModuleViewRoute("finance","transactions")+"?selected="+encodeURIComponent(t.id)}><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.status === "cleared" ? "Posted" : "Pending"}{t.archivedAt && " · Archived"}</small></span><strong>{money(t.amount,{cents:true})}</strong></a>)}</div>
+              <a href={getModuleViewRoute("finance","transactions")+"?query="+encodeURIComponent(objectTitle)}>Find transactions</a>
             </section>
-            <p className={styles.paymentNote}>Recording a payment does not send money.</p>
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="payments" active={safeTab === "payments"}>
-            {billRow.bill.evidence && <section className={styles.inspectorSection}><h3>Observed payments</h3><p>These transactions support the recurring estimate. They do not confirm payment of the next bill.</p><div className={styles.compactList}>{financeState.transactions.filter(t => billRow.bill.evidence?.transactionIds.includes(t.id)).map(t => <a key={t.id} className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?selected=${encodeURIComponent(t.id)}`}><span><strong>{t.merchant}</strong><small>{t.occurredOn} · {t.status}{t.archivedAt ? " · archived" : ""}</small></span><strong>{money(t.amount, { cents: true })}</strong></a>)}</div></section>}
-            <AuditTimeline events={nativeAuditEvents.filter((event) => event.action.includes("paid"))} />
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="value" active={safeTab === "value"} className={styles.inspectorPanel}>
-            <div className={styles.factGrid}>
-              <div><span>Current amount</span><strong>{money(billRow.bill.amount, { cents: true })}</strong></div>
-              <div><span>Monthly equivalent</span><strong>{money(billRow.monthlyEquivalent, { cents: true })}</strong></div>
-              <div><span>Value state</span><strong>Not recorded</strong></div>
-              <div><span>Last reviewed</span><strong>Not recorded</strong></div>
-            </div>
-            <SystemState variant="read_only" title="Value decisions are unavailable" description="Keep, cancel, downgrade, replace, pause, and follow-up actions need a durable value-review contract." />
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="links" active={safeTab === "links"} className={styles.inspectorPanel}>
-            <div className={styles.compactList}>
-              <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "accounts")}?query=${encodeURIComponent(billRow.bill.account)}`}><span><strong>{billRow.bill.account}</strong><small>Finance account owner</small></span><span>Open</span></a>
-              <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?query=${encodeURIComponent(billRow.bill.name)}`}><span><strong>Transaction candidates</strong><small>Merchant search only · no durable link inferred</small></span><span>Search</span></a>
-              <a className={styles.compactRow} href={getModuleViewRoute("finance", "review")}><span><strong>Finance Monthly Review</strong><small>Finance owns close state</small></span><span>Open</span></a>
-            </div>
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="rules" active={safeTab === "rules"}>
-            <SystemState
-              variant="read_only"
-              title="Recurring rules are controlled"
-              description={<span>Persistent rules can be searched and deterministically tested. Suggested changes still require confirmation. <a href={`${getModuleViewRoute("finance", "rules")}?query=${encodeURIComponent(billRow.bill.name)}`}>Search rules.</a></span>}
-            />
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="properties" active={safeTab === "properties"}>
-            <div className={styles.factGrid}>
-              <div><span>Bill ID</span><strong>{billRow.bill.id}</strong></div><div><span>Name</span><strong>{billRow.bill.name}</strong></div>
-              <div><span>Due</span><strong>{billRow.bill.due}</strong></div><div><span>Due offset</span><strong>{billRow.bill.dueIn} days</strong></div>
-              <div><span>Recurring</span><strong>{billRow.bill.recurring || "No"}</strong></div><div><span>Autopay</span><strong>{billRow.bill.evidence && !billRow.bill.autopayConfirmed ? "Unconfirmed" : billRow.bill.autopay ? "Yes" : "No"}</strong></div>
-              <div><span>Account</span><strong>{billRow.bill.account}</strong></div><div><span>Persistence</span><strong>Native Finance store</strong></div>
-            </div>
+            {nativeAuditEvents.some(e => e.action.includes("paid")) && <AuditTimeline events={nativeAuditEvents.filter(e => e.action.includes("paid"))}/>}
           </DetailTabPanel>
         </div>
       )}
 
-      {budgetRow && (
+      {budgetRow && budget && (
         <div className={styles.inspectorPanel}>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="overview" active={safeTab === "overview"} className={styles.inspectorPanel}>
-            <div className={styles.factGrid}>
-              <div><span>Cap</span><strong>{money(budgetRow.budget.limit, { cents: true })}</strong></div>
-              <div><span>Spent</span><strong>{money(budgetRow.budget.spent, { cents: true })}</strong></div>
-              <div><span>Remaining</span><strong>{money(budgetRow.remaining, { cents: true })}</strong></div>
-              <div><span>Used</span><strong>{budgetRow.usedPercent === null ? "Unavailable" : `${budgetRow.usedPercent.toFixed(2)}%`}</strong></div>
-              <div><span>Month</span><strong>{financeState.budgets.find(b => b.id === budgetRow.budget.id)?.period || "Monthly"}</strong></div>
-              <div><span>Status</span><strong>{budgetRow.remaining < 0 ? "Over budget" : "Within budget"}</strong></div>
-            </div>
-            <section className={styles.inspectorSection}><h3>{budgetRow.budget.evidence ? "Budget basis" : "Spending against your limit"}</h3>{budgetRow.budget.evidence && <p>{budgetRow.budget.evidence.basis}</p>}<p>{budgetRow.budget.category} is {money(Math.abs(budgetRow.remaining), { cents: true })} {budgetRow.remaining < 0 ? "over its monthly limit" : "below its monthly limit"}.</p></section>
-            <LinkedDecisionsPanel
-              source={budgetDecisionSource!}
-              decisions={decisions}
-              loading={decisionsLoading}
-              error={decisionsError}
-              onRefresh={onRefreshDecisions}
-              createHref={buildDecisionCreationRoute(budgetDecisionSource!)}
-              compact
-              title="Budget decisions"
-            />
+            <section className={styles.inspectorSection}>
+              <h3>Monthly spending</h3>
+              <div className={styles.factGrid}><div><span>Spent</span><strong>{money(budgetRow.budget.spent,{cents:true})}</strong></div><div><span>{budgetRow.remaining < 0 ? "Over budget" : "Remaining"}</span><strong>{money(Math.abs(budgetRow.remaining),{cents:true})}</strong></div></div>
+              {budgetRow.usedPercent !== null && <progress className={detailStyles.budgetMeter} aria-label="Budget used" value={Math.min(100,budgetRow.usedPercent)} max={100}/>}
+            </section>
+            {budget.evidence && <section className={styles.inspectorSection}><h3>{budget.evidence.automatic ? "Auto-created budget" : "From your spending history"}</h3><p>{budget.evidence.basis}</p></section>}
+            <LinkedDecisionsPanel source={budgetDecisionSource!} decisions={decisions} loading={decisionsLoading} error={decisionsError} onRefresh={onRefreshDecisions} createHref={buildDecisionCreationRoute(budgetDecisionSource!)} compact title="Budget decisions"/>
+            <div className={detailStyles.relatedLinks}><a href={getModuleViewRoute("finance","bills")+"?query="+encodeURIComponent(budget.category)}>Find related bills</a><a href={getModuleViewRoute("finance","rules")+"?filter=budget-rules"}>Budget rules</a></div>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="transactions" active={safeTab === "transactions"} className={styles.inspectorPanel}>
-            <section className={styles.inspectorSection}><h3>Spending in this budget</h3><div className={styles.compactList}>{financeState.transactions.filter(t => { const budget = financeState.budgets.find(b => b.id === budgetRow.budget.id); return !t.archivedAt && budget && transactionInBudget(t, budget); }).sort((a, b) => b.occurredOn.localeCompare(a.occurredOn)).map(t => <a key={t.id} className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?selected=${encodeURIComponent(t.id)}`}><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.status}</small></span><strong>{money(t.amount, { cents: true })}</strong></a>)}</div>{budgetRow.budget.spent === 0 && <p>No spending is recorded for this budget yet.</p>}</section>
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="subscriptions" active={safeTab === "subscriptions"} className={styles.inspectorPanel}>
-            <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "bills")}?query=${encodeURIComponent(budgetRow.budget.category)}`}><span><strong>Search Bills & Subscriptions</strong><small>Bills owns recurring-obligation state; category equality is only search evidence.</small></span><span>Open</span></a>
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="projects" active={safeTab === "projects"}>
-            <SystemState variant="read_only" title="No Project allocation reference" description="No stable Project reference is stored for this budget. No Project object is copied or inferred." />
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="rules" active={safeTab === "rules"}>
-            <SystemState
-              variant="read_only"
-              title="Budget rules require confirmation"
-              description={<span>Persistent variance rules can be inspected and tested without source writes. Forecasting remains unavailable until a formula is approved. <a href={`${getModuleViewRoute("finance", "rules")}?filter=budget-rules`}>Open budget rules.</a></span>}
-            />
-          </DetailTabPanel>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="properties" active={safeTab === "properties"}>
-            <div className={styles.factGrid}>
-              <div><span>Budget ID</span><strong>{budgetRow.budget.id}</strong></div><div><span>Category</span><strong>{budgetRow.budget.category}</strong></div>
-              <div><span>Cap</span><strong>{money(budgetRow.budget.limit, { cents: true })}</strong></div><div><span>Spent</span><strong>{money(budgetRow.budget.spent, { cents: true })}</strong></div>
-              <div><span>Remaining</span><strong>{money(budgetRow.remaining, { cents: true })}</strong></div><div><span>Forecast</span><strong>Unavailable</strong></div>
-            </div>
+            <section className={styles.inspectorSection}><h3>Spending in {periodLabel}</h3>{!budgetSpending.length && <p>No spending recorded for this category yet.</p>}
+              <div className={styles.compactList}>{budgetSpending.map(t => <a key={t.id} className={styles.compactRow} href={getModuleViewRoute("finance","transactions")+"?selected="+encodeURIComponent(t.id)}><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.status === "cleared" ? "Posted" : "Pending"}</small></span><strong>{money(t.amount,{cents:true})}</strong></a>)}</div>
+            </section>
           </DetailTabPanel>
         </div>
       )}

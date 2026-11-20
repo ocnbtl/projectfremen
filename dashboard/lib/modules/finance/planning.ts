@@ -1,8 +1,15 @@
 import type { FinanceState, FinanceTransactionRecord, FinanceEntityScope } from "./native-types";
 
+const spendingGroupNames = new Map(
+  ["Groceries", "Coffee", "Dining & takeout", "Transport & fuel", "Insurance", "Home & utilities", "Software & services", "Pets", "Shopping & personal", "Leisure & travel", "Health", "Bank fees"]
+    .map(name => [name.toLowerCase(), name] as const)
+);
+
 // These groups affect planning only. Original bank categories remain intact.
 export function financeSpendingGroup(category: string): string {
-  const c = category.toLowerCase();
+  const c = category.trim().toLowerCase();
+  const named = spendingGroupNames.get(c);
+  if (named) return named;
   if (c.includes("groceries")) return "Groceries";
   if (c.includes("coffee")) return "Coffee";
   if (c.startsWith("food and drink")) return "Dining & takeout";
@@ -19,9 +26,79 @@ export function financeSpendingGroup(category: string): string {
 }
 
 export type PlanningEvidence = {
+  automatic?: true;
   kind: "transaction_history"; transactionIds: string[]; basis: string;
   generatedOn: string; estimated: true; sourceKey: string;
 };
+
+type BudgetCategory = { category: string; categoryGroup?: string; period: string; entityScope: FinanceEntityScope };
+export function budgetsOverlap(a: BudgetCategory, b: BudgetCategory) {
+  if (a.period !== b.period || a.entityScope !== b.entityScope) return false;
+  if (a.category.toLowerCase() === b.category.toLowerCase()) return true;
+  if (!a.categoryGroup && !b.categoryGroup) return false;
+  return (a.categoryGroup || financeSpendingGroup(a.category)) === (b.categoryGroup || financeSpendingGroup(b.category));
+}
+
+type MonthlySpending = {
+  category: string;
+  categoryGroup?: string;
+  scope: FinanceEntityScope;
+  totals: Map<string, number>;
+  transactions: { id: string; month: string }[];
+};
+
+/** A monthly starting limit requires repeated spending in recent, observed months. */
+export function automaticMonthlyBudgets(state: FinanceState, asOf: string) {
+  const period = asOf.slice(0, 7);
+  if (state.closePeriods.some(close => close.period === period && close.status === "closed")) return [];
+  const from = new Date(period + "-01T12:00:00Z");
+  from.setUTCMonth(from.getUTCMonth() - 3);
+  const earliestPeriod = from.toISOString().slice(0, 7);
+  const accounts = new Set(state.accounts.filter(a => !a.archivedAt).map(a => a.id));
+  const firstSeen = new Map<FinanceEntityScope, string>();
+  const months = new Map<FinanceEntityScope, Set<string>>();
+  const groups = new Map<string, MonthlySpending>();
+  for (const t of state.transactions) {
+    if (t.archivedAt || t.status !== "cleared" || !accounts.has(t.accountId) || t.occurredOn >= period + "-01") continue;
+    if (t.occurredOn < (firstSeen.get(t.entityScope) || "9999")) firstSeen.set(t.entityScope, t.occurredOn);
+    const month = t.occurredOn.slice(0, 7);
+    if (month < earliestPeriod) continue;
+    const observed = months.get(t.entityScope) ?? new Set<string>();
+    observed.add(month);
+    months.set(t.entityScope, observed);
+    if (t.direction !== "expense" || t.transferId || t.savingsMovementId || t.amount <= 0) continue;
+    const raw = t.category.trim();
+    if (!raw || /^(uncategorized|needs review|unknown|other|other spending|loan payments.*credit card payment|credit card payments?)$/i.test(raw)) continue;
+    const group = financeSpendingGroup(raw);
+    const categoryGroup = group === "Other spending" ? undefined : group;
+    const category = categoryGroup || raw;
+    const key = t.entityScope + ":" + category.toLowerCase();
+    const bucket: MonthlySpending = groups.get(key) ?? { category, categoryGroup, scope: t.entityScope, totals: new Map(), transactions: [] };
+    bucket.totals.set(month, (bucket.totals.get(month) || 0) + Math.round(t.amount * 100));
+    bucket.transactions.push({ id: t.id, month });
+    groups.set(key, bucket);
+  }
+  const drafts = [];
+  for (const [key, { category, categoryGroup, scope, totals, transactions }] of groups) {
+    const usable = [...(months.get(scope) || [])].filter(m => m + "-01" >= firstSeen.get(scope)!).sort();
+    if (usable.filter(m => totals.has(m)).length < 2) continue;
+    const sourceKey = "automatic:" + period + ":" + key;
+    const draft = { category, categoryGroup, entityScope: scope, period };
+    // Include archived budgets and remember the source after a user renames or moves one.
+    if (state.budgets.some(b => b.evidence?.sourceKey === sourceKey || budgetsOverlap(b, draft))) continue;
+    const amounts = usable.map(month => totals.get(month) || 0).sort((a, b) => a - b);
+    const middle = Math.floor(amounts.length / 2);
+    const median = amounts.length % 2 ? amounts[middle] / 100 : (amounts[middle - 1] + amounts[middle]) / 200;
+    const monthNames = usable.map(month => new Date(month + "-01T12:00:00Z").toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }));
+    const evidence: PlanningEvidence = {
+      kind: "transaction_history", automatic: true, estimated: true, sourceKey, generatedOn: asOf,
+      transactionIds: transactions.filter(t => usable.includes(t.month)).map(t => t.id),
+      basis: "Your median monthly spend was $" + median.toFixed(2) + " across " + monthNames.join(", ") + ". We rounded the starting limit up to the nearest $5."
+    };
+    drafts.push({ ...draft, limit: Math.ceil(median / 5) * 5, evidence });
+  }
+  return drafts;
+}
 export type PlannedBudget = { category: string; categoryGroup: string; limit: number; period: string; entityScope: FinanceEntityScope; evidence: PlanningEvidence };
 export type PlannedBill = { name: string; amount: number; dueDate: string; accountId: string; category: string; entityScope: FinanceEntityScope; recurring: "monthly"; evidence: PlanningEvidence };
 export type FinancePlan = { asOf: string; fingerprint?: string; periods: string[]; budgets: PlannedBudget[]; bills: PlannedBill[]; reviewIds: string[]; pendingCount: number; notes: string[] };

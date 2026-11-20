@@ -128,10 +128,12 @@ function EditFields({ state, selection, record }: { state: FinanceState; selecti
     <Field label="Due date" name="dueDate" type="date" defaultValue={String(record.dueDate || today())} required />
     <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}>{accountOptions(state)}</Select>
     <Field label="Category" name="category" defaultValue={String(record.category || "Uncategorized")} maxLength={160} />
-    <Select label="Status" name="status" defaultValue={String(record.status || "scheduled")}><option value="scheduled">Scheduled</option><option value="soon">Soon</option><option value="due">Due</option><option value="overdue">Overdue</option></Select>
+    <Select label="Status" name="status" defaultValue={String(record.status || "scheduled")}>{record.status === "paid" && <option value="paid">Paid</option>}<option value="scheduled">Scheduled</option><option value="soon">Soon</option><option value="due">Due</option><option value="overdue">Overdue</option></Select>
     <Select label="Repeats" name="recurring" defaultValue={String(record.recurring || "")}><option value="">One-time</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option></Select>
     <Select label="Entity" name="entityScope" defaultValue={String(record.entityScope || "personal")}><option value="personal">Personal</option><option value="business">Business</option></Select>
-    <label><span>Autopay</span><input name="autopay" type="checkbox" defaultChecked={Boolean(record.autopay)} /></label>
+    <Select label="Autopay" name="autopaySetting" defaultValue={record.evidence && !record.autopayConfirmed ? "" : record.autopay ? "on":"off"}>
+      {Boolean(record.evidence && !record.autopayConfirmed) && <option value="">Not confirmed</option>}<option value="on">On</option><option value="off">Off</option>
+    </Select>
   </>;
   if (selection?.kind === "budget") return <>
     <Field label="Month" name="period" type="month" defaultValue={String(record.period || month())} required />
@@ -214,20 +216,21 @@ function Fields({ operation, state, record, selection, importHeaders, onImportFi
     <label><span>Autopay</span><input name="autopay" type="checkbox" /></label>
   </>;
   if (operation === "payment") return <>
-    <p>Attach a canonical evidence reference when one exists. Otherwise, record an explicit exception.</p>
+    <Field label="Payment note" name="exceptionReason" placeholder="How did you pay?" maxLength={1000} />
+    <details className="finance-import-mapping"><summary>Link a receipt or other record</summary><div>
     <Field label="Evidence owner module" name="evidenceModule" placeholder="notes" maxLength={80} />
     <Field label="Evidence object type" name="evidenceObjectType" placeholder="note" maxLength={100} />
     <Field label="Evidence object ID" name="evidenceObjectId" maxLength={240} />
     <Field label="Evidence label" name="evidenceLabel" maxLength={500} />
     <Field label="Canonical evidence route" name="evidenceRoute" placeholder="/admin/notes/..." maxLength={1000} />
-    <Field label="Exception reason (when evidence is unavailable)" name="exceptionReason" maxLength={1000} />
-    <p>This records an observed outcome; it never sends money.</p>
+    </div></details>
+    <p>Add a payment note or link a receipt to mark this bill paid.</p>
   </>;
   if (operation === "budget") return <>
-    <Field label="Period" name="period" type="month" defaultValue={month()} required />
+    <Field label="Month" name="period" type="month" defaultValue={month()} required />
     <Field label="Category" name="category" required maxLength={160} />
-    <Field label="Monthly cap" name="limit" type="number" min="0" step="0.01" required />
-    <Select label="Entity scope" name="entityScope" defaultValue="personal"><option value="personal">Personal</option><option value="business">Business</option></Select>
+    <Field label="Monthly limit" name="limit" type="number" min="0" step="0.01" required />
+    <Select label="Budget for" name="entityScope" defaultValue="personal"><option value="personal">Personal</option><option value="business">Business</option></Select>
   </>;
   if (operation === "close") return <><Field label="Close period" name="period" type="month" defaultValue={month()} required /><p>Six named required checks will be created. Completion is evidence-gated.</p></>;
   if (operation === "close_check") return <>
@@ -334,7 +337,10 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
       const fields: Record<string, unknown> = {};
       for (const [name, item] of form.entries()) if (!(item instanceof File) && name!=="merchantOrganizationId") fields[name] = item;
       if (selection.kind === "transaction") fields.reviewed = form.has("reviewed");
-      if (selection.kind === "bill") fields.autopay = form.has("autopay");
+      if (selection.kind === "bill") {
+        delete fields.autopaySetting;
+        if (value(form,"autopaySetting")) fields.autopay = value(form,"autopaySetting") === "on";
+      }
       result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields });
     } else if (operation === "transaction_review" && selection && record) {
       result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields: { reviewed: true, ...((record.source as { kind?: string })?.kind === "plaid" ? {} : { status: "cleared" }) } });
@@ -415,14 +421,16 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
     onState(result.data.state, `${importableRows.length} transaction${importableRows.length === 1 ? "" : "s"} imported. ${preview.counts.ambiguous} still need categorization; ${preview.counts.rejected} invalid or duplicate row${preview.counts.rejected === 1 ? " was" : "s were"} skipped.`); onClose();
   };
 
-  const compactForm=["account","bill","transaction","balance"].includes(operation)||(operation==="edit"&&["account","bill","transaction"].includes(selection?.kind || ""));
+
   const recordKind=operation==="edit"?selection?.kind:operation;
   const heading=operation==="edit"?`Edit ${selection?.kind || "record"}`:TITLES[operation];
   const needsAccount = ["transaction", "import", "transfer", "savings", "bill"].includes(operation);
   return createPortal(<div className="finance-module-shell" data-module="finance" style={{...moduleThemeVariables("finance"), display:"contents"} as React.CSSProperties}><div className="finance-modal-backdrop" role="presentation">
-    <section ref={dialogRef} className={`finance-modal ${compactForm?styles.dialog:""}`} role="dialog" aria-modal="true" aria-labelledby="finance-mutation-title">
-      <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance operation" disabled={busy} data-icon-button="standard"><Icon name="X" /></button>
+    <section ref={dialogRef} className={"finance-modal " + styles.dialog} role="dialog" aria-modal="true" aria-labelledby="finance-mutation-title">
+      <header className={styles.formHeader}>
       <h2 id="finance-mutation-title"><UnigentamosIcon role={recordKind==="account"?"wallet":recordKind==="bill"?"calendar":"banknote"} size={23}/>{heading}</h2>
+        <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance operation" disabled={busy} data-icon-button="standard"><Icon name="X"/></button>
+      </header>
       {error && <p className="finance-form-error" role="alert">{error}</p>}
       {preview ? <div className="finance-import-preview">
         <p><strong>{preview.sourceFilename}</strong> is ready.</p>
@@ -431,7 +439,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
         <p>Ready rows become transactions immediately. Uncategorized rows stay visible as “Needs review,” so you can categorize and reconcile them later.</p>
         <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={() => setPreview(null)} disabled={busy}>Back</button><button type="button" className="finance-action is-primary" onClick={() => void confirm()} disabled={busy}>{busy ? "Importing…" : preview.counts.accepted + preview.counts.ambiguous ? `Import ${preview.counts.accepted + preview.counts.ambiguous} transactions` : "Save skipped-row record"}</button></div>
       </div> : <form key={`${operation}:${record?.id || "new"}`} onSubmit={(event) => void submit(event)}>
-        <div className={compactForm?styles.fields:undefined}><Fields operation={operation} state={state} record={record} selection={selection} importHeaders={importHeaders} onImportFile={(file) => {
+        <div className={styles.fields}><Fields operation={operation} state={state} record={record} selection={selection} importHeaders={importHeaders} onImportFile={(file) => {
           setError("");
           if (!file) { setImportHeaders([]); return; }
           if (file.size > 5_000_000) { setImportHeaders([]); setError("Choose a CSV smaller than 5 MB."); return; }

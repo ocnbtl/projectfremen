@@ -15,6 +15,7 @@ export type FinanceMutationPayload = {
 };
 
 export type FinanceRepository = {
+  ensureMonthlyBudgets(): Promise<MutationResult<FinanceState>>;
   readState(): Promise<MutationResult<FinanceState>>;
   create(input: Record<string, unknown>, idempotencyKey: string): Promise<MutationResult<FinanceMutationPayload>>;
   patch(input: Record<string, unknown>): Promise<MutationResult<FinanceMutationPayload>>;
@@ -134,6 +135,11 @@ export function createFinanceRepository(options: { endpoint?: string; fetcher?: 
       : failure("unknown", "Finance mutation response did not include valid state");
   };
   return {
+    async ensureMonthlyBudgets() {
+      const result = await requestPayload(fetcher, endpoint, {method: "POST", headers: mutationHeaders(), body: JSON.stringify({operation: "ensure_monthly_budgets"})});
+      if (!result.ok) return result;
+      return isState(result.data.state) ? {ok:true, data:result.data.state} : failure("unknown", "Could not load the new budgets.");
+    },
     async readState() {
       const result = await requestPayload(fetcher, endpoint, { cache: "no-store" });
       if (!result.ok) return result;

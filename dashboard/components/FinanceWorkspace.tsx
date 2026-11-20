@@ -43,7 +43,8 @@ import { buildFinanceAccountsViewModel } from "../lib/modules/finance/accounts-v
 import { buildFinanceBillsViewModel } from "../lib/modules/finance/bills-view-model";
 import { buildFinanceBudgetsViewModel } from "../lib/modules/finance/budgets-view-model";
 import { buildFinanceMonthlyReviewViewModel } from "../lib/modules/finance/monthly-review-view-model";
-import { financeStateToDataset, financeStateToRulesDataset } from "../lib/modules/finance/native-view-model";
+import { automaticMonthlyBudgets } from "../lib/modules/finance/planning";
+import { budgetRows, financeStateToDataset, financeStateToRulesDataset } from "../lib/modules/finance/native-view-model";
 import type { FinanceRecordKind, FinanceState } from "../lib/modules/finance/native-types";
 import { createFinanceRepository } from "../lib/modules/finance/repository";
 import {
@@ -388,6 +389,16 @@ export default function FinanceWorkspace({
   const routedInitialView = initialView || parsedInitialUrlState.view;
   const initialUrlState = normalizeFinanceUrlStateForView(routedInitialView, parsedInitialUrlState);
   const [view, setView] = useState<ViewId>(routedInitialView);
+  useEffect(() => {
+    if (view !== "budgets" || initialFinanceError || !automaticMonthlyBudgets(financeState, new Date().toISOString().slice(0, 10)).length) return;
+    let current = true;
+    void financeRepository.ensureMonthlyBudgets().then(result => {
+      if (!current) return;
+      if (result.ok) setFinanceState(previous => previous === financeState ? result.data : previous);
+      else setFinanceError(result.error.message);
+    });
+    return () => { current = false; };
+  }, [view, initialFinanceError, financeState, financeRepository]);
   const [selectedAccountId, setSelectedAccountId] = useState(
     routedInitialView === "accounts" || routedInitialView === "overview" ? initialUrlState.selected : ""
   );
@@ -447,7 +458,11 @@ export default function FinanceWorkspace({
     sort,
     selectedId: selectedSecondaryId || undefined
   });
-  const budgetsModel = buildFinanceBudgetsViewModel(financeDataset, {
+  const currentMonth = new Date().toISOString().slice(0,7);
+  const [budgetMonth, setBudgetMonth] = useState(() => initialFinanceState.budgets.find(b=>b.id===parsedInitialUrlState.selected)?.period || currentMonth);
+  const budgetMonths = useMemo(() => [...new Set([budgetMonth, currentMonth, ...financeState.budgets.filter(b=>!b.archivedAt).map(b=>b.period)])].sort().reverse(), [budgetMonth,currentMonth,financeState.budgets]);
+  const monthlyBudgets = useMemo(() => view === "budgets" ? budgetRows(financeState,budgetMonth) : financeDataset.budgets, [view,financeState,budgetMonth,financeDataset]);
+  const budgetsModel = buildFinanceBudgetsViewModel({...financeDataset,budgets:monthlyBudgets}, {
     query: view === "budgets" ? query : "",
     filter: smartFilter === "over-budget" ? "over-budget" : "all",
     sort,
@@ -640,7 +655,8 @@ export default function FinanceWorkspace({
   ) {
     const destination = buildFinanceDestination(partial);
     if (options.native) {
-      window.history.replaceState(window.history.state, "", destination);
+      if (options.history === "push") window.history.pushState(null, "", destination);
+      else window.history.replaceState(window.history.state, "", destination);
       return;
     }
     if (options.history === "push") router.push(destination, { scroll: false });
@@ -729,7 +745,7 @@ export default function FinanceWorkspace({
 
     autoSelectionRef.current = "";
     setInspectorOpen(true);
-    updateFinanceUrl({ selected: id, tab: "overview" }, { history: "push" });
+    updateFinanceUrl({ selected: id, tab: "overview" }, { history: "push", native: true });
   }
 
   const showRail = !utility
@@ -1000,6 +1016,7 @@ export default function FinanceWorkspace({
         {view === "budgets" && (
           <FinanceBudgetsRouteView
             model={budgetsModel}
+            months={budgetMonths} period={budgetMonth} onPeriodChange={month => { setBudgetMonth(month); setSelectedSecondaryId(""); setInspectorOpen(false); updateFinanceUrl({selected:"",tab:"overview"},{native:true}); }}
             filter={smartFilter}
             onQueryChange={(nextQuery) => {
               setQuery(nextQuery);
@@ -1134,6 +1151,11 @@ export default function FinanceWorkspace({
         closeCheckId={view === "review" ? monthlyReviewModel.selectedId || undefined : undefined}
         onClose={() => { setOperation(null); setOperationTarget(null); }}
         onState={(nextState, message) => {
+          if (view === "budgets" && (operation === "edit" || operation === "budget")) {
+            const savedBudget = operation === "edit" ? nextState.budgets.find(b=>b.id===(operationTarget || operationSelection)?.id)
+              : nextState.budgets.find(b=>!financeState.budgets.some(previous=>previous.id===b.id));
+            if (savedBudget) setBudgetMonth(savedBudget.period);
+          }
           setFinanceState(nextState);
           setFinanceError("");
           setNotice(message);

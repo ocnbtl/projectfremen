@@ -5,6 +5,7 @@ import { isCsrfRequestValid } from "../../../lib/csrf";
 import {
   confirmFinanceImport,
   previewFinancePlan,
+  ensureMonthlyBudgets,
   applyFinancePlan,
   createFinanceRecord,
   FinanceStoreError,
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
       return financeJson({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
     operation = typeof body.operation === "string" ? body.operation : "create";
+    if (operation === "ensure_monthly_budgets") return financeJson({ ok: true, state: await ensureMonthlyBudgets() });
     if (operation === "preview_plan") return financeJson({ ok: true, plan: await previewFinancePlan() });
     if (operation === "preview_import") {
       const preview = await previewFinanceCsv(body.input, { actorId: "admin" });

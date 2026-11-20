@@ -34,6 +34,7 @@ export interface FinanceAccount {
 }
 
 export interface FinanceBudget {
+  entityScope?: "personal" | "business";
   evidence?: import("./planning").PlanningEvidence;
   period?: string;
   id: string;

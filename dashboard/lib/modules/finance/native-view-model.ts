@@ -117,17 +117,18 @@ function transactionRows(state: FinanceState): FinanceTransaction[] {
   });
 }
 
-function budgetRows(state: FinanceState, period: string, transactions: readonly FinanceTransaction[]): FinanceBudget[] {
+export function budgetRows(state: FinanceState, period: string): FinanceBudget[] {
   return active(state.budgets)
     .filter((item) => item.period === period)
     .map((item, index) => ({
       id: item.id,
       category: item.category,
+      entityScope: item.entityScope,
       hue: hue(index + 2),
       evidence: item.evidence,
       period: item.period,
       spent: active(state.transactions)
-        .filter((transaction) => transaction.direction === "expense" && (item.categoryGroup ? financeSpendingGroup(transaction.category) === item.categoryGroup : transaction.category === item.category) && transaction.occurredOn.startsWith(period) && transaction.entityScope === item.entityScope)
+        .filter((transaction) => transaction.direction === "expense" && (item.categoryGroup ? financeSpendingGroup(transaction.category) === item.categoryGroup : transaction.category.toLowerCase() === item.category.toLowerCase()) && transaction.occurredOn.startsWith(period) && transaction.entityScope === item.entityScope)
         .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
       limit: item.limit,
       icon: "Circle"
@@ -185,7 +186,7 @@ export function financeStateToDataset(state: FinanceState): FinanceDataset {
   const period = currentPeriod(state);
   const accounts = accountRows(state);
   const transactions = transactionRows(state);
-  const budgets = budgetRows(state, period, transactions);
+  const budgets = budgetRows(state, period);
   const bills = billRows(state);
   const close = active(state.closePeriods).find((item) => item.period === period) || null;
   const periodTransactions = active(state.transactions).filter((item) => item.occurredOn.startsWith(period) && item.status === "cleared");
