@@ -7,7 +7,7 @@ import UnigentamosIcon from "./icons/UnigentamosIcon";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
 import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
@@ -175,16 +175,15 @@ function linkedContextModuleForView(
   );
 }
 
+const shortResourceDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const fullResourceDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
 function formatDate(value?: string | null, fallback = "Not recorded") {
   if (!value) return fallback;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: date.getUTCFullYear() === new Date().getUTCFullYear() ? undefined : "numeric",
-    timeZone: "UTC"
-  }).format(date);
+  const formatter = date.getUTCFullYear() === new Date().getUTCFullYear() ? shortResourceDate : fullResourceDate;
+  return formatter.format(date);
 }
 
 function initials(title: string) {
@@ -869,6 +868,80 @@ export default function ResourcesWorkspace({
     </InspectorRail>
   );
 
+  // Density changes the grid around the cards. Keep the card contents and image refs stable.
+  const cardActions = useRef({ open: selectResource, saved: handleInlineSaved });
+  useLayoutEffect(() => {
+    cardActions.current = { open: selectResource, saved: handleInlineSaved };
+  });
+  const directoryCards = useMemo(() => {
+    if (initialLoadError || unavailableViewReason || view === "duplicate-urls") return null;
+    return visibleResources.map((resource) => {
+      const queueItem = reviewQueue.byResourceId.get(resource.id);
+
+      const linkedContextPlacements = linkedContextModule
+        ? linkedContextByResourceId
+            .get(resource.id)
+            ?.placements.filter(
+              (placement) =>
+                placement.ownerModule === linkedContextModule
+            ) || []
+        : [];
+      return (
+        <ResourceDirectoryCard
+          resource={resource}
+          typeLabel={TYPE_LABELS[resource.type]}
+          description={(resource.metadata.description || resource.body || "").replace(/!?(?:\[([^\]]*)\]\([^)]*\))/g, "$1").replace(/[#*_>`~]/g, "")}
+          metadata={<>
+            {resource.source.canonicalUrl && <span className="resource-card-source" title={resource.source.canonicalUrl}><UnigentamosIcon role="link" size={14} />{resource.source.displayDomain || resource.source.canonicalUrl}</span>}
+            <span title="Date added"><UnigentamosIcon role="calendar" size={14} />Added {formatDate(resource.createdAt)}</span>
+            {resource.review.nextReviewAt && <span title="Next review"><UnigentamosIcon role="clock" size={14} />Review {formatDate(resource.review.nextReviewAt)}</span>}
+          </>}
+          trailing={
+            view === "needs-review" && queueItem ? (
+              <>
+                <strong>{queueItem.evidenceGapCount} of 9 unavailable</strong>
+                <span>{queueItem.primaryReason}</span>
+              </>
+            ) : linkedContextModule ? (
+              <>
+                <strong>
+                  {linkedContextPlacements.length} owner{" "}
+                  {linkedContextPlacements.length === 1 ? "target" : "targets"}
+                </strong>
+                <span>
+                  {linkedContextPlacements.reduce(
+                    (total, placement) =>
+                      total + placement.evidenceSignalCount,
+                    0
+                  )}{" "}
+                  exact{" "}
+                  {linkedContextPlacements.reduce(
+                    (total, placement) =>
+                      total + placement.evidenceSignalCount,
+                    0
+                  ) === 1
+                    ? "signal"
+                    : "signals"}
+                </span>
+              </>
+            ) : null
+          }
+          actions={<ResourceIconButton icon="star" label={resource.pinned ? "Unpin resource" : "Pin resource"} active={resource.pinned === true} onClick={() => {
+            void createResourcesRepository().update(resource.id, { starred: !resource.pinned, expectedUpdatedAt: resource.updatedAt }).then((result) => {
+              if (result.ok) cardActions.current.saved(result.data);
+            });
+          }} />}
+          selected={selectedResource?.id === resource.id}
+          onSelect={() => cardActions.current.open(resource)}
+          key={resource.id}
+        />
+      );
+    });
+  }, [
+    initialLoadError, unavailableViewReason,
+    visibleResources, reviewQueue, linkedContextModule, linkedContextByResourceId, view, selectedResource?.id
+  ]);
+
   return (
     <ModuleShell
       detailOpen={inspectorOpen}
@@ -1065,68 +1138,7 @@ export default function ResourcesWorkspace({
             <SystemState variant="read_only" title="This Resources view is staged" description={unavailableViewReason} />
           ) : view === "duplicate-urls" ? null : visibleResources.length ? (
             <DirectoryLayout view={density} className={`${styles.list} resource-directory is-${density}`} data-density={density} data-library role="list" aria-label="Resources">
-              {visibleResources.map((resource) => {
-                const queueItem = reviewQueue.byResourceId.get(resource.id);
-
-                const linkedContextPlacements = linkedContextModule
-                  ? linkedContextByResourceId
-                      .get(resource.id)
-                      ?.placements.filter(
-                        (placement) =>
-                          placement.ownerModule === linkedContextModule
-                      ) || []
-                  : [];
-                return (
-                  <ResourceDirectoryCard
-                    resource={resource}
-                    typeLabel={TYPE_LABELS[resource.type]}
-                    description={(resource.metadata.description || resource.body || "").replace(/!?(?:\[([^\]]*)\]\([^)]*\))/g, "$1").replace(/[#*_>`~]/g, "")}
-                    metadata={<>
-                      {resource.source.canonicalUrl && <span className="resource-card-source" title={resource.source.canonicalUrl}><UnigentamosIcon role="link" size={14} />{resource.source.displayDomain || resource.source.canonicalUrl}</span>}
-                      <span title="Date added"><UnigentamosIcon role="calendar" size={14} />Added {formatDate(resource.createdAt)}</span>
-                      {resource.review.nextReviewAt && <span title="Next review"><UnigentamosIcon role="clock" size={14} />Review {formatDate(resource.review.nextReviewAt)}</span>}
-                    </>}
-                    trailing={
-                      view === "needs-review" && queueItem ? (
-                        <>
-                          <strong>{queueItem.evidenceGapCount} of 9 unavailable</strong>
-                          <span>{queueItem.primaryReason}</span>
-                        </>
-                      ) : linkedContextModule ? (
-                        <>
-                          <strong>
-                            {linkedContextPlacements.length} owner{" "}
-                            {linkedContextPlacements.length === 1 ? "target" : "targets"}
-                          </strong>
-                          <span>
-                            {linkedContextPlacements.reduce(
-                              (total, placement) =>
-                                total + placement.evidenceSignalCount,
-                              0
-                            )}{" "}
-                            exact{" "}
-                            {linkedContextPlacements.reduce(
-                              (total, placement) =>
-                                total + placement.evidenceSignalCount,
-                              0
-                            ) === 1
-                              ? "signal"
-                              : "signals"}
-                          </span>
-                        </>
-                      ) : null
-                    }
-                    actions={<ResourceIconButton icon="star" label={resource.pinned ? "Unpin resource" : "Pin resource"} active={resource.pinned === true} onClick={() => {
-                      void createResourcesRepository().update(resource.id, { starred: !resource.pinned, expectedUpdatedAt: resource.updatedAt }).then((result) => {
-                        if (result.ok) handleInlineSaved(result.data);
-                      });
-                    }} />}
-                    selected={selectedResource?.id === resource.id}
-                    onSelect={() => selectResource(resource)}
-                    key={resource.id}
-                  />
-                );
-              })}
+              {directoryCards}
             </DirectoryLayout>
           ) : (
             <SystemState

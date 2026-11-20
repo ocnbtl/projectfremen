@@ -1,42 +1,104 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useState, useRef, useImperativeHandle, type Ref, type HTMLAttributes } from "react";
-import { LayoutGroup, motion, useReducedMotion, type HTMLMotionProps } from "motion/react";
+import { Component, createRef, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes } from "react";
 import type { DirectoryView } from "./ViewCycleButton";
 
-const DirectoryViewContext = createContext<string | null>(null);
-// One critically damped spring preserves velocity when a view change is interrupted.
-const layoutTransition = { type: "spring" as const, stiffness: 400, damping: 36, mass: 0.8, restDelta: 0.1, restSpeed: 3 };
+type DirectoryProps = HTMLAttributes<HTMLDivElement> & { view: string };
+type CardBounds = Map<HTMLElement, DOMRect>;
+const cardSelector = "[data-directory-flip-card]";
 
-/** Stable cards share a layout pass when their directory changes view. No remounts or requests. */
-export function DirectoryLayout({ view, children, ...props }: HTMLAttributes<HTMLDivElement> & { view: string }) {
-  const id = useId();
-  return <DirectoryViewContext.Provider value={view}><LayoutGroup id={id}><div {...props} data-directory-view={view}>{children}</div></LayoutGroup></DirectoryViewContext.Provider>;
+function nearViewport(rect: DOMRect) {
+  const margin = 80;
+  return rect.width > 0 && rect.height > 0 && rect.bottom >= -margin && rect.top <= window.innerHeight + margin
+    && rect.right >= -margin && rect.left <= window.innerWidth + margin;
 }
-function useLayoutMotion(position = false) {
-  const view = useContext(DirectoryViewContext);
-  const reduced = useReducedMotion();
-  return { layout: view !== null && !reduced ? (position ? "position" as const : true) : false,
-    "data-directory-motion-part": true, layoutDependency: view, initial: false as const, transition: { layout: reduced ? { duration: 0 } : layoutTransition } };
+
+/** Read the old layout before React changes any density classes, including ancestor classes. */
+export class DirectoryLayout extends Component<DirectoryProps, Record<string, never>, CardBounds | null> {
+  private root = createRef<HTMLDivElement>();
+  private animations = new Map<HTMLElement, Animation>();
+
+  private stopAnimations() {
+    for (const [card, animation] of this.animations) {
+      animation.cancel();
+      card.removeAttribute("data-layout-animating");
+    }
+    this.animations.clear();
+  }
+
+  getSnapshotBeforeUpdate(previous: DirectoryProps): CardBounds | null {
+    const root = this.root.current;
+    if (!root || previous.view === this.props.view) return null;
+    if (!root.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.stopAnimations();
+      return null;
+    }
+
+    const before: CardBounds = new Map();
+    for (const card of root.querySelectorAll<HTMLElement>(cardSelector)) {
+      before.set(card, card.getBoundingClientRect());
+    }
+    // A rapid second switch starts at the card's current on-screen position.
+    this.stopAnimations();
+    return before;
+  }
+
+  componentDidUpdate(_previous: DirectoryProps, _state: Record<string, never>, before: CardBounds | null) {
+    if (!before?.size) return;
+    const moves: { card: HTMLElement; transform: string }[] = [];
+    for (const [card, old] of before) {
+      if (!card.isConnected || !old.width || !old.height) continue;
+      const next = card.getBoundingClientRect();
+      if (!next.width || !next.height || (!nearViewport(old) && !nearViewport(next))) continue;
+      const dx = old.left - next.left;
+      const dy = old.top - next.top;
+      if (Math.max(Math.abs(dx), Math.abs(dy), Math.abs(old.width-next.width), Math.abs(old.height-next.height)) < 0.5) continue;
+      moves.push({card, transform: `translate(${dx}px, ${dy}px) scale(${old.width/next.width}, ${old.height/next.height})`});
+    }
+
+    // Finish every geometry read before starting animations. The browser handles subsequent frames.
+    for (const {card, transform} of moves) {
+      const animation = card.animate(
+        [{ transformOrigin: "top left", transform }, { transformOrigin: "top left", transform: "none" }],
+        { duration: 260, easing: "cubic-bezier(.22,.78,.18,1)" }
+      );
+      this.animations.set(card, animation);
+      card.setAttribute("data-layout-animating", "true");
+      animation.onfinish = () => {
+        if (this.animations.get(card) !== animation) return;
+        this.animations.delete(card);
+        card.removeAttribute("data-layout-animating");
+      };
+    }
+  }
+
+  componentWillUnmount() { this.stopAnimations(); }
+
+  render() {
+    const {view, children, ...props} = this.props;
+    return <div {...props} ref={this.root} data-directory-view={view}>{children}</div>;
+  }
 }
-function useCardBounds<T extends HTMLElement>(forwardedRef: Ref<T> | undefined) {
-  const ref = useRef<T>(null);
-  useImperativeHandle(forwardedRef, () => ref.current!, []);
-  return { ref,
-    onLayoutAnimationStart: () => ref.current?.setAttribute("data-layout-animating", "true"),
-    onLayoutAnimationComplete: () => ref.current?.removeAttribute("data-layout-animating") };
+
+export function MorphingArticle(props: ComponentPropsWithRef<"article">) {
+  return <article {...props} data-directory-motion-card data-directory-flip-card />;
 }
-export function MorphingArticle({ref, ...props}: HTMLMotionProps<"article">) { return <motion.article {...props} {...useLayoutMotion()} {...useCardBounds(ref)} data-directory-motion-card />; }
-export function MorphingLi({ref, ...props}: HTMLMotionProps<"li">) { return <motion.li {...props} {...useLayoutMotion()} {...useCardBounds(ref)} data-directory-motion-card />; }
-// Position-only children cancel the parent's scale so text and controls don't stretch.
-export function MorphingDiv({ resize = false, ...props }: HTMLMotionProps<"div"> & { resize?: boolean }) { return <motion.div {...props} {...useLayoutMotion(!resize)} />; }
-export function MorphingSpan({ resize = false, ...props }: HTMLMotionProps<"span"> & { resize?: boolean }) { return <motion.span {...props} {...useLayoutMotion(!resize)} />; }
-export function MorphingButton(props: HTMLMotionProps<"button">) { return <motion.button {...props} {...useLayoutMotion(true)} />; }
-export function MorphingP(props: HTMLMotionProps<"p">) { return <motion.p {...props} {...useLayoutMotion(true)} />; }
+export function MorphingLi(props: ComponentPropsWithRef<"li">) {
+  return <li {...props} data-directory-motion-card data-directory-flip-card />;
+}
+// Contents reflow with their card. They do not need separate layout subscriptions.
+export function MorphingDiv({resize: _resize, ...props}: ComponentPropsWithRef<"div"> & {resize?: boolean}) {
+  return <div {...props} data-directory-motion-part />;
+}
+export function MorphingSpan({resize: _resize, ...props}: ComponentPropsWithRef<"span"> & {resize?: boolean}) {
+  return <span {...props} data-directory-motion-part />;
+}
+export function MorphingButton(props: ComponentPropsWithRef<"button">) { return <button {...props} data-directory-motion-part />; }
+export function MorphingP(props: ComponentPropsWithRef<"p">) { return <p {...props} data-directory-motion-part />; }
+export function MorphingStrong(props: ComponentPropsWithRef<"strong">) { return <strong {...props} data-directory-motion-part />; }
 
 export function usePersonalDirectoryView() {
   const [view, setView] = useState<DirectoryView>("comfortable");
   useEffect(() => { try { const saved = localStorage.getItem("unigentamos.personal.directory-view"); if (saved === "comfortable" || saved === "compact" || saved === "grid") setView(saved); } catch {} }, []);
   return [view, (next: DirectoryView) => { setView(next); try { localStorage.setItem("unigentamos.personal.directory-view", next); } catch {} }] as const;
 }
-export function MorphingStrong(props: HTMLMotionProps<"strong">) { return <motion.strong {...props} {...useLayoutMotion(true)} />; }

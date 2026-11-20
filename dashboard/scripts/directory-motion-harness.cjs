@@ -29,10 +29,43 @@ const serverReady = new Promise((resolve, reject) => {
 const output = path.join(app, 'output/directory-motion');
 fs.mkdirSync(output, { recursive: true });
 let browser, page;
-(async()=>{await serverReady;browser=await (process.env.WEBKIT_EXECUTABLE ? webkit.launch({executablePath:process.env.WEBKIT_EXECUTABLE}) : chromium.launch());const context=await browser.newContext({timezoneId:'America/New_York'}),payload=`v1.${Date.now()+3600000}.qa`;await context.addCookies([{name:'admin_session',value:payload+'.'+crypto.createHmac('sha256',secret).update(payload).digest('base64url'),url:base},{name:'admin_csrf',value:'fixture-csrf',url:base}]);await context.route(/^https:\/\//,r=>r.abort());const headers={origin:base,'x-csrf-token':'fixture-csrf'},post=async(route,data)=>{const r=await context.request.post(base+route,{headers,data});assert(r.ok(),await r.text());return r.json();};
+(async()=>{await serverReady;browser=await (process.env.WEBKIT_EXECUTABLE ? webkit.launch({executablePath:process.env.WEBKIT_EXECUTABLE}) : chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE}));const context=await browser.newContext({timezoneId:'America/New_York'}),payload=`v1.${Date.now()+3600000}.qa`;await context.addCookies([{name:'admin_session',value:payload+'.'+crypto.createHmac('sha256',secret).update(payload).digest('base64url'),url:base},{name:'admin_csrf',value:'fixture-csrf',url:base}]);await context.route(/^https:\/\//,r=>r.abort());const headers={origin:base,'x-csrf-token':'fixture-csrf'},post=async(route,data)=>{const r=await context.request.post(base+route,{headers,data});assert(r.ok(),await r.text());return r.json();};
 
 const picture='<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#296c88"/><circle cx="40" cy="30" r="18" fill="#e1f0f6"/></svg>';
 await context.route('https://fixture.example/**',r=>r.fulfill({contentType:'image/svg+xml',body:picture}));await context.route('**/api/people/photos/**',r=>r.fulfill({contentType:'image/svg+xml',body:picture}));
+// Measure complete view changes with a long library and a real wide desktop layout.
+if(process.env.MOTION_PHASE==='resource-performance'){
+  const count=180;
+  for(let i=0;i<count;i++){
+    await post('/api/personal/records',{domain:'notes-docs',className:'resource',title:'Resource '+i,status:'active',body:'A reference for the design team.',url:'https://fixture.example/'+i,resourceProfile:{version:1,resourceType:'tool',metadata:{imageUrl:'https://fixture.example/picture.svg'},lifecycle:'active'}});
+  }
+  page=await context.newPage();
+  await page.setViewportSize({width:3440,height:1440});
+  await page.goto(base+'/admin/resources');
+  await expect(page.locator('[data-directory-motion-card]')).toHaveCount(count);
+  await page.waitForTimeout(700);
+  const result=await page.evaluate(async()=>{
+    const cycle=document.querySelector('button[aria-label^="View:"]');
+    const rounds=[];
+    for(let i=0;i<6;i++){
+      const times=[];
+      await new Promise(resolve=>requestAnimationFrame(first=>{
+        times.push(first);
+        cycle.click();
+        function frame(time){
+          times.push(time);
+          if(time-first<750)requestAnimationFrame(frame);else resolve();
+        }
+        requestAnimationFrame(frame);
+      }));
+      const gaps=times.slice(1).map((t,index)=>t-times[index]);
+      rounds.push({maxGapMs:Math.round(Math.max(...gaps)),over33ms:gaps.filter(g=>g>34).length,frames:gaps.length});
+    }
+    return rounds;
+  });
+  console.log(JSON.stringify({cards:count,viewport:'3440x1440',rounds:result}));
+  return;
+}
 for(let i=0;i<7;i++){
  const person=(await post('/api/personal/records',{domain:'family',className:'person',title:'Motion person '+i,status:'active',subjects:['Friend'],profile:{context:'A contact with a short description for layout checks.',occupation:i%2?'Designer':'',photoUrl:'/api/people/photos/personal-'+crypto.randomUUID()}})).items.find(x=>x.title==='Motion person '+i);
  await post('/api/personal/records',{domain:'family',className:'org',title:'Motion organization '+i,status:'active',profile:{context:'A local organization.',organizationType:'Business',photoUrl:'/api/people/photos/personal-'+crypto.randomUUID()}});
@@ -52,9 +85,9 @@ if(process.env.MOTION_MODULES)routes.splice(0,routes.length,...routes.filter(([n
 const cards=()=>page.locator('[data-directory-motion-card]:visible');
 async function recordTransition(name,width,round,reduced=false){
  const nodes=await cards().elementHandles();assert(nodes.length>=7,name+' missing fixtures');
- await page.evaluate(()=>{window.__cardFrames=[];window.__cardDone=false;let start=performance.now();const sample=()=>{window.__cardFrames.push({t:performance.now()-start,cards:[...document.querySelectorAll('[data-directory-motion-card]')].slice(0,7).map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,transform:el.style.transform||'none',computedTransform:getComputedStyle(el).transform};})});if(performance.now()-start<900)requestAnimationFrame(sample);else window.__cardDone=true;};requestAnimationFrame(sample);});
+ await page.evaluate(()=>{window.__cardFrames=[];window.__cardDone=false;let start=performance.now();const sample=()=>{window.__cardFrames.push({t:performance.now()-start,cards:[...document.querySelectorAll('[data-directory-motion-card]')].slice(0,7).map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,animating:el.hasAttribute('data-layout-animating'),transform:el.style.transform||'none',computedTransform:getComputedStyle(el).transform};})});if(performance.now()-start<900)requestAnimationFrame(sample);else window.__cardDone=true;};requestAnimationFrame(sample);});
  const cycle=page.getByRole('button',{name:/^View: .*Switch to/}).first();phase='view';await cycle.click();await page.waitForTimeout(130);if(width===1800&&round===1)await page.screenshot({path:path.join(output,name+'-mid.png')});await page.waitForFunction(()=>window.__cardDone);
- const frames=await page.evaluate(()=>window.__cardFrames),first=frames[0].cards,last=frames.at(-1).cards;const changed=first.some((r,i)=>['x','y','w','h'].some(k=>Math.abs(r[k]-last[i][k])>2));const animated=frames.some(frame=>frame.cards.some(card=>card.transform!=='none'&&card.transform!=='matrix(1, 0, 0, 1, 0, 0)'));
+ const frames=await page.evaluate(()=>window.__cardFrames),first=frames[0].cards,last=frames.at(-1).cards;const changed=first.some((r,i)=>['x','y','w','h'].some(k=>Math.abs(r[k]-last[i][k])>2));const animated=frames.some(frame=>frame.cards.some(card=>(card.animating||card.transform!=='none')&&card.computedTransform!=='none'&&card.computedTransform!=='matrix(1, 0, 0, 1, 0, 0)'));
  for(const node of nodes)assert(await node.evaluate(el=>el.isConnected),name+' remounted a card');
  if(changed&&!reduced)assert(animated,name+' snapped instead of animating '+width+' '+round);if(reduced)assert(!animated,name+' ignored reduced motion');
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' overflow');
@@ -62,7 +95,7 @@ async function recordTransition(name,width,round,reduced=false){
 }
 if(process.env.MOTION_PHASE!=="rapid")for(const width of [1800,820,390]){await page.setViewportSize({width,height:1000});for(const [name,route]of routes){await page.goto(base+route);await expect(cards().first()).toBeVisible();await expect(page.getByRole('button',{name:/^View: .*Switch to/}).first()).toBeVisible();await page.waitForTimeout(550);for(let round=0;round<3;round++)await recordTransition(name,width,round);console.log('PASS view transitions '+name+' '+width);}}
 // Interrupt an in-flight transition; card identity and the final layout must survive.
-await page.setViewportSize({width:1800,height:1000});for(const [name,route]of routes){await page.goto(base+route);await expect(cards().first()).toBeVisible();const cycle=page.getByRole('button',{name:/^View: .*Switch to/}).first();await page.waitForTimeout(550);phase='view';for(let i=0;i<5;i++){await cycle.click();await page.waitForTimeout(45);}await page.waitForTimeout(650);assert(await page.evaluate(()=>[...document.querySelectorAll('[data-directory-motion-card]')].every(el=>getComputedStyle(el).transform==='none')),'Unsettled transform '+name);console.log('PASS rapid switching '+name);phase='navigation';}
+await page.setViewportSize({width:1800,height:1000});for(const [name,route]of routes){await page.goto(base+route);await expect(cards().first()).toBeVisible();const cycle=page.getByRole('button',{name:/^View: .*Switch to/}).first();await page.waitForTimeout(550);phase='view';for(let i=0;i<5;i++){await cycle.click();await page.waitForTimeout(45);}await page.waitForTimeout(650);const unsettled=await cards().evaluateAll(nodes=>nodes.filter(el=>el.hasAttribute('data-layout-animating')||(el.style.transform&&el.style.transform!=='none')||el.getAnimations().some(animation=>animation.effect?.getKeyframes().some(frame=>'transform' in frame))).map(el=>el.className));assert.deepEqual(unsettled,[],'Unsettled motion '+name);console.log('PASS rapid switching '+name);phase='navigation';}
 await page.goto(base+'/admin/personal/goals');const cycle=page.getByRole('button',{name:/^View: .*Switch to/}).first();phase='view';while(!(await cycle.getAttribute('aria-label')).includes('View: Grid.'))await cycle.click();await page.waitForTimeout(550);phase='navigation';await page.reload();await expect(cycle).toHaveAttribute('aria-label',/View: Grid/);await page.getByRole('combobox',{name:'Change status for Motion goal 0',exact:true}).click();await expect(page.getByRole('option',{name:'In progress',exact:true})).toBeVisible();await page.keyboard.press('Escape');assert.equal(writes.length,0,'View changes sent mutation requests: '+JSON.stringify(writes));
 await page.emulateMedia({reducedMotion:'reduce'});for(const [name,route]of routes){await page.goto(base+route);await expect(cards().first()).toBeVisible();await page.waitForTimeout(550);await recordTransition(name,1800,0,true);}
 assert.deepEqual(errors,[]);assert.equal(writes.length,0);fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,results,errors,writes,backgroundRequests},null,2));console.log('PASS: '+routes.length+' directories; '+(process.env.MOTION_PHASE||'full responsive')+' checks; stable card identity, rapid switching, reduced motion, Personal view persistence and status menu, no view-triggered writes or browser errors.');
