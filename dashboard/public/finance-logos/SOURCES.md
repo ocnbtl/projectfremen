@@ -13,3 +13,9 @@ Finance displays these locally stored marks for linked organizations whose websi
 - Discord: https://discord.com/branding — https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/66e3d80db9971f10a9757c99_Symbol.svg
 
 These marks belong to their respective owners. Their use identifies merchants; it does not imply endorsement.
+
+Finance also recognizes specific merchant names when a transaction has no organization link. This only selects the displayed image.
+
+- [Kroger corporate wordmark](https://www.thekrogerco.com/wp-content/uploads/2026/06/logo.svg), rendered on transparency.
+- [Ohio Secretary of State](https://www.ohiosos.gov/), office logo published on the agency’s maintenance page.
+- [Coinbase Developer Platform site icon](https://docs.cdp.coinbase.com/mintlify-assets/_mintlify/favicons/coinbase-prod/c38WXP1QDRE4hnu6/_generated/favicon/android-chrome-192x192.png).

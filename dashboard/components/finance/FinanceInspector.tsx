@@ -145,7 +145,7 @@ function TransactionProperties({ transaction }: { transaction: FinanceTransactio
     ["Income source", transaction.incomeSource || "Not applicable"],
     ["Reimbursable", transaction.reimbursable ? "Yes" : "No"],
     ["Reimbursed on", transaction.reimbursedOn || "Not recorded"],
-    ["Reviewed", transaction.ufInit ? "Yes" : "No"],
+    ["Reviewed", transaction.reviewDenied ? "Denied" : transaction.ufInit ? "Yes" : "No"],
     ["Status", transaction.status]
   ];
   return <div className={styles.factGrid}>{values.map(([label, value]) => <div key={label}><span>{label}</span><strong>{label==="Account" ? <TransactionAccount id={transaction.accountId} label={value}/> : value}</strong></div>)}</div>;
@@ -265,7 +265,19 @@ export default function FinanceInspector({
   const budget = budgetRow && financeState.budgets.find(item => item.id === budgetRow.budget.id);
   const bill = billRow && financeState.bills.find(item => item.id === billRow.bill.id);
   const periodLabel = budget && new Date(budget.period + "-01T12:00:00Z").toLocaleDateString("en-US", {month:"long", year:"numeric", timeZone:"UTC"});
-  const relatedPayments = bill?.evidence ? financeState.transactions.filter(t => bill.evidence!.transactionIds.includes(t.id)).sort((a,b) => b.occurredOn.localeCompare(a.occurredOn)) : [];
+  const paymentIds = new Set(bill?.evidence?.transactionIds);
+  if (bill?.paymentEvidenceRef?.module === "finance" && ["transaction","finance_transaction"].includes(bill.paymentEvidenceRef.objectType)) {
+    paymentIds.add(bill.paymentEvidenceRef.objectId);
+  }
+  const relatedPayments = financeState.transactions.filter(t => paymentIds.has(t.id)).sort((a,b) => b.occurredOn.localeCompare(a.occurredOn));
+  const billPeriod = bill?.dueDate.slice(0,7);
+  const billReview = bill && financeState.closePeriods.find(period => !period.archivedAt && period.period === billPeriod);
+  const billRules = bill ? financeState.rules.filter(rule => !rule.archivedAt && rule.conditions.some(condition => {
+    const field = condition.field === "merchant" ? bill.name : condition.field === "category" ? bill.category : "";
+    const term = typeof condition.value === "string" && condition.value.trim().toLowerCase();
+    if (!field || !term) return false;
+    return condition.operator === "equals" ? field.toLowerCase() === term : condition.operator === "contains" && field.toLowerCase().includes(term);
+  })) : [];
   const budgetSpending = budget ? financeState.transactions.filter(t => !t.archivedAt && transactionInBudget(t, budget)).sort((a,b) => b.occurredOn.localeCompare(a.occurredOn)) : [];
 
   return (
@@ -281,6 +293,7 @@ export default function FinanceInspector({
         {billSelection && <WorkbenchActions>
           <WorkbenchAction primary onClick={() => onOperation("edit", billSelection)}>Edit bill</WorkbenchAction>
           {billRow?.bill.status !== "paid" && <WorkbenchAction onClick={() => onOperation("payment", billSelection)}>Record payment</WorkbenchAction>}
+          {bill && <a className={detailStyles.inlineAction} href={getModuleViewRoute("finance","accounts")+"?selected="+encodeURIComponent(bill.accountId)}><UnigentamosIcon role="wallet" size={16}/>Open account</a>}
           <WorkbenchAction onClick={() => onOperation("archive", billSelection)}>Archive</WorkbenchAction>
         </WorkbenchActions>}
         {budgetSelection && <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", budgetSelection)}>Edit budget</WorkbenchAction><WorkbenchAction onClick={() => onOperation("archive", budgetSelection)}>Archive</WorkbenchAction></WorkbenchActions>}
@@ -335,7 +348,7 @@ export default function FinanceInspector({
               <div><span>Type</span><strong>{transaction.io === "income" ? "Money in" : transaction.io === "transfer" ? "Transfer" : "Money out"}</strong></div>
               <div><span>Account</span><TransactionAccount id={transaction.accountId} label={transaction.account}/></div>
               <div><span>Category</span><strong>{transaction.category}</strong></div>
-              <div><span>Review</span><strong>{transaction.ufInit ? "Reviewed" : "To review"}</strong></div>
+              <div><span>Review</span><strong>{transaction.reviewDenied ? "Denied" : transaction.ufInit ? "Approved" : "To review"}</strong></div>
             </div>
             <section className={styles.inspectorSection}>
               <h3>Notes</h3>
@@ -385,19 +398,28 @@ export default function FinanceInspector({
               {billRow.bill.recurring && billRow.bill.recurring !== "monthly" && <div><span>Monthly equivalent</span><strong>{money(billRow.monthlyEquivalent,{cents:true})}</strong></div>}
             </div>
             <FinanceMerchantPanel kind="bill" id={billRow.bill.id} label={billRow.bill.name}/>
-            <div className={detailStyles.relatedLinks}>
-              {bill && <a href={getModuleViewRoute("finance","accounts")+"?selected="+encodeURIComponent(bill.accountId)}>Open account</a>}
-              <a href={getModuleViewRoute("finance","rules")+"?query="+encodeURIComponent(objectTitle)}>Related rules</a>
-              <a href={getModuleViewRoute("finance","review")}>Monthly review</a>
-            </div>
+            <section className={detailStyles.merchantPanel}>
+              <h3><UnigentamosIcon role="sliders" size={17}/>Related rules</h3>
+              {billRules.length ? billRules.map(rule => <a key={rule.id} href={getModuleViewRoute("finance","rules")+"?selected="+encodeURIComponent(rule.id)}>{rule.name}<UnigentamosIcon role="chevron-right" size={15}/></a>) : <small>No related rules.</small>}
+            </section>
+            <section className={detailStyles.merchantPanel}>
+              <h3><UnigentamosIcon role="review" size={17}/>Monthly review</h3>
+              <small>{billReview ? billReview.period + " · " + (billReview.status === "closed" ? "Closed" : "Open") : "No review for this bill’s month."}</small>
+              {billReview && monthlyReviewModel.rows.some(row => billReview.checks.some(check => check.id === row.item.id)) &&
+                <a className={detailStyles.inlineAction} href={getModuleViewRoute("finance","review")}>Open monthly review</a>}
+            </section>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="payments" active={safeTab === "payments"} className={styles.inspectorPanel}>
             <section className={styles.inspectorSection}><h3>Payment history</h3>
               {bill?.paidAt && <p>Marked paid on {overviewDate(bill.paidAt.slice(0,10))}.{bill.paymentExceptionReason && " " + bill.paymentExceptionReason} {bill.paymentEvidenceRef && <a href={bill.paymentEvidenceRef.route}>{bill.paymentEvidenceRef.label}</a>}</p>}
               {bill?.evidence && <p>We estimated this bill from earlier payments to {objectTitle}. You can adjust its amount or next due date.</p>}
               {!relatedPayments.length && !bill?.paidAt && <p>No payments recorded yet.</p>}
-              <div className={styles.compactList}>{relatedPayments.map(t => <a key={t.id} className={styles.compactRow} href={getModuleViewRoute("finance","transactions")+"?selected="+encodeURIComponent(t.id)}><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.status === "cleared" ? "Posted" : "Pending"}{t.archivedAt && " · Archived"}</small></span><strong>{money(t.amount,{cents:true})}</strong></a>)}</div>
-              <a href={getModuleViewRoute("finance","transactions")+"?query="+encodeURIComponent(objectTitle)}>Find transactions</a>
+              <div className={detailStyles.paymentList}>{relatedPayments.map(t => <a key={t.id} href={getModuleViewRoute("finance","transactions")+"?selected="+encodeURIComponent(t.id)}>
+                <span><FinanceMerchantAvatar kind="transaction" id={t.id} label={t.merchant}/><strong>{t.merchant}</strong></span>
+                <time dateTime={t.occurredOn}>{overviewDate(t.occurredOn)}{t.archivedAt && " · Archived"}</time>
+                <strong>{money(t.amount,{cents:true})}</strong>
+              </a>)}</div>
+              <a className={detailStyles.inlineAction} href={getModuleViewRoute("finance","transactions")+"?query="+encodeURIComponent(objectTitle)}><UnigentamosIcon role="search" size={16}/>Find transactions</a>
             </section>
             {nativeAuditEvents.some(e => e.action.includes("paid")) && <AuditTimeline events={nativeAuditEvents.filter(e => e.action.includes("paid"))}/>}
           </DetailTabPanel>

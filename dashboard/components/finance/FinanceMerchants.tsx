@@ -38,7 +38,7 @@ export function FinanceMerchantsProvider({initial,transactions,children}:{initia
 }
 function useMerchant(kind:Kind,id?:string){const context=useFinanceMerchants();const link=context.links.filter(item=>item.source.objectType===kind&&item.source.objectId===id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];return {context,link,organization:context.organizations.find(item=>item.id===link?.target.objectId)};}
 export default function FinanceMerchantAvatar({kind,id,label}:{kind:Kind;id:string;label:string}){
- const {organization}=useMerchant(kind,id),mark=financeMerchantMark(organization),[failed,setFailed]=useState("");
+ const {organization}=useMerchant(kind,id),mark=financeMerchantMark(organization,label),[failed,setFailed]=useState("");
  return <span className={styles.merchantAvatar} data-brand-mark={!!mark && failed!==mark || undefined} aria-label={label}>
   {mark && failed!==mark ? <img src={`/finance-logos/${mark}`} alt="" loading="lazy" decoding="async" onError={()=>setFailed(mark)}/> : organization?<PeopleProfileAvatar organization label={organization.title} initials={organization.title.slice(0,2)} photoUrl={organization.photoUrl} photoUpdatedAt={organization.photoUpdatedAt} compact/>:<UnigentamosIcon role="organization" size={21}/>}
  </span>;

@@ -1177,7 +1177,14 @@ function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fiel
     }
     if (fields.memo !== undefined) item.memo = optionalText(fields.memo, "fields.memo");
     if (fields.status !== undefined) item.status = oneOf(fields.status, "fields.status", ["cleared", "pending"] as const);
-    if (fields.reviewed !== undefined) item.reviewed = booleanValue(fields.reviewed);
+    if (fields.reviewed !== undefined) {
+      item.reviewed = booleanValue(fields.reviewed);
+      if (item.reviewed) delete item.reviewDenied;
+    }
+    if (fields.reviewDenied === true) {
+      item.reviewed = false;
+      item.reviewDenied = true;
+    }
     if (fields.entityScope !== undefined) item.entityScope = entityScope(fields.entityScope);
     item.updatedAt = now;
     return item;

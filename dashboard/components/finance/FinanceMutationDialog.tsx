@@ -395,7 +395,9 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
       result = await repository.create(input, idempotencyKeyRef.current);
     }
     if (!result.ok) { setBusy(false); setError(result.error.message); return; }
-    let message=`${TITLES[operation]} saved.`;
+    let message = operation === "archive"
+      ? String(result.data.item.name || result.data.item.merchant || result.data.item.category || "Record") + " archived."
+      : TITLES[operation] + " saved.";
     const organizationId=value(form,"merchantOrganizationId"), kind=operation==="edit"?selection?.kind:operation;
     if ((kind === "bill" || kind === "transaction") && form.has("merchantOrganizationId")) {
       const savedId = String(result.data.item.id);
@@ -445,7 +447,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
           if (file.size > 5_000_000) { setImportHeaders([]); setError("Choose a CSV smaller than 5 MB."); return; }
           void file.text().then((text) => setImportHeaders(csvHeaders(text))).catch(() => setError("This CSV could not be read."));
         }} />{["transaction","bill"].includes(recordKind || "")&&<FinanceOrganizationField kind={recordKind as "transaction"|"bill"} recordId={record?.id as string|undefined}/>}</div>
-        <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" className="finance-action is-primary" disabled={busy || (needsAccount && state.accounts.filter((item) => !item.archivedAt).length === 0)}>{busy ? "Saving…" : operation === "import" ? "Preview CSV" : "Save"}</button></div>
+        <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" className="finance-action is-primary" disabled={busy || (needsAccount && state.accounts.filter((item) => !item.archivedAt).length === 0)}>{busy ? "Saving…" : operation === "import" ? "Preview CSV" : operation === "archive" ? "Archive" : "Save"}</button></div>
       </form>}
     </section>
   </div></div>, document.body);

@@ -112,6 +112,8 @@ function transactionRows(state: FinanceState): FinanceTransaction[] {
       reimbursable: item.reimbursable,
       reimbursedOn: item.reimbursedOn || "",
       ufInit: item.reviewed,
+      reviewDenied: item.reviewDenied,
+      reviewLocked: Boolean(item.transferId || item.savingsMovementId || item.source.kind === "transfer"),
       status: item.status
     };
   });
@@ -195,7 +197,7 @@ export function financeStateToDataset(state: FinanceState): FinanceDataset {
   const monthSaved = active(state.savingsMovements).filter((item) => item.occurredOn.startsWith(period))
     .reduce((sum, item) => sum + (item.direction === "to_savings" ? item.amount : -item.amount), 0);
   const overdue = bills.filter((item) => item.status === "overdue");
-  const pending = transactions.filter((item) => !item.ufInit);
+  const pending = transactions.filter((item) => !item.ufInit && !item.reviewDenied);
   const openChecks = close?.checks.filter((item) => item.required && item.resolution === "open") || [];
   const observedDates = active(state.transactions).map(t => t.occurredOn).sort();
   const cashflowPeriods = Array.from({ length: 6 }, (_, offset) => {

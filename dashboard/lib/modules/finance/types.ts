@@ -95,6 +95,8 @@ export interface FinanceTransaction {
   reimbursable: boolean;
   reimbursedOn: string;
   ufInit: boolean;
+  reviewDenied?: boolean;
+  reviewLocked?: boolean;
   status: "cleared" | "pending";
 }
 

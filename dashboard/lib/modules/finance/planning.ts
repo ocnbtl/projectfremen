@@ -173,7 +173,8 @@ export function buildFinancePlan(state: FinanceState, asOf: string): FinancePlan
       basis: `Recorded ${periods.join(", ")} average ${round(mean).toFixed(2)} USD/month, rounded up to $5${recurringFloor > mean ? "; raised to cover detected recurring charges" : ""}. Transfers and pending payments excluded from the baseline. Limited imported history; adjustable starting limit.`
     } });
   }
-  return { asOf, periods, budgets: budgets.sort((a, b) => b.limit - a.limit), bills: bills.sort((a, b) => a.dueDate.localeCompare(b.dueDate)), reviewIds: active.filter(t => !t.reviewed).map(t => t.id).sort(), pendingCount: active.filter(t => !t.reviewed && t.status === "pending").length, notes: [
+  const awaitingReview = active.filter(t => !t.reviewed && !t.reviewDenied);
+  return { asOf, periods, budgets: budgets.sort((a, b) => b.limit - a.limit), bills: bills.sort((a, b) => a.dueDate.localeCompare(b.dueDate)), reviewIds: awaitingReview.map(t => t.id).sort(), pendingCount: awaitingReview.filter(t => t.status === "pending").length, notes: [
     "Starter limits reflect recorded spending, not a verified income or affordability target. Missing accounts, cash spending and annual costs may change this plan.",
     "Only repeated monthly payment patterns become bills. Single charges and multiple purchases in one month are not assumed to be subscriptions.",
     "Estimated bills are reminders, not confirmation of a debt, payment, or autopay enrollment. Transfers and credit-card repayments are excluded."

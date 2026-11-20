@@ -43,12 +43,12 @@
 .pill[data-tone=danger]{color:#a33832!important;background:#fceeea;}
 .pill[data-tone=attention]{color:#775115!important;background:#fbf0d9;}
 .positive{color:var(--module-primary-700);}
-.checkbox{position:absolute;top:15px;left:15px;z-index:2;display:grid;place-items:center;width:22px;height:22px;}
-.checkbox input{width:17px;height:17px;margin:0;accent-color:var(--module-action);cursor:pointer;}
-.transaction .open{padding-left:48px;}
-.batch{display:flex;gap:12px;align-items:center;font-size:13px;}
+
+
+
+
 .list[data-directory-view=compact] .open{padding:12px;gap:9px;}
-.list[data-directory-view=compact] .transaction .open{padding-left:42px;}
+
 .list[data-directory-view=compact] .symbol{width:32px;height:32px;flex-basis:32px;border-radius:9px;}
 .list[data-directory-view=compact] .identity strong{font-size:13px;}
 .list[data-directory-view=compact] .amount strong{font-size:14px;}
@@ -83,14 +83,14 @@
 @media(max-width:600px){.overview :global(.finance-focus-queue){grid-template-columns:minmax(0,1fr);}.chartFilter :global(.finance-chart-filter-grid){grid-template-columns:minmax(0,1fr);}.overview :global(.finance-flow-totals) strong{font-size:18px;}}
 @media(min-width:1800px){.list[data-directory-view=grid]{grid-template-columns:repeat(4,minmax(0,1fr));}.list[data-directory-view=compact]{grid-template-columns:repeat(4,minmax(0,1fr));}}
 @media(max-width:1100px){.list,.list[data-directory-view=compact]{grid-template-columns:repeat(2,minmax(0,1fr));}.list[data-directory-view=grid]{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:600px){.metrics{gap:7px;}.metrics article{padding:12px 9px;}.metrics strong{font-size:18px;}.metrics span{font-size:11px;}.metrics span svg{display:none;}.list,.list[data-directory-view=compact]{grid-template-columns:minmax(0,1fr);}.list[data-directory-view=grid] .open{padding:12px;}.list[data-directory-view=grid] .transaction .open{padding:40px 12px 12px;}.list[data-directory-view=grid] .symbol{width:32px;height:32px;flex-basis:32px;}.list[data-directory-view=grid] .identity{flex-basis:100%;}.list[data-directory-view=grid] .identity strong{font-size:13px;}.list[data-directory-view=grid] .amount strong{font-size:18px;}.footer{gap:6px;}}
+@media(max-width:600px){.metrics{gap:7px;}.metrics article{padding:12px 9px;}.metrics strong{font-size:18px;}.metrics span{font-size:11px;}.metrics span svg{display:none;}.list,.list[data-directory-view=compact]{grid-template-columns:minmax(0,1fr);}.list[data-directory-view=grid] .open{padding:12px;}.list[data-directory-view=grid] .symbol{width:32px;height:32px;flex-basis:32px;}.list[data-directory-view=grid] .identity{flex-basis:100%;}.list[data-directory-view=grid] .identity strong{font-size:13px;}.list[data-directory-view=grid] .amount strong{font-size:18px;}.footer{gap:6px;}}
 @media(prefers-reduced-motion:reduce){.card{transition:none;}}
 /* Keep inherited legacy Finance spacing from offsetting the shared surfaces. */
 .overview :global(.finance-panel){margin:0;}
 .overview :global(.finance-panel-heading) button svg[data-icon-role=information]{transform:none;}
-.checkbox.checkbox{margin:0;padding:0;min-height:0;}
-.checkbox input{height:17px;min-height:17px;padding:0;}
-@media(max-width:600px){.metrics strong{font-size:clamp(13px,3.7vw,18px);}.list[data-directory-view=grid] .transaction .open{padding-top:48px;}}
+
+
+@media(max-width:600px){.metrics strong{font-size:clamp(13px,3.7vw,18px);}}
 /* Overview: cash flow and categories share the main column; recent activity stays beside them. */
 .overview.overview{grid-template-columns:minmax(0,1.8fr) minmax(310px,1fr);grid-template-rows:auto auto;}
 .overview :global(.finance-overview-cashflow){grid-column:1;grid-row:1;}
@@ -194,3 +194,41 @@
 
 .overview :global(.finance-spending-breakdown) :global(.finance-panel-heading){border-bottom:0;box-shadow:none;}
 .overview :global(.finance-focus-queue){position:relative;}
+
+.transactionFoot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:9px 14px}
+.reviewActions{display:flex;align-items:center;gap:5px;position:relative;z-index:1}
+.reviewActions button,.feedback button{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-panel,#fff);color:var(--text);font:500 12px/1.3 var(--font-body);cursor:pointer}
+.reviewActions button[data-decision=approve]:is(:hover,[aria-pressed=true]){color:#155735;background:#e3f3e9;border-color:#a0c9af}
+.reviewActions button[data-decision=deny]:is(:hover,[aria-pressed=true]){color:#8b352d;background:#f9eeeb;border-color:#dcb6af}
+.reviewActions button:disabled{cursor:default}
+.reviewActions.reviewActions button{width:auto;min-width:0;min-height:34px;flex:0 0 auto}
+@media(max-width:600px){.list[data-directory-view=grid] .reviewActions button{padding:5px 4px;min-height:38px;font-size:11px;gap:2px}.list[data-directory-view=grid] .reviewActions button svg{width:13px;height:13px}}
+.feedback{position:fixed;bottom:max(22px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:150;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 32px);width:max-content;padding:9px 10px 9px 14px;background:var(--surface-panel,#fff);border:1px solid var(--module-primary-200,var(--border));border-radius:12px;box-shadow:0 5px 22px #0e302323;color:var(--text-strong);font-size:14px}
+.feedback button{width:32px;height:32px;flex:none;padding:0}
+@media(max-width:600px){.list[data-directory-view=grid] .transaction .top{gap:7px}.list[data-directory-view=grid] .transaction .amount{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}.reviewActions button{min-height:36px}.list[data-directory-view=grid] .reviewActions{flex-wrap:wrap}}
+
+.budgetBar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.budgetBar .metrics{flex:1 1 350px;max-width:640px}
+.budgetBar .metrics article{gap:3px;padding:10px 14px}
+.budgetControls{display:grid;grid-template-columns:minmax(108px,1fr) minmax(100px,1fr) 40px 40px;align-items:center;gap:6px;min-width:0}
+.budgetControls button[role=combobox]{width:100%;max-width:100%}
+.budgetControls>*,.budgetControls button{min-width:0}
+.budgetList{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:12px}
+.budgetCard{display:grid;align-items:center;grid-template-columns:minmax(0,1fr) auto;gap:12px;width:100%;height:100%;padding:16px;border:0;background:transparent;color:var(--text);text-align:start;font:inherit;cursor:pointer}
+.budgetIdentity,.budgetIdentity small{display:flex;align-items:center;gap:8px;min-width:0}
+.budgetIdentity>span:last-child,.budgetFigure,.budgetUsage{display:grid;gap:4px;min-width:0}
+.budgetCard strong{font-weight:550;font-size:15px;overflow-wrap:anywhere}
+.budgetCard small{font-size:12px;color:var(--text-muted);flex-wrap:wrap}
+.budgetFigure{text-align:end;font-variant-numeric:tabular-nums}
+.budgetUsage{grid-column:1/-1}
+.budgetUsage progress{width:100%;height:6px;accent-color:var(--module-primary-600,#477458)}
+.budgetCard[data-over=true] progress{accent-color:#a44135}
+.budgetCard[data-over=true] .budgetUsage small{color:#973b31}
+.budgetList[data-directory-view=compact]{grid-template-columns:1fr;gap:6px}
+.budgetList[data-directory-view=compact] .budgetCard{grid-template-columns:minmax(0,2fr) minmax(90px,1fr) minmax(0,1fr);padding:8px 14px}
+.budgetList[data-directory-view=compact] .budgetUsage{grid-column:auto;text-align:end}
+.budgetList[data-directory-view=grid]{grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr))}
+.budgetList[data-directory-view=grid] .budgetCard{grid-template-columns:1fr;align-content:start}
+.budgetList[data-directory-view=grid] .budgetFigure{text-align:start}
+.budgetList[data-directory-view=grid] .budgetFigure strong{font-size:22px}
+@media(max-width:600px){.budgetBar .metrics{max-width:none}.budgetBar .metrics article{padding:8px}.budgetControls{width:100%}.budgetControls{grid-template-columns:minmax(98px,1.1fr) minmax(84px,1fr) 40px 40px}.budgetList[data-directory-view=grid]{grid-template-columns:repeat(2,minmax(0,1fr))}.budgetList[data-directory-view=grid] .budgetCard{padding:11px}.budgetList[data-directory-view=compact] .budgetCard{grid-template-columns:minmax(0,1.45fr) minmax(0,.9fr);gap:5px}.budgetList[data-directory-view=compact] .budgetUsage{grid-column:1/-1;grid-template-columns:minmax(25px,1fr) auto;align-items:center}.budgetList[data-directory-view=grid] .budgetIdentity{flex-wrap:wrap}}

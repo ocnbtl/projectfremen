@@ -86,3 +86,13 @@
   .planActions.planActions button:global(.finance-action){padding:0 6px;gap:4px;font-size:12px;}
   .planActions.planActions button[aria-label="Archive"]{min-width:40px;width:40px;}
 }
+
+.inlineAction{display:inline-flex;align-items:center;justify-content:center;gap:6px;justify-self:start;width:fit-content;min-height:36px;padding:6px 10px;border:1px solid var(--border);border-radius:9px;color:var(--module-primary-800);background:var(--surface-panel,#fff);font:500 13px/1.3 var(--font-body);text-decoration:none}
+.inlineAction:hover{background:var(--module-primary-50)}
+.paymentList{display:grid;gap:4px}
+.paymentList>a{display:grid;align-items:center;grid-template-columns:minmax(0,1fr) minmax(70px,auto) auto;gap:clamp(6px,2vw,18px);padding:8px 4px;border-bottom:1px solid var(--border);color:var(--text);text-decoration:none;font-size:13px}
+.paymentList>a>span{display:flex;align-items:center;min-width:0;gap:8px;overflow-wrap:anywhere}
+.paymentList time{color:var(--text-muted);font-size:12px}
+.paymentList>a>strong{font-variant-numeric:tabular-nums}
+.paymentList>a:hover{background:var(--module-primary-50)}
+.planActions>div{flex-wrap:wrap}

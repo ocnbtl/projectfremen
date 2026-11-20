@@ -9,6 +9,7 @@ import type {
 export type FinanceTransactionsFilter =
   | "all"
   | "unreviewed"
+  | "denied"
   | "pending"
   | "cleared"
   | "income"
@@ -74,7 +75,7 @@ const DEFAULT_SORT: FinanceTransactionsSort = "date-desc";
 
 function normalizeFilter(value: string | undefined): FinanceTransactionsFilter {
   if (
-    value === "unreviewed"
+    value === "unreviewed" || value === "denied"
     || value === "pending"
     || value === "cleared"
     || value === "income"
@@ -103,7 +104,8 @@ function normalizeSort(value: string | undefined): FinanceTransactionsSort {
 
 function matchesFilter(transaction: FinanceTransaction, filter: FinanceTransactionsFilter): boolean {
   if (filter === "all") return true;
-  if (filter === "unreviewed") return !transaction.ufInit;
+  if (filter === "denied") return Boolean(transaction.reviewDenied);
+  if (filter === "unreviewed") return !transaction.ufInit && !transaction.reviewDenied;
   if (filter === "pending" || filter === "cleared") return transaction.status === filter;
   if (filter === "reimbursable") return transaction.reimbursable;
   if (filter === "receipt-missing") return !transaction.receipt.trim();

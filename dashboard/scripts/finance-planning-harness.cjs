@@ -21,6 +21,18 @@ async function main() {
   // An explicit Other spending group must not collide with the display names
   // of distinct groups, whose text is not an original bank category.
   state.transactions.push(txn('education', '2026-07-20', 250, { category: 'General services education' }), txn('coffee', '2026-08-20', 40, { category: 'Food and drink coffee' }));
+  await check('manual denials survive bulk approval planning; merchant logos resolve without changing links', () => {
+    const held = {...state, transactions: state.transactions.map(t => t.id==='pending' ? {...t,reviewDenied:true} : t)};
+    const plan = buildFinancePlan(held,'2026-09-11');
+    assert(!plan.reviewIds.includes('pending')); assert.equal(plan.pendingCount,0);
+    const {financeMerchantMark: mark}=require('../lib/modules/finance/merchants.ts');
+    for(const [label,asset] of [['Google','google.png'],['Ohio Secretary of State','ohio-secretary.png'],['Kroger #123','kroger.png'],['Coinbase, Inc.','coinbase.png']]){
+      assert.equal(mark(undefined,label),asset);
+      assert(fs.existsSync(path.join(__dirname,'../public/finance-logos',asset)));
+    }
+    assert.equal(mark(undefined,'Google Pay * Independent shop'),undefined);
+    assert.equal(mark({title:'Other shop',website:'google.com.example.test'},'Google'),undefined);
+  });
   await check('planning excludes partial months, pending, transfers and preserves entity scopes', () => {
     const before = JSON.stringify(state), plan = buildFinancePlan(state, '2026-09-11');
     assert.deepEqual(plan.periods, ['2026-07', '2026-08']);

@@ -203,6 +203,7 @@ const FINANCE_FILTERS = [
   "attention",
   "due-week",
   "unreviewed",
+  "denied",
   "recurring",
   "savings-movement",
   "over-budget",
@@ -316,7 +317,7 @@ export function parseFinanceUrlState(searchParams: UrlSearchParamsInput): Financ
 const FINANCE_FILTERS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceFilter[]>> = {
   overview: ["", "attention"],
   accounts: [""],
-  transactions: ["", "unreviewed", "transfer", "pending"],
+  transactions: ["", "unreviewed", "denied", "transfer", "pending"],
   bills: ["", "due-week", "recurring"],
   budgets: ["", "over-budget"],
   review: ["", "incomplete"],

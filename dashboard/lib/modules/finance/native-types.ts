@@ -71,6 +71,7 @@ export interface FinanceTransactionRecord extends FinanceRecordBase {
   memo: string;
   status: "cleared" | "pending";
   reviewed: boolean;
+  reviewDenied?: boolean;
   receiptRef?: NativeObjectRef;
   reimbursable: boolean;
   reimbursedOn?: string;

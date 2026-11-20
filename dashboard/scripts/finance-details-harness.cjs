@@ -4,6 +4,9 @@ const data=fs.mkdtempSync(path.join(os.tmpdir(),'finance-ui-'));const output=pat
 const today=new Date().toISOString().slice(0,10);const common={createdAt:today+'T12:00:00Z',updatedAt:today+'T12:00:00Z',createdBy:'fixture',currency:'USD',entityScope:'personal'};
 const state={schemaVersion:1,updatedAt:null,accounts:['Everyday Checking','Emergency Savings','Travel Savings','Household Checking'].map((name,i)=>({...common,id:'account-'+i,name,kind:i%2?'Savings':'Checking',institution:'Fixture Bank',mask:'100'+i,currentBalance:1234.56*(i+1),balanceAsOf:today,balanceSource:'manual'})),transactions:Array.from({length:6},(_,i)=>({...common,id:'transaction-'+i,occurredOn:new Date(Date.now()-i*86400000).toISOString().slice(0,10),merchant:['Market & pantry','Monthly salary','Bookshop','Transit pass','Dinner with friends','Utility payment'][i],accountId:'account-'+(i%4),category:i===1?'Salary':i%2?'Utilities':'Food',amount:i===1?4200:24.95*(i+1),direction:i===1?'income':'expense',memo:'Fixture only',status:i===0?'pending':'cleared',reviewed:i>1,reimbursable:false,source:{kind:'manual'}})),bills:Array.from({length:4},(_,i)=>({...common,id:'bill-'+i,name:['Internet plan','Rent','Music subscription','Insurance'][i],amount:[59.99,1400,10.99,85][i],dueDate:today,status:'due',accountId:'account-'+i,category:i===1?'Housing':'Subscriptions',recurring:'monthly',autopay:i===2,autopayConfirmed:false})),budgets:[],rules:[],closePeriods:[],savingsMovements:[],transfers:[],auditEvents:[],importBatches:[],importPreviews:[],idempotency:[]};
 if(process.env.FINANCE_BUDGET_CHECK){
+  state.transactions[0].merchant='Ohio Secretary of State';
+  state.bills[0].paymentEvidenceRef={module:'finance',objectType:'transaction',objectId:'transaction-0',label:state.transactions[0].merchant,route:'/admin/finance/transactions?selected=transaction-0'};
+  state.rules.push({...common,id:'rule-internet',name:'Internet payment review',type:'recurrence',mode:'suggest',enabled:true,description:'',scope:'Finance transactions',trigger:'Manual',conditions:[{id:'merchant',field:'merchant',operator:'equals',value:'Internet plan',label:'Internet plan',required:true}],actions:[],tests:[]});
   for(const [months,amount] of [[-4,1],[-3,100],[-2,120],[-1,200]]) {
     const date=new Date(today.slice(0,7)+'-01T12:00:00Z'); date.setUTCMonth(date.getUTCMonth()+months);
     state.transactions.push({...state.transactions[0],id:'budget-fixture'+months,occurredOn:date.toISOString().slice(0,10),category:'Groceries',status:'cleared',amount});
@@ -19,6 +22,25 @@ const csrf=crypto.randomBytes(24).toString('hex');await context.addCookies([{nam
 const snap=async name=>{await page.waitForTimeout(400);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Overflow '+name);await page.screenshot({path:path.join(output,name+'.png')});};
 const read=async()=>{const r=await context.request.get(base+'/api/finance');assert.equal(r.status(),200);return (await r.json()).state;};
 if(process.env.FINANCE_BUDGET_CHECK){
+  await page.goto(base+'/admin/finance/transactions');
+  const txnCard = page.locator('[data-finance-transaction-id="transaction-0"]');
+  await txnCard.getByRole('button',{name:'Deny',exact:true}).click();
+  await expect(txnCard.getByRole('button',{name:'Denied',exact:true})).toBeDisabled();
+  await page.goto(base+'/admin/finance/transactions');
+  await expect(txnCard.getByRole('button',{name:'Denied',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Filter transactions',exact:true}).click();
+  await page.getByLabel('transactions filters').getByRole('button',{name:'Denied',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-finance-transaction-id]')).toHaveCount(1);
+  const denied = (await read()).transactions.find(t=>t.id==='transaction-0');
+  assert.equal(denied.reviewDenied,true);assert.equal(denied.status,'pending');assert.equal(denied.amount,state.transactions[0].amount);
+  await txnCard.getByRole('button',{name:'Approve',exact:true}).click();
+  await expect(txnCard).toHaveCount(0);
+  await page.goto(base+'/admin/finance/transactions');
+  await expect(txnCard.getByRole('button',{name:'Approved',exact:true})).toBeDisabled();
+  const approved=(await read()).transactions.find(t=>t.id==='transaction-0');
+  assert.equal(approved.reviewed,true);assert(!approved.reviewDenied);assert.equal(approved.status,'pending');
+  state.transactions[0]=approved;
   await page.goto(base+'/admin/finance/budgets');
   const groceries=page.locator('[data-finance-budget-id]').filter({hasText:'Groceries'});
   await expect(groceries).toContainText('Auto-created'); await groceries.click();
@@ -34,6 +56,14 @@ if(process.env.FINANCE_BUDGET_CHECK){
   for(const width of [3440,390]){
     await page.setViewportSize({width,height:900});
     await page.goto(base+'/admin/finance/budgets');
+    const cycle=page.getByRole('button',{name:/budgets view:/});
+    for (let i=0;i<3;i++){
+      await expect(page.locator('[data-directory-view]').first()).toHaveAttribute('data-directory-view',['comfortable','compact','grid'][i]);
+      const controls=await Promise.all([page.getByRole('combobox',{name:'Budget month'}),page.getByRole('combobox',{name:'Budget filter'}),page.getByRole('combobox',{name:'Sort budgets'}),cycle].map(el=>el.boundingBox()));
+      assert(controls[0].width>=95,'selected month has room for its label');
+      assert(Math.max(...controls.map(b=>b.y+b.height/2))-Math.min(...controls.map(b=>b.y+b.height/2))<4,'budget controls share a row');
+      await snap('budget-'+width+'-'+i);await cycle.click();
+    }
     await page.getByRole('button',{name:'New budget',exact:true}).click();
     dialog=page.getByRole('dialog',{name:'Create monthly budget'});await expect(dialog).toBeVisible();
     const center=async el=>{const b=await el.boundingBox();return b.y+b.height/2};
@@ -42,13 +72,35 @@ if(process.env.FINANCE_BUDGET_CHECK){
     assert(Math.abs(await center(heading.locator('svg'))-await center(close))<=2,'icon and close aligned');
     assert(Math.abs(await center(dialog.getByRole('button',{name:'Save',exact:true}))-await center(dialog.getByRole('button',{name:'Cancel'})))<=2,'actions aligned');
     await snap('budget-form-'+width);await dialog.getByRole('button',{name:'Cancel'}).click();
-    await page.goto(base+'/admin/finance/bills');await expect(page).toHaveURL(/selected=/);await page.locator('[data-finance-bill-id]').first().click();
+    await page.goto(base+'/admin/finance/bills');await expect(page).toHaveURL(/selected=/);await page.locator('[data-finance-bill-id="bill-1"]').click();
     const inspector=page.locator('#finance-inspector');await expect(inspector.getByRole('tab')).toHaveCount(2);
     const edit=inspector.getByRole('button',{name:'Edit bill',exact:true});await expect(edit).toBeInViewport();
     await expect(inspector.getByRole('button',{name:'Record payment'})).toBeInViewport();
+    await expect(inspector.getByRole('heading',{name:'Related rules'})).toBeVisible();
+    await expect(inspector.getByText('No related rules.')).toBeVisible();
+    await expect(inspector.getByText('No review for this bill’s month.')).toBeVisible();
+    await expect(inspector.getByRole('link',{name:'Open account'})).toBeVisible();
     await snap('bill-header-'+width);
     await edit.click();await expect(page.getByRole('dialog',{name:'Edit bill'})).toBeVisible();await page.getByRole('button',{name:'Cancel',exact:true}).click();
   }
+  await page.goto(base+'/admin/finance/bills');
+  await page.locator('[data-finance-bill-id="bill-0"]').click();
+  await expect(page.getByRole('link',{name:'Internet payment review'})).toHaveAttribute('href',/selected=rule-internet/);
+  await page.getByRole('tab',{name:'Payments',exact:true}).click();
+  const payment=page.locator('#finance-inspector a:has(time)');
+  await expect(payment).toContainText('Ohio Secretary of State');
+  await expect(payment).not.toContainText('Posted');
+  await expect(payment.locator('img')).toHaveAttribute('src','/finance-logos/ohio-secretary.png');
+  assert(await payment.locator('img').evaluate(async img=>{await img.decode();return img.naturalWidth>0}));
+  await snap('bill-payment-history-mobile');
+  await page.getByRole('button',{name:'Archive',exact:true}).click();
+  dialog=page.getByRole('dialog',{name:'Archive Finance record'});
+  await dialog.getByLabel('Archive reason').fill('Local test');
+  await dialog.getByRole('button',{name:'Archive',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'Internet plan archived.'})).toBeVisible();
+  const archived=(await read()).bills.find(b=>b.id==='bill-0');
+  assert.equal(archived.archiveReason,'Local test');assert(archived.archivedAt);
+  state.bills[0]=archived;
   const final=await read();assert.deepEqual(final.accounts,state.accounts);assert.deepEqual(final.transactions,state.transactions);assert.deepEqual(final.bills,state.bills);
   assert.deepEqual(errors.filter(e=>!e.includes('ResizeObserver')),[]);
   console.log('PASS automatic budget creation, labels, edit persistence, bill actions, and aligned desktop/mobile forms.');return;
