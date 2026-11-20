@@ -45,7 +45,7 @@ async function main(){
  await page.getByRole("combobox",{name:"Endpoint",exact:true}).click();await page.getByRole("option",{name:"Circle"}).click();
  await btn("Apply").click();await expect.poll(async()=>(await board()).edges[0]?.style).toBe("dashed");
  await btn("Saved views").click();await page.getByLabel("View name").fill("Brief and direction");await btn("Save current view").click();await btn("Close panel").click();
- const files=await Promise.all(Array.from({length:40},async(_,i)=>({name:"Ad "+String(i+1).padStart(2,"0")+".png",mimeType:"image/png",buffer:await sharp({create:{width:80,height:56,channels:3,background:{r:80+i*3,g:60+i*2,b:180-i*3}}}).png().toBuffer()})));
+ const files=await Promise.all(Array.from({length:40},async(_,i)=>({name:"Ad "+String(i+1).padStart(2,"0")+".png",mimeType:"image/png",buffer:await sharp({create:{width:i===38?1080:i===39?1600:240,height:i===38?1350:i===39?900:240,channels:3,background:{r:80+i*3,g:60+i*2,b:180-i*3}}}).png().toBuffer()})));
  await page.locator('input[type=file]').setInputFiles(files.slice(0,38));
  await expect.poll(async()=>(await board()).nodes.filter(n=>n.ref).length,{timeout:90000}).toBe(38);
  async function transfer(file,kind){
@@ -62,7 +62,16 @@ async function main(){
  const last=(await board()).nodes.find(n=>n.title.includes("39")),ad=page.locator('.react-flow__node[data-id="'+last.id+'"]');
  await expect(ad.locator("img")).toBeVisible();
  assert(await ad.locator("img").evaluate(async img=>{await img.decode();return img.naturalWidth>0}));
- await btn("Edit card").click();await page.getByLabel("Caption").fill("Keep the generous margins.");await btn("Apply").click();await btn("Mark used").click();
+ const byTitle=Object.fromEntries((await board()).nodes.map(n=>[n.title,n]));
+ for(const [name,width,height] of [["Ad 39.png",1080,1350],["Ad 40.png",1600,900],["Ad 01.png",240,240]]){
+   const n=byTitle[name];assert.deepEqual([n.width,n.height,n.imageSize.width,n.imageSize.height],[width,height,width,height]);
+ }
+ const art=ad.locator("img"),control=ad.getByRole("button",{name:"Edit Ad 39.png"});
+ await expect.poll(()=>art.evaluate(i=>i.naturalWidth)).toBe(1080);
+ const imageBox=await art.boundingBox(),controlBox=await control.boundingBox();assert(Math.abs(imageBox.width/imageBox.height-1080/1350)<.01);
+ assert(controlBox.y>=imageBox.y+imageBox.height-1);
+ await btn("Focus mode").click();await expect(control).toHaveCount(0);await expect(art).toBeVisible();await btn("Focus mode").click();
+ await control.click();await page.getByLabel("Caption").fill("Keep the generous margins.");await btn("Apply").click();await btn("Mark used").click();
  await btn("Group cards").click();await page.getByLabel("Group name").fill("Shortlist");await page.getByRole("dialog",{name:"Group cards"}).getByRole("button",{name:"Group cards"}).click();
  const group=await btn("Select group Shortlist").boundingBox();assert(group);const assigned=(await board()).nodes.find(n=>n.id===last.id);
  await page.mouse.move(group.x+group.width/2,group.y+group.height/2);await page.mouse.down();await page.mouse.move(group.x+group.width/2+40,group.y+group.height/2+20,{steps:6});await page.mouse.up();
@@ -75,7 +84,11 @@ async function main(){
  await btn("Fit board").click();await page.waitForTimeout(350);
  await page.screenshot({path:path.join(output,"ad-board-desktop.png")});
  await btn("Back to boards").click();await expect(page.getByRole("link",{name:"Open Ad inspiration"})).toBeVisible();await page.reload();
- await page.getByRole("link",{name:"Open Ad inspiration"}).click();await btn("Saved views").click();await btn("Brief and direction").click();
+ await btn("Saved views for Ad inspiration").click();await page.getByRole("link",{name:"Brief and direction"}).click();
+ await expect(page.getByRole("heading",{name:"Ad inspiration"})).toBeVisible();
+ const requestedView=new URL(page.url()).searchParams.get("view");
+ const savedView=(await board()).views.find(v=>v.id===requestedView);assert(savedView);
+ await expect.poll(()=>page.evaluate(()=>new DOMMatrix(getComputedStyle(document.querySelector(".react-flow__viewport")).transform).a)).toBeCloseTo(savedView.zoom,2);
  const saved=await board();assert.equal(saved.nodes.length,42);assert.equal(saved.edges[0].symbol,"circle");
  assert(saved.nodes.some(n=>n.used&&n.group==="Shortlist"&&n.body==="Keep the generous margins."));
  await page.setViewportSize({width:390,height:844});await expect(btn("Add objects")).toBeInViewport();await btn("Add objects").click();
@@ -83,6 +96,14 @@ async function main(){
  await btn("Fit board").click();await page.waitForTimeout(350);await page.screenshot({path:path.join(output,"ad-board-mobile.png")});
  await expect.poll(()=>page.evaluate(()=>Math.abs(parseInt(document.querySelector('[title="Reset zoom"]').textContent)-Math.round(100*new DOMMatrix(getComputedStyle(document.querySelector(".react-flow__viewport")).transform).a)))).toBeLessThan(2);
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+ // Freshly reopened old one-image boards should recover their original proportions.
+ const legacyId=crypto.randomUUID();const headers={"x-csrf-token":csrf};
+ const create=await context.request.post(base+"/api/personal/canvas",{headers,data:{id:legacyId,title:"Existing ad board",folder:""}});
+ assert.equal(create.ok(),true);const legacy=(await create.json()).board;
+ const oldNode={...last,width:220,height:200};delete oldNode.imageSize;
+ const put=await context.request.put(base+"/api/personal/canvas",{headers,data:{expectedRevision:legacy.revision,board:{...legacy,nodes:[oldNode]}}});assert.equal(put.ok(),true);
+ await page.goto(base+"/admin/personal/canvas?board="+legacyId);
+ await expect.poll(async()=>{const res=await context.request.get(base+"/api/personal/canvas?id="+legacyId);return (await res.json()).board.nodes[0].width;},{timeout:15000}).toBe(1080);
  assert.deepEqual(errors,[]);console.log("PASS 40 distinct images, paste/drop/reuse, real Media links and thumbnails, drag, Undo/Redo, notes, typed connections, saved views, group and used state, navigation and mobile controls.");
 }
 main().catch(async e=>{console.error(e);if(page)await page.screenshot({path:path.join(output,"failure.png")}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

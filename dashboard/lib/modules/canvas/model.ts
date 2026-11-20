@@ -13,6 +13,7 @@ export type CanvasNode = {
   color: string;
   group: string;
   used: boolean;
+  imageSize?: {width:number;height:number};
   ref?: NativeObjectRef;
 };
 export type CanvasEdge = {
@@ -29,6 +30,7 @@ export type Board = {
   nodes: CanvasNode[]; edges: CanvasEdge[]; views: CanvasView[];
 };
 export type BoardSummary = Pick<Board, "id" | "title" | "folder" | "updatedAt" | "revision"> & {
+  viewNames?: Pick<CanvasView,"id"|"name">[];
   nodeCount: number; edgeCount: number; viewCount: number; colors: string[];
   preview: Pick<CanvasNode,"x" | "y" | "width" | "height" | "color">[];
 };
@@ -95,6 +97,7 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
       width: number(node.width, 1, 100000), height: number(node.height, 1, 100000),
       title: string(node.title, 500, "item title"), body: string(node.body, 32000, "item text"),
       group: string(node.group, 160, "group"), color, used: node.used,
+      ...(kind === "object" && node.imageSize ? {imageSize:{width:number(record(node.imageSize).width,1,100000),height:number(record(node.imageSize).height,1,100000)}} : {}),
       ...(kind === "object" ? {ref: reference(node.ref)} : {})
     };
   });
@@ -107,7 +110,7 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
   });
   const views = entries<CanvasView>(item.views, 100, view => ({
     id: canvasId(view.id), name: string(view.name, 160, "view name", true).trim(),
-    x: number(view.x, -1e8, 1e8), y: number(view.y, -1e8, 1e8), zoom: number(view.zoom, 0.05, 8)
+    x: number(view.x, -1e8, 1e8), y: number(view.y, -1e8, 1e8), zoom: number(view.zoom, 0.002, 8)
   }));
   return {...boardNames(item), nodes, edges, views};
 }
@@ -125,5 +128,5 @@ export function boardSummary(board: Board): BoardSummary {
       width: percent(node.width/width), height: percent(node.height/height), color: node.color};
   });
   return {id, title, folder, updatedAt, revision, nodeCount: board.nodes.length, edgeCount: board.edges.length,
-    viewCount: board.views.length, colors: [...new Set(nodes.map(node => node.color))].slice(0,4), preview};
+    viewCount: board.views.length, viewNames:board.views.map(({id,name})=>({id,name})), colors: [...new Set(nodes.map(node => node.color))].slice(0,4), preview};
 }

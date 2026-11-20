@@ -67,8 +67,13 @@ async function run() {
   assert.equal(originalReads,1);
   assert(bytes.equals(Buffer.from(await second.arrayBuffer())));
   assert.equal((await thumb.GET(new Request(address,{headers:{"If-None-Match":headers.get("etag")}}))).status,304);
+  const original=await thumb.GET(new Request(address+"&original=1"));
+  assert.equal(original.headers.get("content-type"),"image/png");
+  assert(image.equals(Buffer.from(await original.arrayBuffer())));
+  assert.equal((await thumb.GET(new Request(address+"&original=1",{headers:{"if-none-match":original.headers.get("etag")}}))).status,304);
   await files.updatePersonalRecord(record.id,{mediaProfile:{...record.mediaProfile,archivedAt:new Date().toISOString()}},{expectedUpdatedAt:record.updatedAt});
   assert.equal((await thumb.GET(new Request(address))).status,404);
+  assert.equal((await thumb.GET(new Request(address+"&original=1"))).status,404);
   assert.equal((await (await modules.GET(req("?module=media"))).json()).items.length,0);
   assert.equal((await (await modules.GET(req("?files=1"))).json()).files[0].archived,true);
   const stamp="2026-11-20T11:00:00.000Z",old={archivedAt:stamp};

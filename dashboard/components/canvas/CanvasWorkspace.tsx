@@ -1,5 +1,7 @@
 "use client";
 
+import * as Popover from "@radix-ui/react-popover";
+import { IconBookmark, IconCalendar, IconFolder } from "@tabler/icons-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
@@ -17,7 +19,8 @@ const CanvasEditor = dynamic(() => import("./CanvasEditor"), {
   loading:() => <p className={styles.loading} role="status">Opening canvas…</p>
 });
 const base = "/admin/personal/canvas";
-const boardUrl = (id: string) => base + "?board=" + encodeURIComponent(id);
+const boardUrl = (id:string,view?:string) => base+"?"+new URLSearchParams(view?{board:id,view}:{board:id});
+const urlView = () => new URL(window.location.href).searchParams.get("view") || undefined;
 const urlBoard = () => new URL(window.location.href).searchParams.get("board");
 const sorts = ["Recent", "Name A–Z", "Most items"] as const;
 type Sort = typeof sorts[number];
@@ -32,9 +35,28 @@ function BoardPreview({item}: {item: BoardSummary}) {
   </div>;
 }
 
+function BoardViews({item,openView}:{item:BoardSummary;openView:(view:string)=>void}) {
+  const [open,setOpen]=useState(false),[legacyViews,setViews]=useState<Board["views"]>(),[error,setError]=useState(false),[retry,setRetry]=useState(0);
+  useEffect(()=>{
+    if(!open || item.viewNames)return;
+    let active=true;setViews(undefined);setError(false);
+    getBoard(item.id).then(board=>{if(active)setViews(board.views);}).catch(()=>{if(active)setError(true);});
+    return ()=>{active=false;};
+  },[open,item.id,item.revision,item.viewNames,retry]);
+  const views=item.viewNames ?? legacyViews;
+  return <Popover.Root open={open} onOpenChange={setOpen}><Popover.Trigger asChild>
+    <button className={styles.viewsButton} aria-label={"Saved views for "+item.title}><IconBookmark size={14}/>{item.viewCount} {item.viewCount===1?"saved view":"saved views"}</button>
+  </Popover.Trigger><Popover.Portal><Popover.Content align="start" sideOffset={5} collisionPadding={12} className={styles.viewList} aria-label={"Views in "+item.title}>
+    {error?<button onClick={()=>setRetry(n=>n+1)}>Retry loading views</button>:!views?<span role="status">Loading views…</span>:!views.length?<span>No saved views</span>:views.map(view=><a href={boardUrl(item.id,view.id)} key={view.id} onClick={e=>{
+      if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();setOpen(false);openView(view.id);
+    }}><IconBookmark size={15}/>{view.name}</a>)}
+  </Popover.Content></Popover.Portal></Popover.Root>;
+}
+
 export default function CanvasWorkspace() {
   const [boards,setBoards] = useState<BoardSummary[]>([]);
   const [session,setSession] = useState<BoardSession | null>(null);
+  const [entryView,setEntryView]=useState<string>();
   const current = useRef<BoardSession | null>(null);
   const [,redraw] = useState(0);
   const [loading,setLoading] = useState(true);
@@ -58,6 +80,7 @@ export default function CanvasWorkspace() {
   },[]);
 
   const openSession = useCallback((board: Board) => {
+    setEntryView(undefined);
     const next = takePendingBoard(board.id) || new BoardSession(board, () => {});
     next.listen(() => {
       if (alive.current && current.current === next) {
@@ -71,7 +94,7 @@ export default function CanvasWorkspace() {
     setError("");
   },[commitSummary]);
 
-  const navigate = useCallback(async (id:string|null, fromHistory=false) => {
+  const navigate = useCallback(async (id:string|null, fromHistory=false,view?:string) => {
     const previous = current.current;
     const ticket = ++routing.current;
     if (previous?.dirty && !await previous.flush()) {
@@ -95,7 +118,8 @@ export default function CanvasWorkspace() {
       const board = await getBoard(id);
       if (!alive.current || ticket !== routing.current) return;
       openSession(board);
-      if (!fromHistory) window.history.pushState(null,"",boardUrl(id));
+      setEntryView(view);
+      if (!fromHistory) window.history.pushState(null,"",boardUrl(id,view));
     } catch (cause) {
       if (!alive.current || ticket !== routing.current) return;
       setError(message(cause));
@@ -121,13 +145,13 @@ export default function CanvasWorkspace() {
   useEffect(() => {
     alive.current = true;
     void loadLibrary();
-    if (urlBoard()) void navigate(urlBoard(),true);
+    if (urlBoard()) void navigate(urlBoard(),true,urlView());
     try {
       const preference = localStorage.getItem("unigentamos.canvas.sort") as Sort;
       if (sorts.includes(preference)) setSort(preference);
     } catch { /* Sorting works without browser storage. */ }
     const pop = () => {
-      if (window.location.pathname === base) void navigate(urlBoard(),true);
+      if (window.location.pathname === base) void navigate(urlBoard(),true,urlView());
     };
     const guard = (event:BeforeUnloadEvent) => {
       if (current.current?.dirty) { event.preventDefault(); event.returnValue = ""; }
@@ -211,7 +235,7 @@ export default function CanvasWorkspace() {
         <WorkspaceButton onClick={()=>void session.flush()}>Retry save</WorkspaceButton>}
     </div>}
     <div className={styles.editor} inert={busy || opening || undefined}>
-      <CanvasEditor key={session.board.id} board={session.board} onChange={board=>session.edit(board)} onBack={()=>void navigate(null)} saveStatus={session.status}/>
+      <CanvasEditor key={session.board.id} board={session.board} entryView={entryView} onChange={board=>session.edit(board)} onBack={()=>void navigate(null)} saveStatus={session.status}/>
     </div>
   </div>;
 
@@ -239,11 +263,12 @@ export default function CanvasWorkspace() {
             if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();void navigate(item.id);
           }}>
             <BoardPreview item={item}/><div className={styles.identity}>
-              {item.folder && <span className={styles.folder}>{item.folder}</span>}
               <strong>{item.title}</strong>
-              <span>{item.nodeCount} {item.nodeCount===1?"item":"items"}<i>·</i>{new Date(item.updatedAt).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}</span>
+              {item.folder && <span className={styles.folder}><IconFolder size={15}/>{item.folder}</span>}
+              <div className={styles.meta}><time dateTime={item.updatedAt} title="Last edited"><IconCalendar size={14}/>{new Date(item.updatedAt).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}</time><span>{item.nodeCount} {item.nodeCount===1?"item":"items"}</span></div>
             </div>
           </a>
+          {item.viewCount>0 && <BoardViews item={item} openView={view=>void navigate(item.id,false,view)}/>}
           <button className={styles.organize} aria-label={"Organize "+item.title} title="Rename or move board" onClick={()=>launchForm(item)}><Icon role="edit" size={16}/></button>
         </article>)}</div>
         {!visible.length && !error && <div className={styles.empty}>

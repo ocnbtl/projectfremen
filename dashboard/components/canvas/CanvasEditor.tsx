@@ -1,13 +1,13 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Background, ReactFlow, MarkerType, SelectionMode, ViewportPortal,
+  Background, ReactFlow, getViewportForBounds, MarkerType, SelectionMode, ViewportPortal,
   type Edge, type NodeChange, type ReactFlowInstance, type Viewport
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
   IconArrowBackUp, IconArrowForwardUp, IconArrowLeft, IconBookmark, IconCheck,
-  IconFrame, IconHandStop, IconHighlight, IconLayoutGrid, IconLine, IconMaximize,
+  IconFocus2, IconFrame, IconHandStop, IconHighlight, IconLayoutGrid, IconLine, IconMaximize,
   IconMinus, IconNote, IconPencil, IconPlus, IconPointer, IconSelectAll,
   IconTrash, IconTypography, IconUpload, IconX
 } from "@tabler/icons-react";
@@ -19,7 +19,7 @@ import { CanvasObjectPicker, useCanvasMediaImport } from "./CanvasIntake";
 import { CardFields, EdgeFields, Panel } from "./CanvasPanels";
 import css from "./CanvasEditor.module.css";
 
-type Props={board:Board;onChange:(board:Board)=>void;onBack:()=>void;saveStatus:string};
+type Props={board:Board;entryView?:string;onChange:(board:Board)=>void;onBack:()=>void;saveStatus:string};
 type Layout=Pick<CanvasNode,"x"|"y"|"width"|"height">;
 const nodeTypes={card:CanvasCard};
 const emptySelection:string[]=[];
@@ -29,19 +29,19 @@ function Action({name,icon,run,active,disabled,label}:{name:string;icon:ReactNod
 function lastViewport(id:string):Viewport|undefined {
   try {
     const value=JSON.parse(sessionStorage.getItem("personal.canvas.viewport."+id)||"null");
-    if(value && [value.x,value.y,value.zoom].every(Number.isFinite) && value.zoom>=0.08 && value.zoom<=3)return value;
+    if(value && [value.x,value.y,value.zoom].every(Number.isFinite) && value.zoom>=.002 && value.zoom<=3)return value;
   } catch {}
 }
 function isField(el:EventTarget|null){
   return el instanceof HTMLElement && Boolean(el.closest("input,textarea,select,[contenteditable=true],[role=dialog],[role=listbox]"));
 }
-export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
+export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus}:Props){
   const latest=useRef(board); latest.current=board;
   const edits=useRef(onChange); edits.current=onChange;
   const previous=useRef<Board[]>([]), next=useRef<Board[]>([]);
   const frame=useRef<HTMLDivElement>(null), uploadInput=useRef<HTMLInputElement>(null);
   const flow=useRef<ReactFlowInstance<FlowCard,Edge>|null>(null);
-  const [initialView]=useState(()=>lastViewport(board.id));
+  const [initialView]=useState(()=>board.views.find(v=>v.id===entryView) || lastViewport(board.id));
   const [zoom,setZoom]=useState(initialView?.zoom||1);
   const viewTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const rememberView=useCallback((view:Viewport)=>{
@@ -52,6 +52,8 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
     },70);
   },[board.id]);
   useEffect(()=>()=>clearTimeout(viewTimer.current),[]);
+  const [focus,setFocus]=useState(false);
+  const [reading,setReading]=useState("");
   const [hand,setHand]=useState(false),[panel,setPanel]=useState(""),[name,setName]=useState("");
   const [ids,setIds]=useState<string[]>([]),[edgeIds,setEdgeIds]=useState<string[]>([]);
   const [editing,setEditing]=useState(""),[connectFrom,setConnectFrom]=useState("");
@@ -82,10 +84,16 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
   },[]);
   const reframe=useCallback((items:string[])=>{
     if(!items.length)return;
-    requestAnimationFrame(()=>{void flow.current?.fitView({nodes:items.map(id=>({id})),padding:.25,maxZoom:1,duration:duration()});});
+    requestAnimationFrame(()=>{
+      const area=frame.current, subset=latest.current.nodes.filter(n=>items.includes(n.id));
+      if(!area || !subset.length || !flow.current)return;
+      const box=bounds(subset);
+      const view=getViewportForBounds({...box,height:box.height+48},area.clientWidth,area.clientHeight,.002,1,.2);
+      void flow.current.setViewport(view,{duration:duration()});
+    });
   },[]);
-  const insertObjects=useCallback((refs:NativeObjectRef[])=>{
-    const current=latest.current,added=addObjects(current,refs,dropPoint.current||place());
+  const insertObjects=useCallback((refs:NativeObjectRef[],sizes?:Map<string,{width:number;height:number}>)=>{
+    const current=latest.current,added=addObjects(current,refs,dropPoint.current||place(),sizes);
     dropPoint.current=null;
     if(!added.length){
       const keys=new Set(refs.map(keyOf)),existing=current.nodes.filter(n=>n.ref&&keys.has(keyOf(n.ref))).map(n=>n.id);
@@ -113,12 +121,20 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
     setLive({});
   },[change]);
   const edit=useCallback((id:string)=>{setEditing(id);choose([id]);setPanel("card");},[choose]);
-  const actions=useMemo(()=>({resize:handleResize,edit}),[edit,handleResize]);
+  const originalLoaded=useCallback((id:string,width:number,height:number)=>{
+    const current=latest.current, item=current.nodes.find(n=>n.id===id);
+    if(!item || item.imageSize || !width || !height || Math.max(width,height)>100000)return;
+    // Preserve hand-sized images and multi-card layouts on boards made before native sizing.
+    const untouched=current.nodes.length===1 && item.width===220 && item.height===200;
+    change(b=>({...b,nodes:b.nodes.map(n=>n.id===id?{...n,imageSize:{width,height},...(untouched?{width,height}:{})}:n)}));
+    if(untouched)reframe([id]);
+  },[change,reframe]);
+  const actions=useMemo(()=>({resize:handleResize,edit,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[edit,handleResize,originalLoaded]);
   const flowNodes=useMemo(()=>board.nodes.map((n):FlowCard=>{
     const position=live[n.id], width=position?.width??n.width,height=position?.height??n.height;
-    return {id:n.id,type:"card",position:{x:position?.x??n.x,y:position?.y??n.y},width,height,data:{item:n},
+    return {id:n.id,type:"card",position:{x:position?.x??n.x,y:position?.y??n.y},width,height,data:{item:n,focus,inspectOriginal:board.nodes.length===1 || (panel==="card" && editing===n.id)},
       selected:ids.includes(n.id),ariaLabel:n.title||n.kind,zIndex:n.kind==="highlight"?0:1};
-  }),[board.nodes,live,ids]);
+  }),[board.nodes,live,ids,focus,panel,editing]);
   const flowEdges=useMemo(()=>board.edges.map((e):Edge=>({
     id:e.id,source:e.source,target:e.target,type:"default",label:e.label,selected:edgeIds.includes(e.id),
     markerEnd:e.symbol==="arrow"?{type:MarkerType.ArrowClosed,color:"#536981"}:e.symbol==="circle"?"canvas-end-circle":undefined,
@@ -184,7 +200,7 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
   useEffect(()=>{const listener=(e:ClipboardEvent)=>paste.current(e);document.addEventListener("paste",listener);return()=>document.removeEventListener("paste",listener);},[]);
   useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(""),4500);return()=>clearTimeout(t);},[notice]);
   const selectionCount=selected.length+edgeIds.length;
-  return <div className={css.editor} data-multi={ids.length>1||undefined} aria-label="Canvas editor" onKeyDown={e=>{
+  return <div className={css.editor} style={{"--footer-scale":Math.min(3,1/zoom)} as React.CSSProperties} data-multi={ids.length>1||undefined} aria-label="Canvas editor" onKeyDown={e=>{
     if(isField(e.target))return;
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"){e.preventDefault();restore(e.shiftKey);}
     else if((e.key==="Delete"||e.key==="Backspace") && selectionCount){e.preventDefault();removeSelected();}
@@ -194,6 +210,7 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
       <Action name="Back to boards" icon={<IconArrowLeft/>} run={onBack} disabled={media.busy}/>
       <div className={css.heading}><h2>{board.title}</h2><span role="status">{saveStatus}</span></div>
       <div className={css.history}><Action name="Undo" icon={<IconArrowBackUp/>} disabled={!previous.current.length} run={()=>restore()}/><Action name="Redo" icon={<IconArrowForwardUp/>} disabled={!next.current.length} run={()=>restore(true)}/></div>
+      <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setPanel("");setConnectFrom("");choose([]);}}/>
       <Action name="Saved views" icon={<IconBookmark/>} label="Views" active={panel==="views"} run={()=>show("views")}/>
     </header>
     <div ref={frame} className={css.stage} data-drop={drop||undefined}
@@ -213,7 +230,7 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
         nodesDraggable={!hand} nodesConnectable={!hand} panOnDrag={hand?true:[1,2]} selectionOnDrag={!hand} selectionMode={SelectionMode.Partial}
         multiSelectionKeyCode={["Shift","Meta","Control"]} deleteKeyCode={null} panOnScroll zoomOnScroll={false} zoomOnPinch
         defaultViewport={initialView} fitView={!initialView&&board.nodes.length>0} fitViewOptions={{padding:.23,maxZoom:1}}
-        minZoom={.08} maxZoom={3} onlyRenderVisibleElements={board.nodes.length>65} zoomOnDoubleClick={false}
+        minZoom={.002} maxZoom={3} onlyRenderVisibleElements={board.nodes.length>65} zoomOnDoubleClick={false}
         onViewportChange={rememberView}>
         <Background gap={24} size={1.3} color="#b9c6d5"/>
         <svg width="0" height="0" aria-hidden="true"><defs><marker id="canvas-end-circle" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5"><circle cx="5" cy="5" r="3.5" fill="#536981"/></marker></defs></svg>
@@ -242,7 +259,8 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
         <Action name="Upload media" icon={<IconUpload/>} disabled={media.busy} run={()=>uploadInput.current?.click()}/>
         <input ref={uploadInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void media.importFiles(files);}}/>
       </div>
-      {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel("")} save={patch=>patchNodes([edited.id],patch)}/>}
+      {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel("")} restoreSize={edited.imageSize?()=>{patchNodes([edited.id],{...edited.imageSize});reframe([edited.id]);}:undefined} save={patch=>patchNodes([edited.id],patch)}/>}
+      {panel==="read" && <Panel title={board.nodes.find(n=>n.id===reading)?.title || "Canvas item"} close={()=>setPanel("")}><p className={css.readBody}>{board.nodes.find(n=>n.id===reading)?.body || "No additional text."}</p></Panel>}
       {panel==="edge"&&edge && <EdgeFields key={edge.id} edge={edge} close={()=>setPanel("")} save={patch=>change(b=>({...b,edges:b.edges.map(e=>e.id===edge.id?{...e,...patch}:e)}))}/>}
       {panel==="group" && <Panel title="Group cards" close={()=>setPanel("")}><form onSubmit={e=>{e.preventDefault();if(name.trim()){patchNodes(ids,{group:name.trim()});setPanel("");}}}>
         <label>Group name<input autoFocus required maxLength={160} list="canvas-group-names" value={name} onChange={e=>setName(e.target.value)}/></label>
@@ -259,7 +277,7 @@ export default function CanvasEditor({board,onChange,onBack,saveStatus}:Props){
           <label>View name<input autoFocus maxLength={160} required value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Shortlisted ads"/></label>
           <button className={css.primary}>Save current view</button>
         </form></Panel>}
-      {selectionCount>0 && !panel && !connectFrom && <div className={css.selection} role="toolbar" aria-label="Selection actions">
+      {!focus && selectionCount>0 && !panel && !connectFrom && <div className={css.selection} role="toolbar" aria-label="Selection actions">
         {one && <><Action name="Edit card" icon={<IconPencil/>} run={()=>edit(one.id)}/><Action name="Connect to another card" icon={<IconLine/>} run={()=>{setConnectFrom(one.id);setHand(false);}}/></>}
         {selected.length>0&&<><Action name="Group cards" icon={<IconFrame/>} run={()=>{show("group");setName(one?.group||"");}}/>
         <Action name={selected.every(n=>n.used)?"Mark unused":"Mark used"} icon={<IconCheck/>} active={selected.every(n=>n.used)} run={()=>patchNodes(ids,{used:!selected.every(n=>n.used)})}/></>}

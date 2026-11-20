@@ -10,10 +10,11 @@ export function bounds(nodes: CanvasNode[]) {
 export function tile(nodes: CanvasNode[], origin: {x:number;y:number}, columns=Math.ceil(Math.sqrt(nodes.length))) {
   if (!nodes.length) return [];
   const step = Math.max(...nodes.map(n=>n.width)) + 32;
+  const rowGap=Math.min(170,Math.max(88,step*.14));
   let top=origin.y, rowHeight=0;
   return nodes.map((node,index)=>{
     const column=index%columns;
-    if (index && column===0) {top+=rowHeight+40;rowHeight=0;}
+    if (index && column===0) {top+=rowHeight+rowGap;rowHeight=0;}
     rowHeight=Math.max(rowHeight,node.height);
     return {...node,x:origin.x+column*step,y:top};
   });
@@ -22,14 +23,16 @@ export function makeNode(kind: CanvasNode["kind"], point:{x:number;y:number}, re
   return {id:crypto.randomUUID(),kind,...point,width:kind==="highlight"?320:220,height:kind==="object"?200:kind==="highlight"?176:136,
     title:ref?.label || "",body:"",color:kind==="sticky"?"butter":kind==="highlight"?"mint":"paper",group:"",used:false,...(ref?{ref}:{})};
 }
-export function addObjects(board:Board, refs:NativeObjectRef[], origin:{x:number;y:number}){
+export function addObjects(board:Board, refs:NativeObjectRef[], origin:{x:number;y:number}, sizes?:Map<string,{width:number;height:number}>){
   const seen=new Set(board.nodes.flatMap(n=>n.ref?[keyOf(n.ref)]:[]));
   const added:CanvasNode[]=[];
   for(const ref of refs){
     const key=keyOf(ref);
     if(seen.has(key)) continue;
     seen.add(key);
-    added.push(makeNode("object",origin,ref));
+    const node=makeNode("object",origin,ref);
+    const size=ref.module==="media" && sizes?.get(ref.objectId);
+    added.push(size?{...node,...size,imageSize:size}:node);
   }
   // Start in the nearest free band so successive pastes never cover older ads.
   const batch=tile(added,origin);
@@ -39,7 +42,7 @@ export function addObjects(board:Board, refs:NativeObjectRef[], origin:{x:number
   let y=box.y;
   for(const n of nearby.sort((a,b)=>a.y-b.y)){
     if(n.y>y+box.height+16) break;
-    y=Math.max(y,n.y+n.height+36);
+    y=Math.max(y,n.y+n.height+Math.min(170,Math.max(88,n.width*.14)));
   }
   return batch.map(n=>({...n,y:n.y+y-box.y}));
 }

@@ -11,13 +11,14 @@ export function Panel({title,close,children}:{title:string;close:()=>void;childr
     <header><h3>{title}</h3><button type="button" onClick={close} aria-label="Close panel"><IconX size={17}/></button></header>{children}
   </section>;
 }
-export function CardFields({node,save,close}:{node:CanvasNode;save:(patch:Partial<CanvasNode>)=>void;close:()=>void}){
+export function CardFields({node,save,close,restoreSize}:{node:CanvasNode;restoreSize?:()=>void;save:(patch:Partial<CanvasNode>)=>void;close:()=>void}){
   const [title,setTitle]=useState(node.title),[body,setBody]=useState(node.body),[color,setColor]=useState(node.color);
   return <Panel title={node.kind==="object"?"Edit card":"Edit "+node.kind} close={close}>
     <form onSubmit={e=>{e.preventDefault();save({title:title.trim()||node.ref?.label||"",body:body.trim(),color});close();}}>
       <label>Title<input autoFocus value={title} maxLength={240} onChange={e=>setTitle(e.target.value)}/></label>
       <label>{node.kind==="object"?"Caption":"Text"}<textarea rows={3} value={body} maxLength={4000} onChange={e=>setBody(e.target.value)}/></label>
-      <div className={css.swatches} role="group" aria-label="Card color">{Object.entries(colors).map(([name,hex])=><button type="button" key={name} title={name} aria-label={name} aria-pressed={color===name} style={{background:hex}} onClick={()=>setColor(name)}/>)}</div>
+      {restoreSize && node.imageSize && <button type="button" onClick={()=>{restoreSize();close();}}>Original size · {node.imageSize.width} × {node.imageSize.height}</button>}
+      {node.ref?.module!=="media" && <div className={css.swatches} role="group" aria-label="Card color">{Object.entries(colors).map(([name,hex])=><button type="button" key={name} title={name} aria-label={name} aria-pressed={color===name} style={{background:hex}} onClick={()=>setColor(name)}/>)}</div>}
       <button className={css.primary} type="submit">Apply</button>
     </form></Panel>;
 }

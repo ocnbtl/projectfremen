@@ -11,7 +11,7 @@ import {uploadAccountFile} from "../../lib/modules/media/account-client";
 import styles from "./CanvasIntake.module.css";
 
 const modules:Record<ModuleId,string>={media:"Media",people:"People",projects:"Projects",notes:"Notes",finance:"Finance",calendar:"Calendar",map:"Map",personal_ops:"Personal",reviews:"Reviews",resources:"Resources"};
-const icons:Record<ModuleId,string>={media:"module-media",people:"person",projects:"module-projects",notes:"module-notes",finance:"module-finance",calendar:"calendar",map:"location",personal_ops:"object",reviews:"module-reviews",resources:"module-resources"};
+export const canvasModuleIcons:Record<ModuleId,string>={media:"module-media",people:"person",projects:"module-projects",notes:"module-notes",finance:"module-finance",calendar:"calendar",map:"location",personal_ops:"object",reviews:"module-reviews",resources:"module-resources"};
 const keyOf=(ref:NativeObjectRef)=>[ref.module,ref.objectType,ref.containerObjectId,ref.objectId].join(":");
 
 export function CanvasObjectPicker({onAdd}:{onAdd:(refs:NativeObjectRef[])=>void}) {
@@ -54,7 +54,7 @@ export function CanvasObjectPicker({onAdd}:{onAdd:(refs:NativeObjectRef[])=>void
       {pasted && !canonical && catalog[source] && <input className={styles.linkLabel} aria-label="Object link name" placeholder="Name this link" maxLength={180} value={linkLabel} onChange={event=>{setLinkLabel(event.target.value);setPicked(old=>{const next=new Map(old);next.delete(keyOf(pasted));return next;});}}/>}
       <div className={styles.results}>
         {error?<div role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>Retry</button></div>:!catalog[source]?<p role="status">Loading {modules[source]}…</p>:!matches.length?<p>{query?"No matching objects.":"Nothing here yet."}</p>:matches.slice(0,limit).map(ref=><button type="button" className={styles.row} key={keyOf(ref)} aria-pressed={picked.has(keyOf(ref))} onClick={()=>toggle(ref)}>
-          <UnigentamosIcon role={icons[ref.module]} size={17}/><span><strong>{ref.label}</strong><small>{ref.objectType.replaceAll("_"," ")}</small></span><UnigentamosIcon role={picked.has(keyOf(ref))?"check":"plus"} size={16}/></button>)}
+          <UnigentamosIcon role={canvasModuleIcons[ref.module]} size={17}/><span><strong>{ref.label}</strong><small>{ref.objectType.replaceAll("_"," ")}</small></span><UnigentamosIcon role={picked.has(keyOf(ref))?"check":"plus"} size={16}/></button>)}
         {matches.length>limit&&<button type="button" className={styles.more} onClick={()=>setLimit(n=>n+60)}>Show more</button>}
       </div>
       <footer><span aria-live="polite">{picked.size} selected</span><button disabled={!picked.size} onClick={()=>{onAdd([...picked.values()]);setOpen(false);}}>Add to canvas</button></footer>
@@ -62,23 +62,40 @@ export function CanvasObjectPicker({onAdd}:{onAdd:(refs:NativeObjectRef[])=>void
   </Popover.Root>;
 }
 
-export function CanvasMediaThumbnail({target}:{target:NativeObjectRef}) {
-  const [failed,setFailed]=useState("");
+export type ImageSize={width:number;height:number};
+export type ImageSizes=Map<string,ImageSize>;
+
+async function dimensions(file:File):Promise<ImageSize|undefined> {
+  if(!file.type.startsWith("image/")) return;
+  const url=URL.createObjectURL(file);
+  try {
+    const image=new Image(); image.src=url;
+    await image.decode();
+    if(image.naturalWidth && image.naturalHeight && Math.max(image.naturalWidth,image.naturalHeight)<=100000)
+      return {width:image.naturalWidth,height:image.naturalHeight};
+  } catch { /* Other Media formats still get a link on the board. */ }
+  finally { URL.revokeObjectURL(url); }
+}
+
+export function CanvasMediaThumbnail({target,full,onOriginal}:{target:NativeObjectRef;full:boolean;onOriginal:(width:number,height:number)=>void}) {
+  const [failed,setFailed]=useState<Record<string,boolean>>({});
   const container=useRef<HTMLDivElement>(null);
   const [visible,setVisible]=useState(false);
   useEffect(()=>{
     const element=container.current;
-    if (!element || visible) return;
+    if (!element) return;
     if (typeof IntersectionObserver==="undefined") {setVisible(true);return;}
     const observer=new IntersectionObserver(entries=>{
-      if (entries.some(entry=>entry.isIntersecting)) {setVisible(true);observer.disconnect();}
+      setVisible(entries.some(entry=>entry.isIntersecting));
     },{rootMargin:"48px"});
     observer.observe(element);
     return ()=>observer.disconnect();
-  },[visible,target.module]);
-  const src="/api/personal/canvas/thumbnail?"+new URLSearchParams({id:target.objectId,v:target.versionId||""});
+  },[target.module]);
+  const base="/api/personal/canvas/thumbnail?"+new URLSearchParams({id:target.objectId,v:target.versionId||""});
+  const original=base+"&original=1";
+  const src=(full || failed[base]) && !failed[original] ? original : base;
   if(target.module!=="media") return null;
-  return <div ref={container} className={styles.thumb}>{!visible||failed===src||target.objectType==="workspace_link"?<UnigentamosIcon role="module-media" size={25}/>:<img src={src} alt="" draggable={false} decoding="async" onError={()=>setFailed(src)}/>}</div>;
+  return <div ref={container} className={styles.thumb}>{!visible||failed[src]||target.objectType==="workspace_link"?<UnigentamosIcon role="module-media" size={25}/>:<img src={src} alt="" draggable={false} decoding="async" onLoad={e=>{if(src===original)onOriginal(e.currentTarget.naturalWidth,e.currentTarget.naturalHeight);}} onError={()=>setFailed(old=>({...old,[src]:true}))}/>}</div>;
 }
 
 type FileMatch={hash:string;archived:boolean;ref:NativeObjectRef};
@@ -91,7 +108,7 @@ function uploadId(hash:string) {
   return hash.slice(0,8)+"-"+hash.slice(8,12)+"-8"+hash.slice(13,16)+"-a"+hash.slice(17,20)+"-"+hash.slice(20,32);
 }
 
-export function useCanvasMediaImport(onAdd:(refs:NativeObjectRef[])=>void) {
+export function useCanvasMediaImport(onAdd:(refs:NativeObjectRef[],sizes?:ImageSizes)=>void) {
   const [busy,setBusy]=useState(false),[message,setMessage]=useState("");
   const running=useRef<AbortController|null>(null);
   useEffect(()=>()=>running.current?.abort(),[]);
@@ -99,6 +116,7 @@ export function useCanvasMediaImport(onAdd:(refs:NativeObjectRef[])=>void) {
     if(!files.length || running.current) return;
     const controller=new AbortController();
     running.current=controller;setBusy(true);setMessage("Checking Media…");
+    const sizes:ImageSizes=new Map();
     const added=new Map<string,NativeObjectRef>(),failures:string[]=[];
     try {
       const response=await fetch("/api/personal/canvas/objects?files=1",{cache:"no-store",signal:controller.signal});
@@ -119,13 +137,15 @@ export function useCanvasMediaImport(onAdd:(refs:NativeObjectRef[])=>void) {
             const ref=createNativeObjectRef({module:"media",objectType:"media_asset",objectId:String(object.fields.id),label:String(object.fields.title),versionId:object.updatedAt});
             match={hash,ref,archived:false};known.set(hash,match);
           }
+          const size=await dimensions(file);
+          if(size) sizes.set(match.ref.objectId,size);
           added.set(keyOf(match.ref),match.ref);
         } catch(error) {
           controller.signal.throwIfAborted();
           failures.push(file.name+" — "+(error instanceof Error?error.message:"Couldn’t add file."));
         }
       }
-      if(added.size) onAdd([...added.values()]);
+      if(added.size) onAdd([...added.values()],sizes);
       setMessage(added.size+" "+(added.size===1?"file":"files")+" linked."+(failures.length?" "+failures.length+" failed. "+failures[0]:""));
     } catch(error) {
       if(!controller.signal.aborted) setMessage(error instanceof Error?error.message:"Couldn’t add files.");
