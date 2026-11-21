@@ -18,6 +18,7 @@ type MediaMetadataEditorSheetProps = {
 type MediaMetadataForm = {
   title: string;
   description: string;
+  notes: string;
 };
 
 const FOCUSABLE_SELECTOR = [
@@ -32,12 +33,13 @@ const FOCUSABLE_SELECTOR = [
 function formForAsset(asset: MediaAsset): MediaMetadataForm {
   return {
     title: asset.title,
-    description: asset.body
+    description: asset.body,
+    notes:asset.notes || ""
   };
 }
 
 function formsEqual(left: MediaMetadataForm, right: MediaMetadataForm) {
-  return left.title === right.title && left.description === right.description;
+  return left.title === right.title && left.description === right.description && left.notes === right.notes;
 }
 
 export default function MediaMetadataEditorSheet({
@@ -56,6 +58,7 @@ export default function MediaMetadataEditorSheet({
   const onCloseRef = useRef(onClose);
   const [form, setForm] = useState<MediaMetadataForm>(() => formForAsset(asset));
   const [baseline, setBaseline] = useState<MediaMetadataForm>(() => formForAsset(asset));
+  const version=useRef(asset.updatedAt);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -137,8 +140,10 @@ export default function MediaMetadataEditorSheet({
     setError("");
 
     const result = await createMediaRepository().update(asset.id, {
-      title: form.title.trim(),
-      description: form.description.trim()
+      expectedUpdatedAt:version.current,
+      ...(form.title!==baseline.title ? {title:form.title.trim()} : {}),
+      ...(form.description!==baseline.description ? {description:form.description.trim()} : {}),
+      ...(form.notes!==baseline.notes ? {notes:form.notes.trim()} : {})
     });
 
     if (!result.ok) {
@@ -180,7 +185,7 @@ export default function MediaMetadataEditorSheet({
                 <span className={styles.eyebrow}>Legacy-backed Media metadata</span>
                 <h2 id={titleId}>{asset.title}</h2>
                 <p id={descriptionId}>
-                  Edit only the title and description already owned by the retained file record.
+                  The title, description and notes are shared with linked Canvas cards.
                 </p>
               </div>
               <button
@@ -200,7 +205,17 @@ export default function MediaMetadataEditorSheet({
                 <div className={styles.error} role="alert">
                   <strong>Media metadata was not saved</strong>
                   <span>{error}</span>
-                  <small>Your title and description are still here. Review them and try again.</small>
+                  <small>Your draft is still here.</small>
+                  <button type="button" disabled={busy} onClick={async()=>{
+                    setBusy(true);
+                    const latest=await createMediaRepository().get(asset.id);
+                    if(latest.ok){
+                      version.current=latest.data.updatedAt;
+                      const fields=formForAsset(latest.data);
+                      setForm(fields);setBaseline(fields);setError("");
+                    } else setError(latest.error.message);
+                    setBusy(false);
+                  }}>Discard draft and reload details</button>
                 </div>
               )}
 
@@ -245,6 +260,10 @@ export default function MediaMetadataEditorSheet({
                   <small data-tone="muted">
                     Compact Media context belongs here. Long-form authored knowledge belongs in Notes.
                   </small>
+                </label>
+                <label className={styles.field}>
+                  <span>Asset notes</span>
+                  <textarea rows={4} maxLength={20000} value={form.notes} onChange={event=>updateField("notes",event.target.value)}/>
                 </label>
               </section>
 
@@ -331,7 +350,7 @@ export default function MediaMetadataEditorSheet({
           onClose();
         }}
         title="Discard unsaved Media changes?"
-        description="The title and description in this sheet have not been saved."
+        description="This sheet contains unsaved Media details."
         consequences={[
           "The stored Media record will remain unchanged.",
           "This editor draft cannot be recovered after closing."

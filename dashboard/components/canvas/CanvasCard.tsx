@@ -7,12 +7,15 @@ import Icon from "../icons/UnigentamosIcon";
 import { CanvasMediaThumbnail,canvasModuleIcons } from "./CanvasIntake";
 import { CanvasItemMenu } from "./CanvasItemMenu";
 import { colors } from "./board-layout";
+import { maxCardSize, minCardSize } from "./alignment";
 import css from "./CanvasEditor.module.css";
 import styles from "./CanvasItem.module.css";
 
 export type FlowCard = Node<{item:CanvasNode;focus:boolean;inspectOriginal:boolean},"card">;
+type Layout=Pick<CanvasNode,"x"|"y"|"width"|"height">;
 export const BoardActions=createContext({
-  resize:(_id:string,_rect:{x:number;y:number;width:number;height:number})=>{},
+  startResize:(_id:string,_rect:Layout)=>{},
+  resize:(_id:string,_rect:Layout,_finished:boolean)=>{},
   appearance:(_id:string,_value:NonNullable<CanvasNode["appearance"]>)=>{},
   style:(_id:string)=>{},
   edit:(_id:string)=>{},open:(_id:string)=>{},originalLoaded:(_id:string,_width:number,_height:number)=>{}
@@ -33,8 +36,9 @@ export const CanvasCard=memo(function CanvasCard({data,selected,id}:NodeProps<Fl
   const compact=useStore(state=>item.width*state.transform[2]<100);
   return <div className={`${css.card} ${styles.item}`} data-kind={item.kind} data-media={media||undefined} data-focus={focus||undefined} data-appearance={item.appearance} data-compact={compact||undefined} style={{"--tint":tint,"--frame-stroke":item.strokeColor,"--frame-width":item.strokeWidth===undefined?undefined:item.strokeWidth+"px"} as React.CSSProperties}
     onDoubleClick={event=>{if(!focus && !(event.target as Element).closest("a,button"))actions.edit(id);}}>
-    <NodeResizer isVisible={selected && !focus && !item.locked} keepAspectRatio={media} minWidth={media?1:138} minHeight={media?1:76} maxWidth={100000} maxHeight={100000}
-      onResizeEnd={(_,rect)=>actions.resize(id,rect)}/>
+    <NodeResizer isVisible={selected && !focus && !item.locked} keepAspectRatio={media} minWidth={media?1:minCardSize.width} minHeight={media?1:minCardSize.height} maxWidth={maxCardSize} maxHeight={maxCardSize}
+      onResizeStart={(_,rect)=>actions.startResize(id,rect)} onResize={(_,rect)=>actions.resize(id,rect,false)}
+      onResizeEnd={(_,rect)=>actions.resize(id,rect,true)}/>
     <Handle type="target" position={Position.Left} aria-label="Incoming connection"/>
     <Handle type="source" position={Position.Right} aria-label="Outgoing connection"/>
     {media ? <div className={css.art} role="img" aria-label={target.label}>

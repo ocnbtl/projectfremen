@@ -55,8 +55,8 @@ export async function POST(request: Request) {
       const record = records.find(item => item.id === body.recordId && item.className === "file");
       if (!record?.mediaProfile) return json({ error: "File not found" }, 404);
       if (typeof body.expectedUpdatedAt !== "string" || !body.expectedUpdatedAt) throw new Error("Reload this file before saving");
-      const profile = normalizeMediaProfile({ ...body.profile, manifest: record.mediaProfile.manifest, accountFile: record.mediaProfile.accountFile })!;
-      const items = await updatePersonalRecord(record.id, { title: String(body.title || record.title), body: String(body.description ?? record.body), mediaProfile: profile }, { expectedUpdatedAt: String(body.expectedUpdatedAt || "") });
+      const profile = body.profile===undefined ? undefined : normalizeMediaProfile({ ...body.profile, manifest: record.mediaProfile.manifest, accountFile: record.mediaProfile.accountFile });
+      const items = await updatePersonalRecord(record.id, { title: typeof body.title==="string"?body.title:undefined, body: typeof body.description==="string"?body.description:undefined, mediaNotes:body.mediaNotes, mediaProfile: profile }, { expectedUpdatedAt: body.expectedUpdatedAt });
       return json({ ok: true, record: items.find(item => item.id === record.id) });
     }
     if (body.action !== "finish") throw new Error("Invalid action");

@@ -10,6 +10,8 @@ export type CanvasNode = {
   height: number;
   title: string;
   body: string;
+  notes?: string;
+  tagIds?: string[];
   color: string;
   group: string;
   used: boolean;
@@ -36,9 +38,12 @@ export type CanvasEdge = {
   label: string;
 };
 export type CanvasView = { id: string; name: string; x: number; y: number; zoom: number };
+export const canvasTagLimits = {categories:64,tags:128,name:80} as const;
+export type CanvasCategory = {id:string;name:string;tags:{id:string;name:string}[]};
 export type Board = {
   id: string; title: string; folder: string; updatedAt: string; revision: number;
   nodes: CanvasNode[]; edges: CanvasEdge[]; views: CanvasView[];
+  categories?: CanvasCategory[];
 };
 export type BoardSummary = Pick<Board, "id" | "title" | "folder" | "updatedAt" | "revision"> & {
   viewNames?: Pick<CanvasView,"id"|"name">[];
@@ -96,8 +101,25 @@ export function boardNames(value: unknown) {
   const item = record(value);
   return {title: string(item.title, 160, "board name", true).trim(), folder: string(item.folder ?? "", 120, "folder").trim()};
 }
-export function boardContents(value: unknown): Pick<Board, "title" | "folder" | "nodes" | "edges" | "views"> {
+function namedTag(input:Record<string,unknown>){
+  return {id:canvasId(input.id),name:string(input.name,canvasTagLimits.name,"tag name",true).trim()};
+}
+function checkNames(items:{name:string}[]){
+  if(new Set(items.map(item=>item.name.toLowerCase())).size!==items.length)throw new CanvasError("That name is already in use.");
+}
+export function boardContents(value: unknown): Pick<Board, "title" | "folder" | "nodes" | "edges" | "views" | "categories"> {
   const item = record(value);
+  const tags=new Set<string>();
+  const categories=item.categories===undefined?undefined:entries<CanvasCategory>(item.categories,canvasTagLimits.categories,category=>{
+    const options=entries(category.tags,canvasTagLimits.tags,namedTag);
+    checkNames(options);
+    for(const option of options){
+      if(tags.has(option.id))throw new CanvasError("Each board tag needs a unique ID.");
+      tags.add(option.id);
+    }
+    return {...namedTag(category),tags:options};
+  });
+  if(categories)checkNames(categories);
   const nodes = entries<CanvasNode>(item.nodes, 1000, node => {
     const kind = option(node.kind, ["sticky","text","highlight","object"] as const);
     const color = string(node.color, 32, "item color");
@@ -107,10 +129,18 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
       if (color !== undefined && (typeof color !== "string" || !/^#[\da-f]{6}$/i.test(color))) throw new CanvasError("Choose a valid frame color.");
     }
     if (node.locked !== undefined && typeof node.locked !== "boolean") throw new CanvasError("Choose a valid lock setting.");
+    let tagIds:string[]|undefined;
+    if(node.tagIds!==undefined){
+      if(!Array.isArray(node.tagIds)||node.tagIds.length>tags.size)throw new CanvasError("Choose tags from this board.");
+      tagIds=[...new Set(node.tagIds.map(canvasId))];
+      if(tagIds.some(id=>!tags.has(id)))throw new CanvasError("Choose tags from this board.");
+    }
     return {
       id: canvasId(node.id), kind, x: number(node.x, -1e7, 1e7), y: number(node.y, -1e7, 1e7),
       width: number(node.width, 1, 100000), height: number(node.height, 1, 100000),
       title: string(node.title, 500, "item title"), body: string(node.body, 32000, "item text"),
+      ...(node.notes!==undefined?{notes:string(node.notes,20000,"notes")} : {}),
+      ...(tagIds?{tagIds}:{}),
       group: string(node.group, 160, "group"), color, used: node.used,
       ...(node.appearance !== undefined ? {appearance:option(node.appearance, ["plain","outline","card"] as const)} : {}),
       ...(node.strokeColor !== undefined ? {strokeColor:node.strokeColor as string} : {}),
@@ -132,7 +162,7 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
     id: canvasId(view.id), name: string(view.name, 160, "view name", true).trim(),
     x: number(view.x, -1e8, 1e8), y: number(view.y, -1e8, 1e8), zoom: number(view.zoom, 0.002, 8)
   }));
-  return {...boardNames(item), nodes, edges, views};
+  return {...boardNames(item), nodes, edges, views,...(categories?{categories}:{})};
 }
 export function boardSummary(board: Board): BoardSummary {
   const {id, title, folder, updatedAt, revision} = board;

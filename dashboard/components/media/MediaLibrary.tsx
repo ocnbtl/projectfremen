@@ -23,6 +23,7 @@ import { useSearchParams } from "next/navigation";
 import { browserVault } from "../../lib/local-first/browser-engine";
 import { mirrorPersonalRecord } from "../../lib/local-first/domain-mirror";
 import { pendingCanonicalCommands } from "../../lib/local-first/canonical-record";
+import {watchMediaDetails} from "../../lib/modules/media/detail-events";
 import type {
   VaultObjectSnapshot,
   VaultMediaManifest,
@@ -40,7 +41,7 @@ import {
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./MediaLibrary.module.css";
 
-type MediaDraft = { title: string; description: string; profile: MediaProfile };
+type MediaDraft = { title: string; description: string; notes:string; profile: MediaProfile; base:VaultObjectSnapshot };
 const mediaDrafts = new Map<string, MediaDraft>();
 if (typeof window !== "undefined")
   window.addEventListener("unigentamos-vault-locked", () =>
@@ -148,6 +149,8 @@ export default function MediaLibrary({
   >([]);
   const [queueOpen, setQueueOpen] = useState(false);
   const [catalogueLoaded, setCatalogueLoaded] = useState(false);
+  const [fileRecords,setFileRecords]=useState(records);
+  const refreshNumber=useRef(0),openedRoute=useRef("");
   const [selectionMode, setSelectionMode] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [undoBatch, setUndoBatch] = useState<
@@ -177,9 +180,11 @@ export default function MediaLibrary({
     [profile, setProfile] = useState<MediaProfile>(),
     [title, setTitle] = useState(""),
     [description, setDescription] = useState(""),
+    [notes,setNotes]=useState(""),
     [preview, setPreview] = useState(""),
     [context, setContext] = useState<PlanningSnapshot>();
   const refresh = useCallback(async () => {
+    const request=++refreshNumber.current;
     setUnlocked(browserVault.isUnlocked());
     if (!browserVault.isUnlocked()) clearThumbnailCache();
     let canonical = records;
@@ -188,10 +193,19 @@ export default function MediaLibrary({
       if (!response.ok) throw new Error("Media catalogue could not be loaded");
       canonical = (await response.json()).items;
     } catch (error) { if (!browserVault.isUnlocked()) throw error; }
+    if(request!==refreshNumber.current)return;
+    canonical=canonical.filter(item=>item.className==="file");
+    setFileRecords(canonical);
+    if(browserVault.isUnlocked())
+      for(const record of canonical) {
+        if(request!==refreshNumber.current)return;
+        if(record.mediaProfile && !record.mediaProfile.accountFile)await mirrorPersonalRecord(record);
+      }
     const catalogue = canonical.filter(item => item.className === "file" && item.mediaProfile).map(mediaSnapshot);
     const local = browserVault.isUnlocked() ? await browserVault.listObjects(["media"]) : [];
     const media = catalogue.map(item => accountFile(item) ? item : local.find(other => other.fields.id === item.fields.id && !other.tombstone) || item);
     media.push(...local.filter(item => !item.tombstone && manifestFor(item) && !media.some(other => other.fields.id === item.fields.id)));
+    if(request!==refreshNumber.current)return;
     setObjects(media);
     setCatalogueLoaded(true);
     const pending = [];
@@ -201,17 +215,13 @@ export default function MediaLibrary({
       if (state && state.local > state.uploaded)
         pending.push({ object, ...state });
     }
-    setTransfers(pending);
+    if(request===refreshNumber.current)setTransfers(pending);
   }, [records]);
   useEffect(() => {
     let active = true;
-    void (async () => {
-      if (browserVault.isUnlocked())
-        for (const record of records)
-          if (record.mediaProfile && !record.mediaProfile.accountFile) await mirrorPersonalRecord(record);
-      if (active) await refresh();
-    })().catch((e) => setError(e.message));
+    void refresh().catch((e) => setError(e.message));
     const update = () => void refresh().catch((e) => setError(e.message));
+    const unwatch=watchMediaDetails(update);
     window.addEventListener("unigentamos-vault-data-changed", update);
     void fetch("/api/planning")
       .then(async (response) => {
@@ -224,19 +234,21 @@ export default function MediaLibrary({
       .catch(() => {});
     return () => {
       active = false;
+      unwatch();
       window.removeEventListener("unigentamos-vault-data-changed", update);
       controller.current?.abort();
     };
   }, [records, refresh]);
   const open = useCallback((object: VaultObjectSnapshot) => {
     const draft = mediaDrafts.get(object.objectId);
-    setSelected(object);
+    setSelected(draft?.base || object);
     setProfile(draft?.profile || profileFor(object));
     setTitle(
       draft?.title ??
         String(object.fields.title || manifestFor(object).fileName),
     );
     setDescription(draft?.description ?? String(object.fields.body || ""));
+    setNotes(draft?.notes ?? String(object.fields.mediaNotes || ""));
     setError("");
   }, []);
   useEffect(() => {
@@ -248,17 +260,24 @@ export default function MediaLibrary({
     const changed =
       title !==
         String(selected.fields.title || manifestFor(selected).fileName) ||
-      description !== String(selected.fields.body || "") ||
+      description !== String(selected.fields.body || "") || notes!==String(selected.fields.mediaNotes || "") ||
       JSON.stringify(profile) !== JSON.stringify(profileFor(selected));
     if (changed)
-      mediaDrafts.set(selected.objectId, { title, description, profile });
+      mediaDrafts.set(selected.objectId, { title, description, notes, profile, base:selected });
     else mediaDrafts.delete(selected.objectId);
-  }, [selected, profile, title, description]);
+  }, [selected, profile, title, description, notes]);
   useEffect(() => {
     const id = params.get("selected") || initialSelected;
     const item = objects.find((o) => o.fields.id === id || o.objectId === id);
-    if (item) open(item);
-  }, [params, initialSelected, objects.length, open]);
+    if(!id)openedRoute.current="";
+    else if (item && openedRoute.current!==id){openedRoute.current=id;open(item);}
+  }, [params, initialSelected, objects, open]);
+  const dirty=Boolean(selected && profile && (title!==String(selected.fields.title || manifestFor(selected).fileName) || description!==String(selected.fields.body || "") || notes!==String(selected.fields.mediaNotes || "") || JSON.stringify(profile)!==JSON.stringify(profileFor(selected))));
+  useEffect(()=>{
+    if(!selected || dirty || busy)return;
+    const latest=objects.find(item=>item.objectId===selected.objectId);
+    if(latest && latest.versionId!==selected.versionId && latest.updatedAt>=selected.updatedAt)open(latest);
+  },[objects,selected,dirty,busy,open]);
   useEffect(() => {
     setPreview("");
     if (!selected) return;
@@ -295,6 +314,7 @@ export default function MediaLibrary({
       const saved = await saveMediaDetails(selected, {
         title,
         body: description,
+        mediaNotes:notes,
         mediaProfile: {
           ...profile,
           ...(archivedAt !== undefined ? { archivedAt } : {}),
@@ -303,8 +323,7 @@ export default function MediaLibrary({
       const pendingDraft = mediaDrafts.get(selected.objectId);
       if (
         pendingDraft &&
-        JSON.stringify(pendingDraft) ===
-          JSON.stringify({ title, description, profile })
+        pendingDraft.title===title && pendingDraft.description===description && pendingDraft.notes===notes && JSON.stringify(pendingDraft.profile)===JSON.stringify(profile)
       )
         mediaDrafts.delete(selected.objectId);
       setSelected((current) =>
@@ -408,7 +427,7 @@ export default function MediaLibrary({
       mediaSearchText(String(object.fields.title||""),String(object.fields.body||""),profileFor(object)).includes(query.toLocaleLowerCase()),
   );
   const known = new Set(objects.map((o) => String(o.fields.id)));
-  const legacy = records.filter(
+  const legacy = fileRecords.filter(
     (record) =>
       !known.has(record.id) &&
       !record.mediaProfile && matchesMediaFilters(undefined,filters,Object.values(record.relations || {}).some(refs=>Array.isArray(refs)&&refs.length>0)) &&
@@ -463,6 +482,7 @@ export default function MediaLibrary({
             <WorkspaceFeedback error={error} />
             <MediaDetailsFields value={{...profile,title,description}} context={context?{...context,refs:context.refs.filter(ref=>ref.objectId!==selected.fields.id&&ref.objectId!==selected.objectId)}:undefined} onChange={patch=>{if(patch.title!==undefined)setTitle(patch.title);if(patch.description!==undefined)setDescription(patch.description);const {title:_title,description:_description,...metadata}=patch;setProfile({...profile,...metadata});}}/>
             <label>Alt text<input value={profile.altText} onChange={e=>setProfile({...profile,altText:e.target.value})}/></label>
+            <label>Notes<textarea aria-label="Media notes" rows={3} maxLength={20000} value={notes} onChange={e=>setNotes(e.target.value)}/></label>
             <div className="work-actions">
               <Button intent="primary" busy={busy} onClick={() => void save()}>
                 Save details

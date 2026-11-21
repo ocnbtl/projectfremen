@@ -130,6 +130,7 @@ export function editableFieldsFor(module: CanonicalModule, collection: string): 
     ];
     if (collection === "file") return [
       FIELD("mediaProfile", "Encrypted media metadata", "text", {group:"Details",hidden:true}),
+      FIELD("mediaNotes", "Media notes", "textarea", {group:"Details"}),
       FIELD("title", "Title", "text", { group: "Essentials", required: true }),
       FIELD("body", "Description", "textarea", { group: "Details" }),
       FIELD("status", "Status", "select", { group: "Planning", options: PERSONAL_STATUS_OPTIONS }),
@@ -358,6 +359,9 @@ export function readCanonicalMetadata(fields: Record<string, VaultFieldValue>): 
     || typeof candidate.route !== "string"
     || !Array.isArray(candidate.editableFields)
   ) return null;
+  if (candidate.module==="personal-records" && candidate.collection==="file" && !candidate.editableFields.some(field=>field.key==="mediaNotes")) {
+    return {...candidate,editableFields:editableFieldsFor("personal-records","file")} as VaultCanonicalRecordMetadata;
+  }
   return candidate as VaultCanonicalRecordMetadata;
 }
 

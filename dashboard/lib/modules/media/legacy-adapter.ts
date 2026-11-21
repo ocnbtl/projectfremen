@@ -76,6 +76,7 @@ export function legacyPersonalRecordToMediaAsset(record: LegacyMediaRecord): Med
     }),
     title: record.title,
     body: record.body,
+    ...(record.mediaNotes ? {notes:record.mediaNotes} : {}),
     type: "unknown",
     roles: [],
     lifecycleState: "unknown",
@@ -176,6 +177,7 @@ export function mediaUpdateInputToLegacy(input: MediaUpdateInput): PersonalRecor
   return {
     title: input.title?.trim(),
     body: input.description?.trim(),
+    ...(input.notes !== undefined ? {mediaNotes:input.notes.trim()} : {}),
     time: hasTimeUpdate
       ? {
           reviewCadence: input.reviewCadence,

@@ -141,6 +141,7 @@ export async function PATCH(request: Request) {
       archiveReason: typeof body.archiveReason === "string" ? body.archiveReason : undefined,
       starred: typeof body.starred === "boolean" ? body.starred : undefined,
       body: typeof body.body === "string" ? body.body : undefined,
+      mediaNotes: typeof body.mediaNotes === "string" ? body.mediaNotes : undefined,
       noteType: body.noteType,
       url: typeof body.url === "string" ? body.url : undefined,
       areas: Array.isArray(body.areas) ? body.areas.map(String) : undefined,

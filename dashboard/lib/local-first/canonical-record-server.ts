@@ -155,7 +155,7 @@ async function createPersonal(command: VaultPendingCanonicalCommand, collection:
     url: typeof command.patch.url === "string" ? command.patch.url : "",
     starred: command.patch.starred === true,
     profile,
-    ...(collection === "file" ? {mediaProfile:command.patch.mediaProfile as never} : {})
+    ...(collection === "file" ? {mediaProfile:command.patch.mediaProfile as never, mediaNotes:typeof command.patch.mediaNotes==="string"?command.patch.mediaNotes:undefined} : {})
   }, { requestedId: recordId });
   const created = items.find((item) => item.id === recordId);
   if (!created) throw new Error("The new record could not be confirmed");

@@ -344,6 +344,9 @@ export type PersonalRecord = {
   profile?: PersonalContactProfile;
   resourceProfile?: PersonalResourceProfile;
   mediaProfile?: MediaProfile;
+  mediaNotes?: string;
+  mediaCaptionEdited?: boolean;
+  mediaTitleEdited?: boolean;
   interaction?: PersonalInteractionDetails;
   createdMeta: PersonalRecordCreatedMeta;
   createdAt: string;
@@ -378,13 +381,14 @@ export type PersonalRecordInput = {
   profile?: Partial<PersonalContactProfile>;
   resourceProfile?: Partial<PersonalResourceProfile>;
   mediaProfile?: MediaProfile;
+  mediaNotes?: string;
   interaction?: Partial<PersonalInteractionDetails>;
 };
 
 export type PersonalRecordPatch = { interaction?: Partial<PersonalInteractionDetails> } & Partial<
   Pick<
     PersonalRecord,
-    "noteType" | "title" | "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources" | "starred"
+    "noteType" | "title" | "status" | "body" | "mediaNotes" | "url" | "projects" | "areas" | "subjects" | "externalSources" | "starred"
   >
 > & {
   action?: "review" | "archive" | "restore";
@@ -2071,6 +2075,9 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     profile,
     resourceProfile,
     mediaProfile: className === "file" ? normalizeMediaProfile(raw.mediaProfile) : undefined,
+    ...(className === "file" && typeof raw.mediaNotes === "string" ? { mediaNotes: raw.mediaNotes } : {}),
+    ...(className === "file" && raw.mediaCaptionEdited === true ? { mediaCaptionEdited: true } : {}),
+    ...(className === "file" && raw.mediaTitleEdited === true ? { mediaTitleEdited: true } : {}),
     interaction: className === "interaction" ? normalizeInteractionDetails(raw.interaction) : undefined,
     noteType: (NOTE_KINDS as readonly unknown[]).includes(raw.noteType) ? raw.noteType as StoredNoteType : undefined,
     createdMeta,
@@ -2294,6 +2301,7 @@ export async function createPersonalRecord(
     ),
     profile,
     mediaProfile: className === "file" ? normalizeMediaProfile(input.mediaProfile) : undefined,
+    ...(className === "file" && input.mediaNotes ? { mediaNotes: input.mediaNotes.trim().slice(0, 20000) } : {}),
     resourceProfile: className === "resource"
       ? normalizeResourceProfile(input.resourceProfile || { version: 1 }, recordId, meta.createdIso)
       : undefined,
@@ -2668,7 +2676,7 @@ export async function undoPeopleImport(batch: string) {
 export async function updatePersonalRecord(
   id: string,
   patch: PersonalRecordPatch,
-  options: { expectedUpdatedAt?: string; autofill?: unknown } = {}
+  options: { expectedUpdatedAt?: string; autofill?: unknown; markMediaCaptionEdited?: boolean } = {}
 ): Promise<PersonalRecord[]> {
   return mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], (stored) => {
   const existing = stored.map(normalizeRecord).filter((record) => isAllowedDomain(record.domain));
@@ -2677,9 +2685,13 @@ export async function updatePersonalRecord(
     throw new Error("Record not found");
   }
 
-  const now = new Date().toISOString();
   const next = [...existing];
   const current = next[idx];
+  const storedTime=Date.parse(current.updatedAt);
+  const now = new Date(current.className==="file" && Number.isFinite(storedTime) ? Math.max(Date.now(),storedTime+1) : Date.now()).toISOString();
+  if (patch.mediaNotes !== undefined && (current.className !== "file" || typeof patch.mediaNotes !== "string" || patch.mediaNotes.length > 20000)) {
+    throw new Error("Media notes can contain up to 20,000 characters.");
+  }
   if (options.expectedUpdatedAt && current.updatedAt !== options.expectedUpdatedAt) {
     throw new Error("This record changed after it was opened. Refresh before saving so newer work is not overwritten.");
   }
@@ -2763,7 +2775,10 @@ export async function updatePersonalRecord(
     ...current,
     interaction,
     title: typeof patch.title === "string" ? sanitizeTitle(patch.title) : current.title,
+    ...(current.className === "file" && typeof patch.title === "string" && patch.title.trim() !== current.title ? { mediaTitleEdited: true } : {}),
     body: typeof patch.body === "string" ? patch.body.trim() : current.body,
+    ...(current.className === "file" && typeof patch.body === "string" && (options.markMediaCaptionEdited || patch.body.trim() !== current.body) ? { mediaCaptionEdited: true } : {}),
+    ...(typeof patch.mediaNotes === "string" ? { mediaNotes: patch.mediaNotes.trim() } : {}),
     noteType: patch.noteType === undefined ? current.noteType : storedNoteType(patch.noteType),
     url,
     areas: Array.isArray(patch.areas) ? sanitizeList(patch.areas) : current.areas,

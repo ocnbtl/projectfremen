@@ -8,18 +8,20 @@ import "@xyflow/react/dist/style.css";
 import {
   IconArrowBackUp, IconArrowForwardUp, IconArrowLeft, IconBookmark, IconCheck,
   IconBoxMultiple, IconAdjustments, IconArrowsMove, IconMagnet, IconFocus2, IconFrame, IconHandStop, IconHighlight, IconLayoutGrid, IconLine, IconMaximize,
-  IconMinus, IconNote, IconPlus, IconPointer, IconSelectAll,
+  IconMinus, IconNote, IconPlus, IconPointer, IconSelectAll, IconTags,
   IconCopy, IconLock, IconLockOpen, IconTrash, IconTypography, IconUpload, IconX
 } from "@tabler/icons-react";
-import { defaultCanvasAppearance, canvasAppearances, type Board, type CanvasNode, type CanvasEdge } from "../../lib/modules/canvas/model";
+import { defaultCanvasAppearance, canvasAppearances, type Board, type CanvasNode, type CanvasEdge, type CanvasCategory } from "../../lib/modules/canvas/model";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import { addObjects, bounds, duplicateItems, makeNode, tile, unusedGroupName, withoutSelection, keyOf } from "./board-layout";
-import { snapTranslation,spaceEvenly,type AlignmentGuide } from "./alignment";
+import { snapResize,snapTranslation,spaceEvenly,type AlignmentGuide } from "./alignment";
 import { BoardActions, CanvasCard, type FlowCard } from "./CanvasCard";
 import { CanvasObjectPicker, useCanvasMediaImport } from "./CanvasIntake";
 import { CardFields, EdgeFields, Panel } from "./CanvasPanels";
 import { FrameFields,withFrame,type FrameStyle } from "./FrameFields";
 import { CanvasSaveStatus } from "./CanvasSaveStatus";
+import { ItemTags, BoardOrganizer } from "./CanvasTaxonomy";
+import { useCanvasMediaDetails, displayMediaDetails, linkedMediaId } from "./useCanvasMediaDetails";
 import css from "./CanvasEditor.module.css";
 
 type Props={board:Board;entryView?:string;onChange:(board:Board)=>void;onBack:()=>void;saveStatus:string};
@@ -76,13 +78,25 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const [hand,setHand]=useState(false),[panel,setPanel]=useState(""),[name,setName]=useState("");
   const [ids,setIds]=useState<string[]>([]),[edgeIds,setEdgeIds]=useState<string[]>([]);
   const [editing,setEditing]=useState(""),[connectFrom,setConnectFrom]=useState("");
+  const [tagDraft,setTagDraft]=useState<string[]>();
+  const [categoryDraft,setCategoryDraft]=useState<CanvasCategory[]>();
+  const [fromOrganizer,setFromOrganizer]=useState(false);
+  const [tagFilter,setTagFilter]=useState<string[]>([]);
+  const visibleBoardNodes=useMemo(()=>tagFilter.length?board.nodes.filter(n=>tagFilter.every(id=>n.tagIds?.includes(id))):board.nodes,[board.nodes,tagFilter]);
+  const visibleIds=useMemo(()=>tagFilter.length?new Set(visibleBoardNodes.map(n=>n.id)):null,[tagFilter,visibleBoardNodes]);
+  const sharedMedia=useCanvasMediaDetails(board.nodes);
+  const displayNodes=useMemo(()=>board.nodes.map(n=>{
+    const id=linkedMediaId(n);
+    return id?displayMediaDetails(n,sharedMedia.get(id)):n;
+  }),[board.nodes,sharedMedia]);
   const [notice,setNotice]=useState(""),[drop,setDrop]=useState(false);
   const [live,setLive]=useState<Record<string,Partial<Layout>>>({});
+  const resizing=useRef<{item:CanvasNode;start:Layout}|null>(null);
   const pointerDrag=useRef(false);
   const boxSelecting=useRef(false);
   const groupDrag=useRef<{clientX:number;clientY:number;items:CanvasNode[]}|null>(null);
   const dropPoint=useRef<{x:number;y:number}|null>(null);
-  const selected=board.nodes.filter(n=>ids.includes(n.id)), one=selected.length===1?selected[0]:undefined;
+  const selected=visibleBoardNodes.filter(n=>ids.includes(n.id)), one=selected.length===1?selected[0]:undefined;
   const movable=selected.filter(n=>!n.locked);
   const lockedIds=useMemo(()=>new Set(board.nodes.filter(n=>n.locked).map(n=>n.id)),[board.nodes]);
   const edited=board.nodes.find(n=>n.id===editing),edge=board.edges.find(e=>e.id===edgeIds[0]);
@@ -98,7 +112,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     const from=redo?next:previous,to=redo?previous:next,entry=from.current.pop();
     if(!entry)return;
     const current=latest.current;to.current.push(current);
-    const restored={...current,nodes:entry.nodes,edges:entry.edges,views:entry.views};
+    const restored={...current,nodes:entry.nodes,edges:entry.edges,views:entry.views,categories:entry.categories??[]};
     latest.current=restored;edits.current(restored);choose([]);setPanel("");setConnectFrom("");
   }
   const place=useCallback(()=>{
@@ -116,6 +130,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     });
   },[]);
   const insertObjects=useCallback((refs:NativeObjectRef[],sizes?:Map<string,{width:number;height:number}>)=>{
+    setTagFilter([]);
     const current=latest.current,added=addObjects(current,refs,dropPoint.current||place(),sizes);
     dropPoint.current=null;
     if(!added.length){
@@ -128,6 +143,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const media=useCanvasMediaImport(insertObjects);
   function insert(kind:CanvasNode["kind"],point=place(),body=""){
     if(latest.current.nodes.length>=1000){setNotice("This board is full.");return;}
+    setTagFilter([]);setCategoryDraft(undefined);setTagDraft(undefined);setFromOrganizer(false);
     const node={...makeNode(kind,point),body:body.slice(0,32000)};
     // Keep newly inserted notes reachable when several are added from the toolbar.
     for(let step=0;step<18 && latest.current.nodes.some(n=>Math.abs(node.x-n.x)<30 && Math.abs(node.y-n.y)<30);step++){
@@ -138,13 +154,38 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   function patchNodes(targets:string[],patch:Partial<CanvasNode>){
     change(b=>({...b,nodes:b.nodes.map(n=>targets.includes(n.id)?{...n,...patch}:n)}));
   }
-  const handleResize=useCallback((id:string,rect:Layout)=>{
-    if(latest.current.nodes.find(n=>n.id===id)?.locked)return;
-    const {x,y,width,height}=rect;
-    change(b=>({...b,nodes:b.nodes.map(n=>n.id===id?{...n,x,y,width,height}:n)}));
-    setLive({});
-  },[change]);
-  const edit=useCallback((id:string)=>{setEditing(id);choose([id]);setPanel("card");},[choose]);
+  const snapTargets=useCallback(()=>{
+    const view=flow.current?.getViewport(), area=frame.current;
+    if(!snap || !view || !area)return {visible:[],zoom:1};
+    const left=(-view.x-6)/view.zoom,top=(-view.y-6)/view.zoom;
+    const right=(area.clientWidth-view.x+6)/view.zoom,bottom=(area.clientHeight-view.y+6)/view.zoom;
+    const visible=visibleBoardNodes.filter(n=>n.x+n.width>=left && n.x<=right && n.y+n.height>=top && n.y<=bottom);
+    return {visible,zoom:view.zoom};
+  },[snap,visibleBoardNodes]);
+  const startResize=useCallback((id:string,start:Layout)=>{
+    const item=latest.current.nodes.find(n=>n.id===id);
+    if(item && !item.locked)resizing.current={item,start};
+  },[]);
+  const handleResize=useCallback((id:string,proposed:Layout,finished:boolean)=>{
+    const session=resizing.current;
+    if(!session || session.item.id!==id)return;
+    const {item,start}=session,{visible,zoom}=snapTargets();
+    const {rect,guides}=snapResize(item,start,proposed,visible,zoom,item.ref?.module==="media");
+    if(!finished){
+      setLive({[id]:rect});setGuides(guides);return;
+    }
+    resizing.current=null;setLive({});setGuides([]);
+    change(b=>{
+      const current=b.nodes.find(n=>n.id===id);
+      if(!current || current.locked || (current.x===rect.x && current.y===rect.y &&
+        current.width===rect.width && current.height===rect.height))return b;
+      return {...b,nodes:b.nodes.map(n=>n.id===id?{...n,...rect}:n)};
+    });
+  },[change,snapTargets]);
+  const edit=useCallback((id:string)=>{
+    setTagDraft(undefined);setCategoryDraft(undefined);setFromOrganizer(false);
+    setEditing(id);choose([id]);setPanel("card");
+  },[choose]);
   const originalLoaded=useCallback((id:string,width:number,height:number)=>{
     const current=latest.current, item=current.nodes.find(n=>n.id===id);
     if(!item || item.imageSize || !width || !height || Math.max(width,height)>100000)return;
@@ -157,12 +198,12 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     change(b=>({...b,nodes:b.nodes.map(n=>n.id===id?{...n,appearance:value}:n)}));
   },[change]);
   const openStyle=useCallback((id:string)=>{choose([id]);setFrameDraft({});setPanel("appearance");},[choose]);
-  const actions=useMemo(()=>({resize:handleResize,edit,appearance,style:openStyle,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[appearance,edit,handleResize,originalLoaded,openStyle]);
-  const baseNodes=useMemo(()=>board.nodes.map((n):FlowCard=>{
+  const actions=useMemo(()=>({startResize,resize:handleResize,edit,appearance,style:openStyle,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[appearance,edit,startResize,handleResize,originalLoaded,openStyle]);
+  const baseNodes=useMemo(()=>displayNodes.filter(n=>!visibleIds||visibleIds.has(n.id)).map((n):FlowCard=>{
     return {id:n.id,type:"card",position:{x:n.x,y:n.y},...cardGeometry(n.width,n.height),
       draggable:!n.locked && !hand && (!multiPick || ids.includes(n.id)),data:{item:n,focus,inspectOriginal:board.nodes.length===1 || (panel==="card" && editing===n.id)},
       selected:ids.includes(n.id),ariaLabel:n.title||n.kind,zIndex:n.kind==="highlight"?0:1};
-  }),[board.nodes,ids,focus,panel,editing,multiPick,hand]);
+  }),[displayNodes,visibleIds,board.nodes.length,ids,focus,panel,editing,multiPick,hand]);
   const flowNodes=useMemo(()=>baseNodes.map(n=>{
     const preview=panel==="appearance" && n.selected && Object.keys(frameDraft).length>0;
     const displayed=preview?{...n,data:{...n.data,item:withFrame(n.data.item,frameDraft)}}:n;
@@ -170,20 +211,15 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     const size=p.width!==undefined || p.height!==undefined ? cardGeometry(p.width??n.data.item.width,p.height??n.data.item.height) : undefined;
     return {...displayed,...size,position:{x:p.x??n.position.x,y:p.y??n.position.y}};
   }),[baseNodes,live,panel,frameDraft]);
-  const flowEdges=useMemo(()=>board.edges.map((e):Edge=>({
+  const flowEdges=useMemo(()=>board.edges.filter(e=>!visibleIds||(visibleIds.has(e.source)&&visibleIds.has(e.target))).map((e):Edge=>({
     id:e.id,source:e.source,target:e.target,type:"default",label:e.label,selected:edgeIds.includes(e.id),
     markerEnd:e.symbol==="arrow"?{type:MarkerType.ArrowClosed,color:"#536981"}:e.symbol==="circle"?"canvas-end-circle":undefined,
     style:{stroke:edgeIds.includes(e.id)?"#215da1":"#536981",strokeWidth:2.4,strokeDasharray:e.style==="solid"?undefined:e.style==="dashed"?"7 5":"2 5"},
     labelStyle:{fontSize:13,fill:"#35465a"},labelBgPadding:[7,4],labelBgBorderRadius:5,interactionWidth:24
-  })),[board.edges,edgeIds]);
+  })),[board.edges,edgeIds,visibleIds]);
   function snapMovement(items:CanvasNode[],raw:{x:number;y:number}){
-    const view=flow.current?.getViewport(), area=frame.current;
-    if(!snap || !view || !area)return {delta:raw,guides:[]};
-    // Offscreen artwork should never pull a nearby card out of the user's alignment.
-    const left=(-view.x-6)/view.zoom,top=(-view.y-6)/view.zoom;
-    const right=(area.clientWidth-view.x+6)/view.zoom,bottom=(area.clientHeight-view.y+6)/view.zoom;
-    const visible=latest.current.nodes.filter(n=>n.x+n.width>=left && n.x<=right && n.y+n.height>=top && n.y<=bottom);
-    return snapTranslation(items,visible,raw,view.zoom);
+    const {visible,zoom}=snapTargets();
+    return snapTranslation(items,visible,raw,zoom);
   }
   function onNodesChange(changes:NodeChange<FlowCard>[]){
     const selection=changes.filter(c=>c.type==="select");
@@ -193,7 +229,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     });
     const temporary:Record<string,Partial<Layout>>={},finished=new Map<string,{x:number;y:number}>();
     for(const c of changes){
-      if((c.type==="position" || c.type==="dimensions") && lockedIds.has(c.id))continue;
+      // The resize callback supplies the full snapped rectangle, including dimension-only bottom/right drags.
+      if((c.type==="position" || c.type==="dimensions") && (lockedIds.has(c.id) || resizing.current?.item.id===c.id))continue;
       if(c.type==="position" && c.position){
         temporary[c.id]=c.position;
         if(c.dragging===false)finished.set(c.id,c.position);
@@ -255,9 +292,9 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     else if(!ungroup && selected.length>1)patchNodes(ids,{group:unusedGroupName("Group",new Set(board.nodes.map(n=>n.group)))});
   }
   const groups=useMemo(()=>{
-    const map=new Map<string,CanvasNode[]>();for(const n of board.nodes)if(n.group){const group=map.get(n.group)||[];group.push({...n,...live[n.id]});map.set(n.group,group);}
+    const map=new Map<string,CanvasNode[]>();for(const n of visibleBoardNodes)if(n.group){const group=map.get(n.group)||[];group.push({...n,...live[n.id]});map.set(n.group,group);}
     return [...map].map(([name,items])=>({name,items,box:bounds(items)}));
-  },[board.nodes,live]);
+  },[visibleBoardNodes,live]);
   function animatePlacement(){
     clearTimeout(arrangeTimer.current);setArranging(true);
     arrangeTimer.current=setTimeout(()=>setArranging(false),210);
@@ -280,7 +317,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     setIds(old=>old.includes(id)?old.filter(other=>other!==id):[...old,id]);setEdgeIds([]);
   }
   function arrange(){
-    const items=(selected.length>1?selected:board.nodes).filter(n=>!n.locked);if(items.length<2)return;
+    const items=(selected.length>1?selected:visibleBoardNodes).filter(n=>!n.locked);if(items.length<2)return;
     animatePlacement();
     const arranged=new Map(tile(items,bounds(items)).map(n=>[n.id,n]));
     change(b=>({...b,nodes:b.nodes.map(n=>arranged.get(n.id)||n)}));reframe(items.map(n=>n.id));
@@ -313,7 +350,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     if(key==="d" && !e.shiftKey && selected.length){e.preventDefault();if(!e.repeat)duplicate();}
     else if(key==="g" && selected.length){e.preventDefault();if(!e.repeat)quickGroup(e.shiftKey);}
     else if(key==="l" && e.shiftKey && selected.length){e.preventDefault();if(!e.repeat)lockSelection();}
-    else if(key==="a" && !e.shiftKey){e.preventDefault();choose(board.nodes.map(n=>n.id));}
+    else if(key==="a" && !e.shiftKey){e.preventDefault();choose(visibleBoardNodes.map(n=>n.id));}
     else if(key==="z" || (key==="y"&&!e.shiftKey)){e.preventDefault();restore(key==="y"||e.shiftKey);}
   };
   useEffect(()=>{const handle=(e:KeyboardEvent)=>shortcut.current(e);document.addEventListener("keydown",handle,true);return()=>document.removeEventListener("keydown",handle,true);},[]);
@@ -332,6 +369,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       <Action name="Back to boards" icon={<IconArrowLeft/>} run={onBack} disabled={media.busy}/>
       <div className={css.heading}><h2>{board.title}</h2></div>
       <CanvasSaveStatus status={saveStatus} updatedAt={board.updatedAt}/>
+      {visibleIds && <Action name="Clear board filter" label="Clear filter" icon={<IconX/>} run={()=>setTagFilter([])}/>}
+      <Action name="Organize board" label="Organize" icon={<IconTags/>} active={panel==="organizer"} run={()=>show("organizer")}/>
       <div className={css.history}><Action name="Undo" icon={<IconArrowBackUp/>} disabled={!previous.current.length} run={()=>restore()}/><Action name="Redo" icon={<IconArrowForwardUp/>} disabled={!next.current.length} run={()=>restore(true)}/></div>
       <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
       <Action name="Saved views" icon={<IconBookmark/>} label="Views" active={panel==="views"} run={()=>show("views")}/>
@@ -396,7 +435,16 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         <Action name="Upload media" icon={<IconUpload/>} disabled={media.busy} run={()=>uploadInput.current?.click()}/>
         <input ref={uploadInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void media.importFiles(files);}}/>
       </div>
-      {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel("")} restoreSize={edited.imageSize&&!edited.locked?()=>{patchNodes([edited.id],{...edited.imageSize});reframe([edited.id]);}:undefined} save={patch=>patchNodes([edited.id],patch)}/>}
+      {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel(fromOrganizer?"organizer":"")} restoreSize={edited.imageSize&&!edited.locked?()=>{patchNodes([edited.id],{...edited.imageSize});reframe([edited.id]);}:undefined} save={patch=>{
+        change(b=>({...b,...(categoryDraft?{categories:categoryDraft}:{}),nodes:b.nodes.map(n=>n.id===edited.id?{...n,...patch,...(tagDraft?{tagIds:tagDraft}:{})}:n)}));
+        if(tagFilter.some(id=>!(tagDraft??edited.tagIds)?.includes(id)))choose([]);
+      }}>
+        <ItemTags categories={categoryDraft??board.categories??[]} tagIds={tagDraft??edited.tagIds??[]} onChange={setTagDraft} onCategoriesChange={setCategoryDraft}/>
+      </CardFields>}
+      {panel==="organizer" && <BoardOrganizer boardId={board.id} categories={board.categories??[]} nodes={displayNodes}
+        close={()=>setPanel("")} onEdit={id=>{edit(id);setFromOrganizer(true);}}
+        onShowOnCanvas={tags=>{setTagFilter(tags);choose([]);setPanel("");reframe(board.nodes.filter(n=>tags.every(id=>n.tagIds?.includes(id))).map(n=>n.id));}}
+        onCategoriesChange={categories=>change(b=>({...b,categories}))}/>}
       {panel==="read" && <Panel title={board.nodes.find(n=>n.id===reading)?.title || "Canvas item"} close={()=>setPanel("")}><p className={css.readBody}>{board.nodes.find(n=>n.id===reading)?.body || "No additional text."}</p></Panel>}
       {panel==="edge"&&edge && <EdgeFields key={edge.id} edge={edge} close={()=>setPanel("")} save={patch=>change(b=>({...b,edges:b.edges.map(e=>e.id===edge.id?{...e,...patch}:e)}))}/>}
       {panel==="arrange" && selected.length>1 && <Panel title="Arrange selection" close={()=>setPanel("")}>
@@ -451,7 +499,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       </div>}
       <div className={css.navigation} role="toolbar" aria-label="Board navigation">
         <Action name="Snap to align" icon={<IconMagnet/>} active={snap} run={()=>{setSnap(v=>!v);setGuides([]);}}/>
-        <Action name="Select all cards" icon={<IconSelectAll/>} disabled={!board.nodes.length} run={()=>{choose(board.nodes.map(n=>n.id));setPanel("");}}/>
+        <Action name="Select all cards" icon={<IconSelectAll/>} disabled={!visibleBoardNodes.length} run={()=>{choose(visibleBoardNodes.map(n=>n.id));setPanel("");}}/>
         <Action name="Arrange cards in a grid" icon={<IconLayoutGrid/>} disabled={board.nodes.length<2} run={arrange}/>
         <i/><Action name="Zoom out" icon={<IconMinus/>} run={()=>void flow.current?.zoomOut({duration:duration()})}/>
         <button type="button" title="Reset zoom" onClick={()=>void flow.current?.zoomTo(1,{duration:duration()})}>{Math.round(zoom*100)}%</button>

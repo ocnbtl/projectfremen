@@ -252,6 +252,7 @@ export type MediaAsset = {
   nativeRef: NativeObjectRef;
   title: string;
   body: string;
+  notes?: string;
   type: MediaType;
   roles: readonly string[];
   lifecycleState: MediaLifecycleState;
@@ -429,6 +430,8 @@ export type MediaUsageEvidenceIndex = {
  * lifecycle, versions, links, and usage remain native Media contracts.
  */
 export type MediaUpdateInput = {
+  expectedUpdatedAt?: string;
+  notes?: string;
   title?: string;
   description?: string;
   reviewCadence?: string;

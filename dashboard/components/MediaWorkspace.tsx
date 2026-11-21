@@ -15,6 +15,8 @@ import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import MediaMetadataEditorSheet from "./media/MediaMetadataEditorSheet";
+import {watchMediaDetails} from "../lib/modules/media/detail-events";
+import {createMediaRepository} from "../lib/modules/media/repository";
 import MediaReviewScheduleEditorSheet from "./media/MediaReviewScheduleEditorSheet";
 import DirectoryCard from "./operational/DirectoryCard";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
@@ -484,6 +486,14 @@ export default function MediaWorkspace({
   );
   const [issue, setIssue] = useState<MediaIssue>(initialUrlState.issue);
   const [assets, setAssets] = useState(initialAssets);
+  useEffect(()=>{
+    let sequence=0;
+    const stop=watchMediaDetails(()=>{
+      const request=++sequence;
+      void createMediaRepository().list().then(result=>{if(result.ok && request===sequence)setAssets(result.data);});
+    });
+    return ()=>{sequence++;stop();};
+  },[]);
   const [resources, setResources] = useState(initialResources);
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -1230,6 +1240,7 @@ export default function MediaWorkspace({
                 <span className={styles.stateChip}>Authored context only</span>
               </div>
               <p>{summarizeBody(asset.body)}</p>
+              {asset.notes && <p><strong>Notes</strong> {asset.notes}</p>}
             </section>
 
             <section className={styles.panel} data-wide="true">
@@ -1335,7 +1346,7 @@ export default function MediaWorkspace({
             <section className={styles.panel} data-wide="true">
               <h2>Edit metadata</h2>
               <div className={styles.sourceBoundary}>
-                <strong>Titles and descriptions are editable.</strong>
+                <strong>Titles, descriptions and notes are editable.</strong>
                 <span>Automatic extraction and metadata completion are not available yet. Saved edits keep the existing file identity and references.</span>
               </div>
               <QuickActionBar

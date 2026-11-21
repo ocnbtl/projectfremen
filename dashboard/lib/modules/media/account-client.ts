@@ -5,10 +5,12 @@ import type { VaultObjectSnapshot } from "../../local-first/types";
 import type { PersonalRecord } from "../../personal-records-store";
 import type { UploadDetails } from "./organization";
 import type { MediaProfile } from "./profile";
+import { announceMediaDetails } from "./detail-events";
+import { readCanonicalMetadata } from "../../local-first/canonical-record";
 export function mediaSnapshot(record: PersonalRecord): VaultObjectSnapshot {
   return { objectId: record.mediaProfile!.manifest.objectId, objectKind: "media", versionId: record.updatedAt, updatedAt: record.updatedAt, tombstone: false,
     hlc: { wallMs: Date.parse(record.updatedAt), counter: 0, deviceId: "account" }, fieldClocks: {},
-    fields: { id: record.id, title: record.title, body: record.body, mediaManifest: record.mediaProfile!.manifest, mediaProfile: record.mediaProfile } as never };
+    fields: { id: record.id, title: record.title, body: record.body, mediaNotes:record.mediaNotes || "", mediaManifest: record.mediaProfile!.manifest, mediaProfile: record.mediaProfile } as never };
 }
 export function accountFile(object: VaultObjectSnapshot) { return (object.fields.mediaProfile as unknown as MediaProfile)?.accountFile; }
 async function post(body: unknown, signal?: AbortSignal): Promise<{ record: PersonalRecord }> {
@@ -56,7 +58,16 @@ export async function openMediaFile(object: VaultObjectSnapshot) {
   return { blob, manifest: profile.manifest };
 }
 export async function saveMediaDetails(object: VaultObjectSnapshot, fields: Record<string, unknown>) {
-  if (!accountFile(object) && browserVault.isUnlocked()) return browserVault.saveCanonicalFields(object, fields as never);
-  const result = await post({ action: "edit", recordId: object.fields.id, expectedUpdatedAt: object.updatedAt, title: fields.title ?? object.fields.title, description: fields.body ?? object.fields.body, profile: fields.mediaProfile ?? object.fields.mediaProfile });
+  const changes=Object.fromEntries(Object.entries(fields).filter(([key,value])=>JSON.stringify(value)!==JSON.stringify(object.fields[key] ?? (key==="mediaNotes"?"":null))));
+  if(!Object.keys(changes).length)return object;
+  if (!accountFile(object) && browserVault.isUnlocked() && readCanonicalMetadata(object.fields)) {
+    const current=await browserVault.readObject(object.objectId);
+    if(!current || current.tombstone || Object.keys(changes).some(key=>JSON.stringify(current.fields[key])!==JSON.stringify(object.fields[key])))throw Error("Media changed. Reopen this file before saving.");
+    const saved=await browserVault.saveCanonicalFields(current,changes as never);
+    announceMediaDetails();
+    return saved;
+  }
+  const result = await post({ action: "edit", recordId: object.fields.id, expectedUpdatedAt: object.updatedAt, title: changes.title, description: changes.body, mediaNotes:changes.mediaNotes, profile:changes.mediaProfile });
+  announceMediaDetails();
   return mediaSnapshot(result.record);
 }
