@@ -4,7 +4,9 @@ import { readTravelRecords } from "../modules/planning/travel-store";
 import { effectiveEvent } from "../modules/planning/types";
 import { readPersonalOpsState } from "../modules/personal-ops/store";
 import { readReviewsState } from "../modules/reviews/store";
-import { readFinanceState } from "../modules/finance/store";
+import { readFinanceSnapshot } from "../modules/finance/store";
+import { taskKey } from "../modules/planning/task-model";
+import { legacyGoalTasks } from "../modules/planning/task-legacy-goals";
 import { readPersonalLifeState } from "../modules/personal-life/store";
 import { readDogTrackerState } from "../modules/dog-tracker/store";
 import { LEGACY_PET_ID, PET_PROFILE_FIELDS } from "../modules/dog-tracker/types";
@@ -15,23 +17,25 @@ import type { ModuleId } from "../native-objects/types";
 import type { WritingSource } from "./usage";
 
 // Read on an explicit library request. Only marked, user-authored fields become results.
-export async function readExtraWritingSources(unavailable: Set<string> = new Set()): Promise<WritingSource[]> {
+export async function readExtraWritingSources(unavailable: Set<string> = new Set(), kind: "skill" | "object" = "skill", aliases?: Map<string,string>): Promise<WritingSource[]> {
   const read = <T,>(area:string, operation:Promise<T>) => operation.catch(() => { unavailable.add(area); return undefined; });
   const [projects, planning, personal, reviews, finance, life, pets, wellness, travel] = await Promise.all([
     read("Projects",readProjectsState()), read("Calendar and Map",readPlanningState()), read("Personal tasks",readPersonalOpsState()),
-    read("Reviews",readReviewsState()), read("Finance",readFinanceState()),read("Personal",readPersonalLifeState()),
+    read("Reviews",readReviewsState()), read("Finance",readFinanceSnapshot()),read("Personal",readPersonalLifeState()),
     read("Pets",readDogTrackerState()), Promise.all(WELLNESS_SECTIONS.map(section => read(section,readWellnessState(section)))), read("Travel",readTravelRecords())
   ]);
   const sources: WritingSource[] = [];
   function collect(area: string, href: string, row: { updatedAt?: string; archivedAt?: string }, title: string, fields: Record<string, string | undefined>) {
     if (row.archivedAt) return;
-    for (const [field, text] of Object.entries(fields)) {
-      if (text?.includes("](/admin/personal/settings?skill=")) sources.push({ key: href + ":" + field, area, href, field, title, text, updatedAt: row.updatedAt });
+    const marker = kind === "object" ? "](/admin/" : "](/admin/personal/settings?skill=";
+    const authored = kind === "object" ? {...fields, Title:title} : fields;
+    for (const [field, text] of Object.entries(authored)) {
+      if (text?.includes(marker)) sources.push({ key: href + ":" + field, area, href, field, title, text, updatedAt: row.updatedAt });
     }
   }
   const route = (module: ModuleId, objectType: string, objectId: string, containerObjectId?: string) => getNativeObjectRoute({ module, objectType, objectId, containerObjectId });
-  const activeProjects = new Set(projects?.projects.filter(p => !p.archivedAt).map(p => p.id));
-  for (const p of projects?.projects ?? []) collect("Projects", route("projects", "project", p.id), p, p.name, { Description: p.description });
+  const activeProjects = new Set(projects?.projects.filter(p => !p.archivedAt && p.lifecycle !== "archived").map(p => p.id));
+  for (const p of projects?.projects ?? []) if (activeProjects.has(p.id)) collect("Projects", route("projects", "project", p.id), p, p.name, { Description: p.description });
   for (const m of projects?.milestones ?? []) if (activeProjects.has(m.projectId)) collect("Projects", route("projects","milestone",m.id,m.projectId), m, m.title, { Description: m.description, Completion: m.completionNote });
   for (const b of projects?.blockers ?? []) if (activeProjects.has(b.projectId)) collect("Projects", route("projects","blocker",b.id,b.projectId), b, b.title, { Condition: b.condition, Resolution: b.resolution });
   for (const update of projects?.timelineEvents ?? []) if (update.isManual && activeProjects.has(update.projectId)) collect("Projects", route("projects","timeline_event",update.id,update.projectId), update, update.title, { Summary: update.summary });
@@ -41,18 +45,38 @@ export async function readExtraWritingSources(unavailable: Set<string> = new Set
   }
   for (const entry of planning?.events ?? []) {
     const event = effectiveEvent(entry);
-    if (!event.source?.cancelled) collect("Calendar", route("calendar","event",event.id), event, event.title, { Description: event.description });
+    if (event.archivedAt || event.source?.cancelled || entry.overrides?.cancelled) continue;
+    const href = route("calendar","event",event.id);
+    if (event.isTask) aliases?.set("/admin/personal?task="+encodeURIComponent(taskKey({family:"events",id:event.id})), href);
+    collect("Calendar", href, event, event.title, { Description: event.description });
   }
   for (const task of planning?.taskPlans ?? []) if (!task.source) collect("Personal","/admin/personal?task="+encodeURIComponent(task.id), task, task.title ?? "Task", { Notes: task.description });
-  for (const item of personal ? [...personal.goals,...personal.followUps,...personal.decisions,...personal.obligations,...personal.routines] : []) {
-    collect("Personal",route("personal_ops",item.objectType,item.id),item,item.title,{
+  if (kind === "object") {
+    const plans = planning?.taskPlans || [];
+    const byId = new Map(plans.map(plan => [plan.id, plan]));
+    for (const p of projects?.projects ?? []) {
+      if (!activeProjects.has(p.id) || p.lifecycle === "complete") continue;
+      for (const objective of p.objectives) {
+        const id = taskKey({family:"objectives", projectId:p.id, id:objective.id});
+        collect("Projects", "/admin/personal?task="+encodeURIComponent(id), p, objective.text, { Notes: byId.get(id)?.description, Title: objective.text });
+      }
+    }
+    for (const task of await read("Legacy goals", legacyGoalTasks(plans,"UTC")) ?? []) {
+      collect("Personal", "/admin/personal?task="+encodeURIComponent(task.id), task, task.title, { Notes:task.description, Title:task.title });
+    }
+  }
+  for (const family of ["goals","followUps","decisions","obligations","routines"] as const) for (const item of personal?.[family] ?? []) {
+    if (item.lifecycle === "archived" || item.archivedAt) continue;
+    const href = route("personal_ops",item.objectType,item.id);
+    aliases?.set("/admin/personal?task="+encodeURIComponent(taskKey({family,id:item.id})), href);
+    collect("Personal",href,item,item.title,{
       Description: "description" in item ? item.description : item.summary,
       Question: "question" in item ? item.question : undefined, Decision: "finalDecision" in item ? item.finalDecision : undefined,
       Reasoning: "rationale" in item ? item.rationale : undefined, Context: "context" in item ? item.context : undefined,
       Outcome: "outcome" in item ? item.outcome : undefined, Completion: "completionNote" in item ? item.completionNote : undefined
     });
   }
-  for (const run of reviews?.runs ?? []) collect("Reviews",route("reviews","review",run.id),run,run.title,run.summary);
+  for (const run of reviews?.runs ?? []) if (run.lifecycle !== "archived") collect("Reviews",route("reviews","review",run.id),run,run.title,run.summary);
   for (const transaction of finance?.transactions ?? []) collect("Finance",route("finance","transaction",transaction.id),transaction,transaction.merchant,{ Memo: transaction.memo });
   for (const rule of finance?.rules ?? []) collect("Finance",route("finance","finance_rule",rule.id),rule,rule.name,{ Description:rule.description });
   for (const list of life?.lists ?? []) collect("Personal",route("personal_ops","list",list.id),list,list.title,{ Description:list.description });

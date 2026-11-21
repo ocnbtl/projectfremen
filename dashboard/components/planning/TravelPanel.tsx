@@ -1,4 +1,6 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
+import { getNativeObjectRoute } from "../../lib/native-objects/routes";
 import SearchField from "../ui/SearchField";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -39,10 +41,14 @@ export default function TravelPanel({open,onClose,trips,onPlan,onShow,onPlanDest
   },[open,kind,country,query,page,retry,tab,mode]);
   const matchingRecords=entries.filter(r=>r.kind===kind&&(kind==="country"||kind==="state"||r.country===country));
   const destinations=useMemo(()=>{
-    if(mode==="mine")return filterTravelEntries(entries,savedKinds,savedStatuses,query);
+    if (mode === "mine") {
+      const matches = filterTravelEntries(entries, savedKinds, savedStatuses, query);
+      const linked = expanded === selectedId ? matches.find(entry => entry.id === selectedId) : undefined;
+      return linked ? [linked, ...matches.filter(entry => entry.id !== linked.id)] : matches;
+    }
     const base=kind==="country"?countryDestinations:kind==="state"?stateDestinations:[...items,...matchingRecords];
     return [...new Map(base.map(x=>[x.id,x])).values()].filter(d=>d.name.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name));
-  },[mode,kind,items,entries,country,query,savedKinds,savedStatuses]);
+  },[mode,kind,items,entries,country,query,savedKinds,savedStatuses,expanded,selectedId]);
   const [visible,setVisible]=useState(36);
   const quickStatus=mode==="browse"?status:null;
   const hasSavedFilters=!!(savedKinds.length||savedStatuses.length);
@@ -101,6 +107,7 @@ export default function TravelPanel({open,onClose,trips,onPlan,onShow,onPlanDest
           <AnimatePresence initial={false}>{expandedHere&&<motion.div key="details" initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} transition={{duration:reduced?0:.28,ease:[.22,1,.36,1]}} className={styles.details}>
           {mode!=="mine"&&<div className={styles.statuses}>{travelStatuses.filter(s=>s!=="lived"||!["park","landmark"].includes(d.kind)).map(s=><button type="button" key={s} data-status={s} disabled={!ready||!!busy||entry.tripVisits.some(v=>v.status===s)||(s==="visited"&&!!entry.visits?.length)} title={entry.tripVisits.some(v=>v.status===s)?"Managed by a linked trip":s==="visited"&&entry.visits?.length?"Recorded by your visit dates":undefined} aria-label={`${travelStatusLabels[s]}: ${d.name}`} aria-pressed={entry.statuses.includes(s)} onClick={()=>void toggle(d,s)}><UnigentamosIcon role={travelStatusIcons[s]} size={16}/><span>{travelStatusLabels[s]}</span></button>)}</div>}
 
+            {records.some(record => record.id === d.id && (record.statuses.length || record.visits?.length)) && <MentionBacklinks collapsed targetHref={getNativeObjectRoute({ module: "map", objectType: "travel_destination", objectId: d.id })} />}
             <TravelVisitEditor entry={entry} addRequest={dateEntry.id===d.id?dateEntry.sequence:0} busy={!!busy} onSave={visits=>saveVisits(d,visits)} onTrip={id=>{const trip=loadedTrips.find(t=>t.id===id);if(trip)onPlan(trip)}} onPlan={()=>onPlanDestination(d)}/>
             {d.latitude!==undefined&&<button type="button" className={styles.textAction} onClick={()=>onShow(d)}><UnigentamosIcon role="location" size={16}/>Show on map</button>}
           </motion.div>}</AnimatePresence>

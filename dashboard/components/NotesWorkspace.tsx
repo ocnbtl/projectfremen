@@ -99,6 +99,7 @@ import {
 } from "../lib/native-objects/url-state";
 import type { NativeObjectRef } from "../lib/native-objects/types";
 import { createNativeObjectRef, getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
+import MentionBacklinks from "./writing/MentionBacklinks";
 import styles from "./content-graph/ContentGraphWorkspace.module.css";
 
 type NotesWorkspaceProps = {
@@ -1225,6 +1226,7 @@ export default function NotesWorkspace({
       <DetailTabPanel tabsId={tabsId} tabId="links" active>
         <div className={styles.overviewGrid}>
           <UsedOnBoards key={note.id} module="notes" ids={[note.id]}/>
+          <MentionBacklinks targetHref={note.nativeRef.route} />
           <div className={styles.panel} data-wide="true">
             <NoteLinksManager
               noteRef={note.nativeRef}

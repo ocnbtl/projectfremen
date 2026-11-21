@@ -1,4 +1,5 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
 
 import { WritingValue } from "../writing/WritingText";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -119,6 +120,7 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
         {draftKind.fields.map(field => <label key={field.id} data-wide={field.type === "textarea" || undefined}>{field.label}{field.id === "recipeId" ? <SelectField value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)}><option value="">No recipe</option>{entries.filter(item => item.kind === "recipe" && (!item.archived || item.id === draft.fields.recipeId)).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</SelectField> : field.type === "select" ? <SelectField value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)}><option value="">Not recorded</option>{field.options?.map(value => <option key={value}>{value}</option>)}</SelectField> : field.type === "textarea" ? <textarea rows={3} maxLength={8000} value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)} /> : <input type={field.type} min={field.min} max={field.max} step={field.type === "number" ? "any" : undefined} maxLength={300} value={draft.fields[field.id] || ""} onChange={event => setField(field.id, event.target.value)} />}</label>)}
         <label data-wide="true">{draft.kind === "recipe" ? "Instructions & notes" : "Notes"}<textarea rows={3} maxLength={12000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} placeholder="Optional" /></label>
         {error && <p data-wide="true" role="alert" className={styles.error}>{error}</p>}
+        {draft.id && <div data-wide="true"><MentionBacklinks collapsed targetHref={"/admin/personal/" + section + "?entry=" + encodeURIComponent(draft.id)} /></div>}
         <footer className={styles.formFooter}>{draft.id && !draft.archived && <WorkspaceButton icon="archive" busy={busy} onClick={() => void save({ ...draft, archived: true })}>Archive</WorkspaceButton>}<span /><WorkspaceButton disabled={busy} onClick={() => setDraft(null)}>Cancel</WorkspaceButton><WorkspaceButton type="submit" intent="primary" icon="check" busy={busy}>Save</WorkspaceButton></footer>
       </form>}
     </WorkspaceSheet>

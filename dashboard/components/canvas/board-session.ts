@@ -1,5 +1,6 @@
 import { boardContents,type Board } from "../../lib/modules/canvas/model";
 import { buildCsrfHeaders, buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
+import { notifyWritingSourcesChanged } from "../../lib/writing/source-changes";
 
 const endpoint = "/api/personal/canvas";
 export class BoardRequestError extends Error {
@@ -27,6 +28,16 @@ export async function getBoard(id: string) {
 function sameContent(a: Board, b: Board) {
   // A retried save can return the same frame fields in the server's canonical key order.
   return JSON.stringify(boardContents(a)) === JSON.stringify(boardContents(b));
+}
+
+// Moving and resizing cards do not change where a mention was written.
+function mentionedText(board: Board) {
+  const marked = board.nodes.flatMap(node => {
+    const fields = [node.title,node.body,node.notes,...(node.imagePins ?? []).map(pin => pin.text)];
+    if (!fields.some(value => value?.includes("](/admin/"))) return [];
+    return [[node.id,node.title,node.ref?.route,...fields]];
+  });
+  return marked.length ? JSON.stringify([board.title,marked]) : "";
 }
 
 export class BoardSession {
@@ -86,6 +97,7 @@ export class BoardSession {
             throw new Error("This board changed in another tab. Save your edits as a separate board to keep both versions.");
           }
         }
+        if (mentionedText(this.saved) !== mentionedText(result)) notifyWritingSourcesChanged();
         this.saved = result;
         this.board = this.board === snapshot ? result : {...this.board, revision:result.revision, updatedAt:result.updatedAt};
       } catch (error) {
@@ -108,7 +120,9 @@ export class BoardSession {
     const copy = {...this.board, title, id:empty.id, revision:empty.revision};
     if (sameContent(empty,copy)) return empty;
     if (empty.revision !== 1) throw new Error("The recovery copy has also changed. Your edits are still open.");
-    return (await canvasRequest<{board:Board}>("", "PUT", {board:copy, expectedRevision:empty.revision})).board;
+    const savedCopy = (await canvasRequest<{board:Board}>("", "PUT", {board:copy, expectedRevision:empty.revision})).board;
+    if (mentionedText(savedCopy)) notifyWritingSourcesChanged();
+    return savedCopy;
   }
 }
 

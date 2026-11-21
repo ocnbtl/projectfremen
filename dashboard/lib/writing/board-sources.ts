@@ -4,13 +4,13 @@ import type { PersonalRecord } from "../personal-records-store";
 import type { WritingSource } from "./usage";
 import { legacyAdPrompt } from "./legacy-prompt";
 
-export function boardWritingSources(board: Board, media: Map<string, PersonalRecord>): WritingSource[] {
+export function boardWritingSources(board: Pick<Board,"id"|"title"|"updatedAt"|"nodes">, media: Map<string, PersonalRecord>, cardNumbers?: number[]): WritingSource[] {
   const result: WritingSource[] = [];
   for (const [i, node] of board.nodes.entries()) {
     const href = "/admin/personal/canvas?" + new URLSearchParams({board:board.id, card:node.id});
     const mediaId = node.ref?.module === "media" ? sourceObjectId(node.ref) : undefined;
     const file = mediaId ? media.get(mediaId) : undefined;
-    const title = [board.title, file?.title || (!mediaId && node.title) || "Card " + (i + 1)].join(" / ");
+    const title = [board.title, file?.title || (!mediaId && node.title) || "Card " + (cardNumbers?.[i] ?? i + 1)].join(" / ");
     const add = (field: string, text?: string, fieldId = field) => {
       if (text) result.push({key:["canvas", board.id, node.id, fieldId].join(":"), title, area:"Canvas", field, href, text, updatedAt:board.updatedAt,
         ...(field === "Notes" ? {legacyPrompt:legacyAdPrompt(text)} : {})});

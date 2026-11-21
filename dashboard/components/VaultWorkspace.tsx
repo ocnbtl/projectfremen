@@ -35,6 +35,7 @@ import {
 import styles from "./VaultWorkspace.module.css";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
 import QuickActionBar from "./operational/QuickActionBar";
+import MentionBacklinks from "./writing/MentionBacklinks";
 
 type VaultStatus = Awaited<ReturnType<typeof browserVault.status>>;
 type BootstrapObject = { canonicalId: string; objectKind: VaultObjectKind; fields: Record<string, VaultFieldValue> };
@@ -275,6 +276,7 @@ export default function VaultWorkspace({
   const [journalId, setJournalId] = useState<string | null>(null);
   const [historyCount, setHistoryCount] = useState(0);
   const [objects, setObjects] = useState<VaultObjectSnapshot[]>([]);
+  const [workspaceMentionRoutes, setWorkspaceMentionRoutes] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [activeKind, setActiveKind] = useState<VaultObjectKind | "all">(initialKind);
   const [returnRoot, setReturnRoot] = useState<HTMLDivElement | null>(null);
   useWorkspaceReturn(returnRoot);
@@ -324,15 +326,21 @@ export default function VaultWorkspace({
     refresh().then(() => setMessage((current) => current === "Checking this device…" ? "" : current)).catch(() => setMessage("We could not check this device. Try again.")).finally(() => setCheckingDevice(false));
     const handleOnline = () => { setOnline(navigator.onLine); void browserVault.syncOnce().finally(refresh); };
     const handleVaultDataChanged = () => { void Promise.all([loadObjects(), refresh()]); };
+    const handleLock = () => {
+      setWorkspaceMentionRoutes(new Map());
+      workspaceRefreshStarted.current = false;
+    };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOnline);
     window.addEventListener("unigentamos-vault-data-changed", handleVaultDataChanged);
+    window.addEventListener("unigentamos-vault-locked", handleLock);
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOnline);
       window.removeEventListener("unigentamos-vault-data-changed", handleVaultDataChanged);
+      window.removeEventListener("unigentamos-vault-locked", handleLock);
     };
   }, [loadObjects, refresh]);
 
@@ -484,10 +492,23 @@ export default function VaultWorkspace({
     await run(async () => {
       const response = await fetch("/api/vault/bootstrap", { cache: "no-store" });
       const payload = await response.json() as { ok?: boolean; objects?: BootstrapObject[]; error?: string };
-      if (response.status === 401) throw new Error(VAULT_ONLINE_SIGN_IN_MESSAGE);
+      if (response.status === 401) {
+        setWorkspaceMentionRoutes(new Map());
+        throw new Error(VAULT_ONLINE_SIGN_IN_MESSAGE);
+      }
       if (!response.ok || !payload.ok || !payload.objects) throw new Error(payload.error || "We could not refresh your workspace. Try again.");
+      // Only use routes supplied by the authenticated owner. Local-only IDs stay on this device.
+      const routes = new Map<string, string>();
       let changed = 0;
       for (const item of payload.objects) {
+        const record = readCanonicalMetadata(item.fields);
+        if (record?.canonicalId === item.canonicalId && (
+          (record.module === "personal-records" && ["person", "org", "note", "resource", "file"].includes(record.collection))
+          || (record.module === "projects" && record.collection === "projects")
+          || (record.module === "reviews" && record.collection === "runs")
+          || (record.module === "map" && record.collection === "places")
+          || (record.module === "calendar" && record.collection === "events")
+        )) routes.set(record.canonicalId, record.route);
         const objectId = await deterministicVaultObjectId(item.canonicalId);
         const mirrored = await browserVault.mirrorCanonicalObject({
           objectId,
@@ -497,6 +518,7 @@ export default function VaultWorkspace({
         if (mirrored.changed) changed += 1;
         if (!quiet && changed > 0 && changed % 10 === 0) setMessage(`Adding ${changed} items to the Vault…`);
       }
+      if (browserVault.isUnlocked()) setWorkspaceMentionRoutes(routes);
       await browserVault.syncUntilSettled();
       await loadObjects();
       if (!quiet) setMessage(changed ? `Updated ${changed} item${changed === 1 ? "" : "s"} from your workspace.` : "Your Vault already has the latest workspace data.");
@@ -934,6 +956,7 @@ export default function VaultWorkspace({
   const selectedObject = objects.find((item) => item.objectId === selectedObjectId) || null;
   const editorKind = selectedObject?.objectKind || activeKind;
   const selectedCanonical = selectedObject ? readCanonicalMetadata(selectedObject.fields) : null;
+  const mentionRoute = selectedCanonical && workspaceMentionRoutes.get(selectedCanonical.canonicalId);
   const editorFields = selectedCanonical?.editableFields.filter(field => !field.hidden) || [];
   const selectedArchived = Boolean(selectedObject?.fields.archivedAt)
     || selectedObject?.fields.lifecycle === "archived"
@@ -1311,6 +1334,7 @@ export default function VaultWorkspace({
                   </dl>}
                 </div> : <div className={styles.editorEmpty}><strong>Choose a record</strong><span>Select an item to see its details and full history.</span></div>}
 
+                {online && status.unlocked && !onlineAuthorizationRequired && mentionRoute && <MentionBacklinks targetHref={mentionRoute} collapsed />}
                 {selectedCanonical && <section className={styles.connectionsPanel} aria-label="Connected records">
                   <div>
                     <span className={styles.recordType}>Record spine</span>

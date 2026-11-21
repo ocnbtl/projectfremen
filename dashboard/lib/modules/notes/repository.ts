@@ -1,6 +1,7 @@
 "use client";
 
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
+import { notifyWritingSourcesChanged } from "../../writing/source-changes";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import type { PersonalRecord } from "../../personal-records-store";
 import { mirrorPersonalRecord } from "../../local-first/domain-mirror";
@@ -150,6 +151,7 @@ async function requestRecords(
     });
   }
 
+  if (init?.method && init.method !== "GET") notifyWritingSourcesChanged();
   return { ok: true, data: payload.items };
 }
 

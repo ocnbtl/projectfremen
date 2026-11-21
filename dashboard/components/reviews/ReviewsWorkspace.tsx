@@ -65,7 +65,8 @@ import type {
   ReviewStructuredSummary,
   ReviewsState
 } from "../../lib/modules/reviews/types";
-import { createNativeObjectRef } from "../../lib/native-objects/routes";
+import { createNativeObjectRef, getNativeObjectRoute } from "../../lib/native-objects/routes";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import { NATIVE_MODULES, type ModuleId, type NativeObjectRef } from "../../lib/native-objects/types";
 import {
   parseReviewsUrlState,
@@ -1656,6 +1657,7 @@ export default function ReviewsWorkspace({
         {initialMode !== "detail" && !reviewIsReadOnly(run) && <p className={styles.reviewProgress}>{counts.resolved} of {counts.required} required checks complete · {counts.blockers.length} completion blocker{counts.blockers.length === 1 ? "" : "s"}</p>}
         <ReviewPeriodOverview start={run.periodStart} end={run.periodEnd}/>
         {renderSummary(run)}
+        {urlState.tab === "overview" && <MentionBacklinks collapsed targetHref={getNativeObjectRoute({module: "reviews", objectType: "review_run", objectId: run.id})} />}
         <section className={styles.panel} data-span="full">
           <div className={styles.panelHeader}>
             <div><h2>Linked source context</h2><p>Keep the records that support your conclusions together.</p></div>

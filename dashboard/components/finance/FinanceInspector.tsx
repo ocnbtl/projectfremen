@@ -1,4 +1,5 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
 
 import { WritingValue } from "../writing/WritingText";
 import FinanceMerchantAvatar,{FinanceMerchantPanel} from "./FinanceMerchants";
@@ -24,7 +25,7 @@ import type { FinanceTransactionsViewModel } from "../../lib/modules/finance/tra
 import type { FinanceAuditEvent, FinanceRecordKind, FinanceState } from "../../lib/modules/finance/native-types";
 import type { FinanceLinkedContext, FinanceTransaction } from "../../lib/modules/finance/types";
 import type { FinanceTab } from "../../lib/native-objects/url-state";
-import { createNativeObjectRef, getModuleRoute, getModuleViewRoute } from "../../lib/native-objects/routes";
+import { createNativeObjectRef, getModuleRoute, getModuleViewRoute, getNativeObjectRoute } from "../../lib/native-objects/routes";
 import { Chip, Icon, money } from "./FinancePrimitives";
 import type { FinanceOperation } from "./FinanceMutationDialog";
 import styles from "./FinanceOperational.module.css";
@@ -363,6 +364,7 @@ export default function FinanceInspector({
           </DetailTabPanel>
 
           <DetailTabPanel tabsId="finance-object-tabs" tabId="links" active={safeTab === "links"} className={styles.inspectorPanel}>
+            {safeTab === "links" && <MentionBacklinks targetHref={getNativeObjectRoute({ module: "finance", objectType: "transaction", objectId: transaction.id })} />}
             <section className={styles.inspectorSection}>
               <h3>Related records</h3>
 
@@ -387,6 +389,7 @@ export default function FinanceInspector({
         </div>
       )}
 
+      {safeTab === "overview" && (accountRow || billRow || budgetRow) && <MentionBacklinks collapsed targetHref={getNativeObjectRoute({ module: "finance", objectType: objectKind, objectId: objectId })} />}
       {accountRow && <FinanceAccountDetails row={accountRow} state={financeState} tab={safeTab} onOperation={onOperation}/> }
 
       {billRow && (

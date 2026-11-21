@@ -1,4 +1,6 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
+import { getNativeObjectRoute } from "../../lib/native-objects/routes";
 import { WritingValue } from "../writing/WritingText";
 import PlaceImagePicker from "./PlaceImagePicker";
 import { placeDisplayName, formatPlaceCoordinates } from "../../lib/modules/planning/place-presentation";
@@ -26,6 +28,7 @@ export default function MapPlaceProfile({ place, picture, classification, onImag
       <p className={styles.coordinates}><UnigentamosIcon role="location" candidate="current-location" size={16} /><span>{pinned ? formatPlaceCoordinates(place.latitude, place.longitude) : "No map pin yet"}</span></p>
       <div className={styles.tags}>{place.tags.filter(tag => !classification?.type || !["organization", "school"].includes(tag.toLowerCase())).map(tag => <PlaceTagLabel key={tag} tag={tag}/>)}{Object.values(classification || {}).filter(Boolean).map(value => <span key={value}>{value}</span>)}</div>
       {place.notes && <p className={styles.notes}><WritingValue>{place.notes}</WritingValue></p>}
+      <MentionBacklinks collapsed targetHref={getNativeObjectRoute({ module: "map", objectType: "place", objectId: place.id })} />
       <RelatedRecordsView {...related} compact hideEmpty />
     </div>
     <footer className={styles.actions}>

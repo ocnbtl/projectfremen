@@ -275,6 +275,11 @@ function pruneExpiredImportPreviews(state: FinanceState, now = new Date().toISOS
   return importPreviews.length === state.importPreviews.length ? state : { ...state, importPreviews };
 }
 
+/** Inspect saved Finance fields without running import-preview maintenance. */
+export async function readFinanceSnapshot(): Promise<FinanceState> {
+  return assertState(await readJsonFile<unknown>(FILE_NAME, createEmptyFinanceState()));
+}
+
 export async function readFinanceState(): Promise<FinanceState> {
   // This fallback must stay empty. Passing demonstration data here could seed production app_state.
   return mutateJsonFile<unknown, FinanceState>(FILE_NAME, createEmptyFinanceState(), async (value) => {

@@ -12,6 +12,7 @@ import Icon from "../icons/UnigentamosIcon";
 import { boardSummary, type Board, type BoardSummary } from "../../lib/modules/canvas/model";
 import { colors } from "./board-layout";
 import { BoardSession, canvasRequest, getBoard, keepPendingBoard, takePendingBoard } from "./board-session";
+import { notifyWritingSourcesChanged } from "../../lib/writing/source-changes";
 import styles from "./CanvasWorkspace.module.css";
 
 const CanvasEditor = dynamic(() => import("./CanvasEditor"), {
@@ -210,6 +211,7 @@ export default function CanvasWorkspace() {
         }
         const {board} = await canvasRequest<{board:Board}>("", "PUT", { board:{...fresh,title,folder:nextFolder},expectedRevision:fresh.revision });
         commitSummary(board);
+        if (board.title !== fresh.title) notifyWritingSourcesChanged();
         if (folder && folder !== "folder:" + nextFolder) setFolder("");
       } else {
         const {board} = await canvasRequest<{board:Board}>("", "POST", { id:form.id,title,folder:nextFolder });

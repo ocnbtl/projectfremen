@@ -6,6 +6,8 @@ import MediaBulkEditSheet from "./MediaBulkEditSheet";
 import {applyMediaBulkEdit,type MediaBulkEdit} from "../../lib/modules/media/bulk-edit";
 import MediaDetailsFields from "./MediaDetailsFields";
 import UsedOnBoards from "../canvas/UsedOnBoards";
+import MentionBacklinks from "../writing/MentionBacklinks";
+import { getNativeObjectRoute } from "../../lib/native-objects/routes";
 import LegacyPromptSkill from "./LegacyPromptSkill";
 import {MEDIA_PURPOSES,mediaSearchText} from "../../lib/modules/media/organization";
 import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
@@ -24,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { browserVault } from "../../lib/local-first/browser-engine";
 import { mirrorPersonalRecord } from "../../lib/local-first/domain-mirror";
-import { pendingCanonicalCommands } from "../../lib/local-first/canonical-record";
+import { pendingCanonicalCommands, readCanonicalMetadata } from "../../lib/local-first/canonical-record";
 import {watchMediaDetails} from "../../lib/modules/media/detail-events";
 import type {
   VaultObjectSnapshot,
@@ -439,6 +441,7 @@ export default function MediaLibrary({
   const position = selected
     ? visible.findIndex((x) => x.objectId === selected.objectId)
     : -1;
+  const recordId = selected && (readCanonicalMetadata(selected.fields)?.recordId || selected.fields.id);
   return (
     <ModuleShell module="media" detailOpen={Boolean(selected)} onBack={() => setSelected(undefined)} sidebar={<ModuleSidebar title="Media" sections={[]} />} inspector={<section className="media-detail-page">        {selected && profile && (
           <div className="work-form">
@@ -487,6 +490,7 @@ export default function MediaLibrary({
             <label>Notes<textarea aria-label="Media notes" rows={3} maxLength={20000} value={notes} onChange={e=>setNotes(e.target.value)}/></label>
             <LegacyPromptSkill notes={notes} />
             <UsedOnBoards key={selected.objectId} module="media" ids={[String(selected.fields.id || ""),selected.objectId]}/>
+            {typeof recordId === "string" && recordId && <MentionBacklinks collapsed targetHref={getNativeObjectRoute({module: "media", objectType: "media_asset", objectId: recordId})} />}
             <div className="work-actions">
               <Button intent="primary" busy={busy} onClick={() => void save()}>
                 Save details

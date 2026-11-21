@@ -6,6 +6,7 @@ import type { NativeObjectRef } from "../../lib/native-objects/types";
 import type { ObjectLink } from "../../lib/native-objects/links";
 import { buildProfileRecordEdges, collectProfileConnections, profileConnectionKey, profileRecordReferences, resolveProfileTarget, type ProfileRecordEdge } from "../../lib/modules/people/profile-connections";
 import { useRelatedRecords } from "../planning/RelatedRecords";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import PeopleProfilePreview from "./PeopleProfilePreview";
 import { PeopleProfileAvatar } from "./PeopleProfilePhoto";
@@ -42,6 +43,7 @@ export default function PeopleLinksPanel({person,people,targets,links,edges,proj
       return <article key={profileConnectionKey(item.ref)}>{record ? <PeopleProfilePreview person={record} onOpen={onOpenPerson}>{content}</PeopleProfilePreview> : <Link prefetch={false} href={item.ref.route}>{content}</Link>}{item.linkIds.length===1 && <button type="button" className={styles.unlink} disabled={busy} aria-label={`Remove direct link to ${item.ref.label}`} title="Remove direct link; profile and other connections are kept" onClick={()=>{const link=links.find(link=>link.id===item.linkIds[0]);if(link)onRemove(link);}}><UnigentamosIcon role="close" size={16}/></button>}</article>;
     })}</div></section>;})}</div>
     {!visible.length && <p>{query ? "No links match your search." : "No linked objects yet."}</p>}
+    {source && <MentionBacklinks targetHref={source.route} />}
     {savedReferences.length>0 && <details><summary>Saved references · {savedReferences.length}</summary><p>These names or IDs have no unique active match. They are preserved for review.</p>{savedReferences.map(value=><div key={value}>{value}</div>)}</details>}
     {person.externalSources.length>0 && <section><h4><UnigentamosIcon role="link" size={18}/>External sources</h4><div className={styles.sources}>{person.externalSources.map((value,index)=>/^https?:\/\//i.test(value) ? <a key={index} href={value} target="_blank" rel="noreferrer">{value}</a> : <span key={index}>{value}</span>)}</div></section>}
   </section>;

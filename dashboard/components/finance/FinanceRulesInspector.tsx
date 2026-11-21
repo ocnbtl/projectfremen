@@ -1,4 +1,6 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
+import { getNativeObjectRoute } from "../../lib/native-objects/routes";
 
 import { WritingValue } from "../writing/WritingText";
 import Link from "next/link";
@@ -246,6 +248,7 @@ export default function FinanceRulesInspector({
         </DetailTabPanel>
 
         <DetailTabPanel tabsId="finance-rule-tabs" tabId="links" active={safeTab === "links"} className={styles.inspectorPanel}>
+          {safeTab === "links" && <MentionBacklinks targetHref={getNativeObjectRoute({ module: "finance", objectType: "finance_rule", objectId: rule.id })} />}
           {rule.linkedObjects.length ? (
             <section className={`${styles.inspectorSection} ${styles.linkList}`}>
               <h3>Verified owner-route references</h3>

@@ -69,6 +69,7 @@ import {
   type ResourcesUrlState
 } from "../lib/native-objects/url-state";
 import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
+import MentionBacklinks from "./writing/MentionBacklinks";
 import styles from "./content-graph/ContentGraphWorkspace.module.css";
 
 type ResourcesWorkspaceProps = {
@@ -748,6 +749,7 @@ export default function ResourcesWorkspace({
     if (activeTab === "links") {
       return (
         <DetailTabPanel tabsId={tabsId} tabId="links" active>
+          <MentionBacklinks targetHref={selectedResource.nativeRef.route} />
           <ResourceLinksView
             resource={selectedResource}
             links={objectLinks}

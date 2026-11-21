@@ -1,5 +1,6 @@
 "use client";
 import { WritingValue } from "../writing/WritingText";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import { DirectoryLayout, MorphingLi, MorphingSpan } from "../ui/DirectoryLayout";
 import SearchField from "../ui/SearchField";
 import { WorkspaceNavSlot } from "../admin-shell/WorkspaceTopbar";
@@ -60,6 +61,7 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
             : <p key={id}>{person ? `${person.title} (archived)` : "Profile unavailable"}</p>;
         })}{!item.participantIds.length && <p>No participants recorded.</p>}</div></section>
         <section className="people-interaction-detail-notes"><h3>Notes</h3><p><WritingValue>{item.summary || "No additional notes recorded."}</WritingValue></p></section>
+        {item.source === "record" && <MentionBacklinks collapsed targetHref={`/admin/people?sidebar=interactions&interaction=${encodeURIComponent(item.id)}`} />}
         <dl className="people-interaction-detail-facts">
           {item.approach && <div><dt>Approach</dt><dd>{label(item.approach)}</dd></div>}
         </dl>

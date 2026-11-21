@@ -1,4 +1,5 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import { WritingValue } from "../writing/WritingText";
 import { memo, useContext, useMemo, useState, type ReactNode, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -100,6 +101,7 @@ function TaskEditor({item,occurrence,zone,snapshot,busy,onBack,onSave,onComplete
     <div className={styles.top}><Button className={styles.backButton} onClick={onBack}><span className={styles.backLabel}><UnigentamosIcon role="chevron-right" size={16} style={{transform:"rotate(180deg)"}}/>Back to tasks</span></Button></div>
     <div className={styles.identityFields}><label>Task<input aria-label="Task name" required maxLength={240} value={draft.title} onChange={e=>update({title:e.target.value})}/></label><label>Type<SelectField contained aria-label="New task type" optionIcons={taskTypeIcons} value={draft.kind} onChange={e=>update({kind:e.target.value as TaskItem["kind"]})}>{Object.entries(TASK_KINDS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</SelectField></label></div>
     <label>Notes<textarea aria-label="Task notes" rows={2} value={draft.description} onChange={e=>update({description:e.target.value})}/></label>
+    {(item.updatedAt || item.source) && <MentionBacklinks collapsed targetHref={"/admin/personal?task=" + encodeURIComponent(item.id)} />}
     <TaskDetailFields draft={draft} update={update} zone={zone}/>
     <TaskScheduleFields draft={draft} update={update} zone={zone} onRepeatError={setRepeatError}/>
     {repeatError&&<p role="alert">{repeatError}</p>}

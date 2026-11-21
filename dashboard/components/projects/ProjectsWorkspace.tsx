@@ -40,6 +40,7 @@ import SystemState from "../operational/SystemState";
 import LinkedDecisionsPanel from "../operational/LinkedDecisionsPanel";
 import LinkedFollowUpsPanel from "../operational/LinkedFollowUpsPanel";
 import UsedOnBoards from "../canvas/UsedOnBoards";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import { usePersonalOpsDecisions } from "../operational/usePersonalOpsDecisions";
 import { usePersonalOpsFollowUps } from "../operational/usePersonalOpsFollowUps";
 import {
@@ -2510,6 +2511,7 @@ export default function ProjectsWorkspace({
           </div>
         </header>
 
+        {(milestone || blocker) && <MentionBacklinks collapsed targetHref={getNativeObjectRoute({ module: "projects", objectType: milestone ? "milestone" : "blocker", objectId: selectedChildId, containerObjectId: item.project.id })} />}
         {milestone && (
           <div className={inspectionStyles.body}>
             <div className={inspectionStyles.milestoneSummary}>
@@ -2697,6 +2699,7 @@ export default function ProjectsWorkspace({
         <DetailTabPanel tabsId={tabsId} tabId="activity" active={visibleProjectTab(activeTab) === "activity"}>{renderTimeline(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="links" active={visibleProjectTab(activeTab) === "links"}>
           <UsedOnBoards key={item.project.id} module="projects" ids={[item.project.id,item.project.slug,item.project.legacyKey]}/>
+          {visibleProjectTab(activeTab) === "links" && <MentionBacklinks targetHref={item.project.nativeRef.route} />}
           <div className={styles.projectLinks}><div className={styles.linkColumn}>{renderPeople(item)}{renderFilesLinks(item)}</div><div className={styles.linkColumn}>{renderNotesDecisions(item)}{renderReviewCoverage(item)}</div><RelatedRecords module="projects" type="project" id={item.project.id} hideEmpty /></div>
         </DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="properties" active={activeTab === "properties"}>{renderProperties(item)}</DetailTabPanel>

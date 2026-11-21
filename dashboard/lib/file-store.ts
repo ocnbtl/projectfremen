@@ -1,4 +1,5 @@
 import { constants as fsConstants } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { access, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -12,6 +13,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL?.trim() || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
 let resolvedDataDirPromise: Promise<string> | null = null;
 const writeQueues = new Map<string, Promise<void>>();
+const readOnlyScope = new AsyncLocalStorage<boolean>();
+
+/** A cross-workspace lookup may read existing documents and fallbacks without seeding them. */
+export function withReadOnlyDocuments<T>(read: () => Promise<T>) {
+  return readOnlyScope.run(true, read);
+}
 let ephemeralWarningShown = false;
 
 type SupabaseConfig = {
@@ -276,6 +283,8 @@ export async function readJsonFile<T>(fileName: string, fallback: T): Promise<T>
     await pendingWrite.catch(() => undefined);
   }
 
+  if (readOnlyScope.getStore()) return readJsonFileUnlocked(fileName, fallback);
+
   const supabase = getSupabaseConfig();
   if (supabase) {
     const value = await readJsonFromSupabase<T>(fileName, supabase);
@@ -396,6 +405,30 @@ export async function mutateJsonFile<T, Result>(
 
 export async function getWritableDataDir(): Promise<string> {
   return getDataDirectory();
+}
+
+/** Version-only projection for a server-defined set of documents and a paged document family. */
+export async function providerDocumentVersions(names: string[], prefix: string): Promise<string | null> {
+  const config = getSupabaseConfig();
+  if (!config) return null;
+  if (!names.every(name => /^[a-z0-9.-]+$/.test(name)) || !/^[a-z0-9-]+-$/.test(prefix)) throw new Error("Invalid document filter");
+  const versions: [string,string][] = [];
+  const limit = 250;
+  let after = "";
+  while (true) {
+    const query = new URLSearchParams({select:"key,updated_at", order:"key.asc", limit:String(limit),
+      or:"(key.in.(" + names.join(",") + "),key.like." + prefix + "*.json)"});
+    if (after) query.set("key","gt." + after);
+    const response = await fetch(config.url + "/rest/v1/app_state?" + query, {headers:supabaseHeaders(config), cache:"no-store"});
+    if (!response.ok) throw new Error("Unable to check document versions");
+    const rows: {key:string; updated_at:string}[] = await response.json();
+    for (const row of rows) {
+      if (typeof row.key !== "string" || typeof row.updated_at !== "string" || row.key <= after) throw new Error("Invalid document version");
+      versions.push([row.key, row.updated_at]);
+      after = row.key;
+    }
+    if (rows.length < limit) return JSON.stringify(versions);
+  }
 }
 
 /** List summaries written alongside their documents, without fetching document bodies from the provider. */

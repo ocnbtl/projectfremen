@@ -10,6 +10,7 @@ export type WritingSource = {
   updatedAt?: string;
   legacyPrompt?: string;
   promptRecord?: boolean;
+  markdown?: boolean;
 };
 export type WritingUsage = Pick<WritingSource, "key" | "title" | "field" | "area" | "text" | "href" | "updatedAt">;
 

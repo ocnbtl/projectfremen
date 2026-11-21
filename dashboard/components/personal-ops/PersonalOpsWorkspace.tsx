@@ -1,4 +1,6 @@
 "use client";
+import { taskKey } from "../../lib/modules/planning/task-model";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import { WritingValue } from "../writing/WritingText";
 import { DirectoryLayout, MorphingArticle, MorphingDiv, MorphingButton, MorphingP, usePersonalDirectoryView } from "../ui/DirectoryLayout";
 import PersonalCardStatusControl, { personalCardStatusChoices } from "./PersonalCardStatusControl";
@@ -1773,6 +1775,7 @@ export default function PersonalOpsWorkspace({
                         {selectedItem.sourceRefs.length + selectedItem.linkedRefs.length ? (
                           <ul>{[...selectedItem.sourceRefs, ...selectedItem.linkedRefs].map((ref) => <li key={`${ref.module}:${ref.objectType}:${ref.containerObjectId || "root"}:${ref.objectId}`}><Link prefetch={false} href={ref.route} style={{display:"inline-flex",alignItems:"center",gap:6}}><EventObjectIdentity record={{...ref,preview:linkedPreviews[`${ref.module}:${ref.objectType}:${ref.objectId}`]}} />{ref.label}</Link> <small>({cleanLabel(ref.module)})</small></li>)}</ul>
                         ) : <p>No linked items.</p>}
+                        <MentionBacklinks targetHref={"/admin/personal?task=" + encodeURIComponent(taskKey({ family: familyForObject(selectedItem), id: selectedItem.id }))} />
                       </PersonalOpsPanel>
                     )}
 

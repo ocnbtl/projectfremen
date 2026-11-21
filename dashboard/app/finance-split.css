@@ -154,6 +154,12 @@
 }
 @media (prefers-reduced-motion:reduce) { .finance-flow-line { animation: none; } .finance-flow-point { transition: none; } }
 
+/* On the full-page mobile inspector, keep links in the page's scroll flow above the action footer. */
+@media (max-width:760px) {
+  .finance-split-workspace .workspace-detail-page > .finance-right-rail:has([data-writing-mentions]) { max-height:none; }
+  .finance-split-workspace .workspace-detail-page > .finance-right-rail:has([data-writing-mentions]) > .inspector-rail__content { flex:none; }
+}
+
 @media (max-width:480px) {
   .finance-split-workspace .finance-summary-grid { grid-template-columns: minmax(0,1fr); gap: 0; }
   .finance-split-workspace .finance-summary-grid article { grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 5px 16px; padding: 12px 0; border-right: 0; border-bottom: 1px solid var(--border); }

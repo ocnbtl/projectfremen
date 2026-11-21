@@ -26,6 +26,7 @@ import EvidenceChecklist from "./operational/EvidenceChecklist";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedNotesPanel from "./operational/LinkedNotesPanel";
 import UsedOnBoards from "./canvas/UsedOnBoards";
+import MentionBacklinks from "./writing/MentionBacklinks";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import ObjectHeader from "./operational/ObjectHeader";
@@ -1434,6 +1435,7 @@ export default function MediaWorkspace({
 
         <DetailTabPanel tabsId={tabsId} tabId="links" active={activeTab === "links"}>
           <div className={styles.overviewGrid}>
+            {activeTab === "links" && <MentionBacklinks targetHref={asset.nativeRef.route} />}
             <LinkedNotesPanel
               source={asset.nativeRef}
               state={noteLinksState}
@@ -1837,6 +1839,7 @@ export default function MediaWorkspace({
         {activeTab !== "review" && (
           <DetailTabPanel tabsId={tabsId} tabId={activeTab} active>
             <div className={styles.overviewGrid}>
+              {activeTab === "links" && <MentionBacklinks targetHref={asset.nativeRef.route} />}
               <section className={styles.panel} data-wide="true">
                 <SystemState
                   variant="read_only"

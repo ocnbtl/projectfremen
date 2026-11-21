@@ -1,4 +1,5 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
@@ -537,6 +538,7 @@ export default function MediaInUseWorkspace({
     if (tab === "links") {
       return (
         <div className={styles.inspectorStack}>
+          {selectedRecord.asset && <MentionBacklinks targetHref={selectedRecord.asset.nativeRef.route} />}
           <section className={baseStyles.panel}>
             <h2>Native owner references</h2>
             {placementList(selectedRecord)}

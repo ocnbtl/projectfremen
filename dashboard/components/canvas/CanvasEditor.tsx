@@ -1,4 +1,5 @@
 "use client";
+import MentionBacklinks from "../writing/MentionBacklinks";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Background, ReactFlow, getViewportForBounds, MarkerType, Position, SelectionMode, ViewportPortal,
@@ -8,7 +9,7 @@ import "@xyflow/react/dist/style.css";
 import {
   IconArrowBackUp, IconArrowForwardUp, IconArrowLeft, IconBookmark, IconCheck,
   IconBoxMultiple, IconAdjustments, IconArrowsMove, IconMagnet, IconFocus2, IconFrame, IconHandStop, IconHighlight, IconLayoutGrid, IconLine, IconMaximize,
-  IconMinus, IconNote, IconPlus, IconPointer, IconSelectAll, IconTags,
+  IconLink, IconMinus, IconNote, IconPlus, IconPointer, IconSelectAll, IconTags,
   IconCopy, IconLock, IconLockOpen, IconTrash, IconTypography, IconUpload, IconX
 } from "@tabler/icons-react";
 import { defaultCanvasAppearance, canvasAppearances, canvasMaxRequestBytes, type Board, type CanvasNode, type CanvasEdge, type CanvasCategory, type CanvasArrangementOptions, type CanvasView } from "../../lib/modules/canvas/model";
@@ -534,6 +535,7 @@ export default function CanvasEditor({board:sourceBoard,entryView,entryCard,onCh
       <Action name="Organize board" label="Organize" icon={<IconTags/>} active={panel==="organizer"} run={()=>show("organizer")}/>
       <div className={css.history}><Action name="Undo" icon={<IconArrowBackUp/>} disabled={!previous.current.length} run={()=>restore()}/><Action name="Redo" icon={<IconArrowForwardUp/>} disabled={!next.current.length} run={()=>restore(true)}/></div>
       <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
+      <Action name="Board mentions" icon={<IconLink/>} active={panel==="mentions"} run={()=>show("mentions")}/>
       <Action name="Saved views" icon={<IconBookmark/>} label="Views" active={panel==="views"} run={()=>show("views")}/>
     </header>
     <div ref={frame} className={css.stage} data-box-select={multiPick||undefined} data-drop={drop||undefined}
@@ -613,6 +615,7 @@ export default function CanvasEditor({board:sourceBoard,entryView,entryCard,onCh
         apply={(op,tags,additions)=>{change(b=>applyBoardTags(b,tagTargets,op,tags,additions));setPanel(fromOrganizer?"organizer":"");}}/>}
       {panel==="pins" && edited?.ref && <ImagePinsPanel key={edited.id+":"+(initialPin??"")} node={edited} initialPinId={initialPin}
         save={imagePins=>patchNodes([edited.id],{imagePins})} close={()=>setPanel("")}/>}
+      {panel==="mentions" && <Panel title="Board mentions" close={()=>setPanel("")}><MentionBacklinks targetHref={"/admin/personal/canvas?board=" + encodeURIComponent(board.id)} /></Panel>}
       {panel==="read" && <Panel title={board.nodes.find(n=>n.id===reading)?.title || "Canvas item"} close={()=>setPanel("")}><p className={css.readBody}>{board.nodes.find(n=>n.id===reading)?.body || "No additional text."}</p></Panel>}
       {panel==="edge"&&edge && <EdgeFields key={edge.id} edge={edge} close={()=>setPanel("")} save={patch=>change(b=>({...b,edges:b.edges.map(e=>e.id===edge.id?{...e,...patch}:e)}))}/>}
       {panel==="arrange" && selected.length>1 && <Panel title="Arrange selection" close={()=>setPanel("")}>

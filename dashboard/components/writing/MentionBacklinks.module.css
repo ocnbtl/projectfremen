@@ -1,0 +1,22 @@
+.panel { min-width:0; width:100%; box-sizing:border-box; padding:.8rem 1rem; border:1px solid var(--work-border,#d3dfe3); border-radius:12px; background:var(--surface,#fff); color:var(--text,#20343e); text-align:start; }
+.panel .heading,.panel .heading button { display:flex; align-items:center; gap:.5rem; margin:0; font:inherit; font-weight:650; line-height:1.4; color:inherit; }
+.panel .heading button { width:100%; cursor:pointer; padding:0; border:none; background:transparent; text-align:start; }
+.heading small { border-radius:999px; padding:.02rem .4rem; color:#455b67; background:#edf2f4; font-size:.77rem; font-weight:600; }
+.bar { display:flex; align-items:center; gap:.6rem; }
+.bar .heading { flex:1; }
+.bar .refresh { display:grid; place-items:center; width:2rem; height:2rem; border-radius:.5rem; border:0; background:transparent; color:#536471; padding:0; cursor:pointer; }
+.bar .refresh:hover,.bar .refresh:focus-visible { background:#edf3f7; }
+.arrow,.open { display:flex; align-items:center; margin-inline-start:auto; color:#60737d; }
+.body { margin-top:.6rem; }
+.body p { margin:.35rem 0; font-size:.88rem; color:#536471; }
+.body ul { display:grid; gap:.25rem; padding:0; margin:0; list-style:none; }
+.body li { min-width:0; padding:0; margin:0; }
+.body li a { display:flex; align-items:center; gap:.7rem; padding:.6rem; color:inherit; border-radius:8px; text-decoration:none; transition:background-color .14s ease; }
+.body li a:hover,.body li a:focus-visible { background:var(--module-quiet,#edf3f7); }
+.icon { display:grid; place-items:center; flex:0 0 2rem; height:2rem; border:1px solid #dbe4e8; border-radius:.5rem; color:var(--module-icon,#395460); }
+.copy { display:grid; gap:.14rem; min-width:0; overflow-wrap:anywhere; line-height:1.35; }
+.copy small,.copy>span { font-size:.82rem; color:#536471; }
+.copy strong { font-size:.94rem; font-weight:640; }
+.body button { padding:.15rem .4rem; background:transparent; border:0; border-radius:.3rem; color:var(--module-icon,#295074); font:inherit; font-weight:600; cursor:pointer; }
+.body .more { margin-top:.4rem; font-size:.85rem; }
+@media (prefers-reduced-motion:reduce) { .body li a { transition:none; } }

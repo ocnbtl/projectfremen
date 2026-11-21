@@ -2190,11 +2190,16 @@ export async function readMediaFileRecords(): Promise<PersonalRecord[]> {
   return rows.filter(row => (row.className ?? row.kind) === "file").map(normalizeRecord).filter(row => isAllowedDomain(row.domain));
 }
 
-export async function readPersonalRecords(): Promise<PersonalRecord[]> {
+/** Writing and other stored-field readers do not need resolved contact addresses. */
+export async function readStoredPersonalRecords(): Promise<PersonalRecord[]> {
   const existing = await readJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>>(FILE_NAME, []);
-  const records = existing
+  return existing
     .map(normalizeRecord)
     .filter((record) => isAllowedDomain(record.domain));
+}
+
+export async function readPersonalRecords(): Promise<PersonalRecord[]> {
+  const records = await readStoredPersonalRecords();
   const places = records.some(record => record.profile?.locations.some(location => location.placeId))
     ? (await readJsonFile<{ places: import("./modules/planning/types").Place[] }>("planning-records.json", { places: [] }).catch(() => ({ places: [] }))).places || []
     : [];
