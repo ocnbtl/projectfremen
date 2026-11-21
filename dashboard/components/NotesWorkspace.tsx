@@ -28,6 +28,7 @@ import SystemState from "./operational/SystemState";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
+import UsedOnBoards from "./canvas/UsedOnBoards";
 import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
@@ -1223,6 +1224,7 @@ export default function NotesWorkspace({
     return (
       <DetailTabPanel tabsId={tabsId} tabId="links" active>
         <div className={styles.overviewGrid}>
+          <UsedOnBoards key={note.id} module="notes" ids={[note.id]}/>
           <div className={styles.panel} data-wide="true">
             <NoteLinksManager
               noteRef={note.nativeRef}

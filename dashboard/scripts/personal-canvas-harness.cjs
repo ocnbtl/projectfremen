@@ -12,6 +12,7 @@ require.extensions[".ts"] = (module, filename) => module._compile(ts.transpileMo
 
 const {createBoard,getBoard,listBoardSummaries,updateBoard} = require("../lib/modules/canvas/store.ts");
 const {boardSummary,boardContents,canvasViewLimits,canvasTagLimits} = require("../lib/modules/canvas/model.ts");
+const {applyBoardTags} = require("../components/canvas/board-tags.ts");
 const groups = [
   ["Static ad inspiration", "media", "asset", "/admin/media/"],
   ["Project handoff", "projects", "project", "/admin/projects/"],
@@ -131,6 +132,18 @@ async function main(){
     assert.deepEqual((await getBoard(saved.id)).views,board.views);
   }
   const base=await getBoard(boards[0].id);
+  const category={id:"format",name:"Format",tags:[{id:"portrait",name:"Portrait"},{id:"carousel",name:"Carousel"}]};
+  const batchBoard={...base,categories:[category],nodes:base.nodes.map((n,i)=>i===0?{...n,tagIds:["carousel"]}:n)};
+  const targets=batchBoard.nodes.slice(0,2).map(n=>n.id);
+  const alias={id:"draft-format",name:"FORMAT",tags:[{id:"draft-portrait",name:"Portrait"}]};
+  const tagged=applyBoardTags(batchBoard,targets,"add",["draft-portrait","draft-portrait"],[alias]);
+  assert.deepEqual(tagged.nodes[0].tagIds,["carousel","portrait"]);
+  assert.deepEqual(tagged.nodes[1].tagIds,["portrait"]);
+  assert.deepEqual(tagged.categories,[category]);
+  assert.deepEqual(tagged.nodes.slice(2),batchBoard.nodes.slice(2));
+  assert.equal(applyBoardTags(tagged,targets,"add",["portrait"],[]),tagged);
+  assert.deepEqual(applyBoardTags(tagged,targets,"remove",["portrait"],[]).nodes[0].tagIds,["carousel"]);
+  assert.equal(applyBoardTags(tagged,targets,"remove",["invalid"],[]),tagged);
   const race=await Promise.allSettled(["Window one","Window two"].map(title=>updateBoard({...base,title},base.revision)));
   assert.equal(race.filter(r=>r.status==="fulfilled").length,1);
   assert.equal(race.find(r=>r.status==="rejected").reason.status,409);
@@ -145,7 +158,18 @@ async function main(){
   ];
   for(const draft of invalid) await assert.rejects(updateBoard(draft,current.revision), e=>e.status===400);
   assert.deepEqual(await getBoard(base.id),current,"invalid saves are atomic");
-  await checkSavedViewSettings(current);
+  const pin={id:"feature",x:0.125,y:1,text:"Detail on the lower edge"};
+  const picture=current.nodes[0];
+  for(const invalidPins of [[{...pin,x:1.001}],[{...pin,y:-0.1}],[{...pin,y:NaN}],[{...pin,text:" "}],[pin,pin],
+    [{...pin,text:"x".repeat(2001)}], Array.from({length:101},(_,i)=>({...pin,id:"pin-"+i}))]) {
+    assert.throws(()=>boardContents({...current,nodes:[{...picture,imagePins:invalidPins}],edges:[]}),e=>e.status===400);
+  }
+  assert.throws(()=>boardContents({...current,nodes:[{...current.nodes.at(-1),imagePins:[pin]}],edges:[]}),e=>e.status===400);
+  const pinned=await updateBoard({...current,nodes:current.nodes.map((n,i)=>i===0?{...n,imagePins:[pin]}:n)},current.revision);
+  const moved=await updateBoard({...pinned,nodes:pinned.nodes.map((n,i)=>i===0?{...n,x:123,y:456,width:310,height:420}:n)},pinned.revision);
+  assert.deepEqual((await getBoard(moved.id)).nodes[0].imagePins,[pin]);
+  assert.equal("imagePins" in moved.nodes[1],false);
+  await checkSavedViewSettings(moved);
   await assert.rejects(getBoard("../not-a-board"), e=>e.status===400);
   await assert.rejects(getBoard("nonexistent"), e=>e.status===404);
   await checkSummaryPagination(summaries);

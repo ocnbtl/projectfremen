@@ -21,6 +21,7 @@ const CanvasEditor = dynamic(() => import("./CanvasEditor"), {
 const base = "/admin/personal/canvas";
 const boardUrl = (id:string,view?:string) => base+"?"+new URLSearchParams(view?{board:id,view}:{board:id});
 const urlView = () => new URL(window.location.href).searchParams.get("view") || undefined;
+const urlCard = () => new URL(window.location.href).searchParams.get("card") || undefined;
 const urlBoard = () => new URL(window.location.href).searchParams.get("board");
 const sorts = ["Recent", "Name A–Z", "Most items"] as const;
 type Sort = typeof sorts[number];
@@ -57,6 +58,7 @@ export default function CanvasWorkspace() {
   const [boards,setBoards] = useState<BoardSummary[]>([]);
   const [session,setSession] = useState<BoardSession | null>(null);
   const [entryView,setEntryView]=useState<string>();
+  const [entryCard,setEntryCard]=useState<string>();
   const current = useRef<BoardSession | null>(null);
   const [,redraw] = useState(0);
   const [loading,setLoading] = useState(true);
@@ -81,6 +83,7 @@ export default function CanvasWorkspace() {
 
   const openSession = useCallback((board: Board) => {
     setEntryView(undefined);
+    setEntryCard(undefined);
     const next = takePendingBoard(board.id) || new BoardSession(board, () => {});
     next.listen(() => {
       if (alive.current && current.current === next) {
@@ -94,7 +97,7 @@ export default function CanvasWorkspace() {
     setError("");
   },[commitSummary]);
 
-  const navigate = useCallback(async (id:string|null, fromHistory=false,view?:string) => {
+  const navigate = useCallback(async (id:string|null, fromHistory=false,view?:string,card?:string) => {
     const previous = current.current;
     const ticket = ++routing.current;
     if (previous?.dirty && !await previous.flush()) {
@@ -111,7 +114,7 @@ export default function CanvasWorkspace() {
       if (!fromHistory) window.history.pushState(null,"",base);
       return;
     }
-    if (current.current?.board.id === id) return;
+    if (current.current?.board.id === id) { setEntryCard(card); return; }
     if (library.current) previousScroll.current = library.current.scrollTop;
     setOpening(true); setError("");
     try {
@@ -119,6 +122,7 @@ export default function CanvasWorkspace() {
       if (!alive.current || ticket !== routing.current) return;
       openSession(board);
       setEntryView(view);
+      setEntryCard(card);
       if (!fromHistory) window.history.pushState(null,"",boardUrl(id,view));
     } catch (cause) {
       if (!alive.current || ticket !== routing.current) return;
@@ -145,13 +149,13 @@ export default function CanvasWorkspace() {
   useEffect(() => {
     alive.current = true;
     void loadLibrary();
-    if (urlBoard()) void navigate(urlBoard(),true,urlView());
+    if (urlBoard()) void navigate(urlBoard(),true,urlView(),urlCard());
     try {
       const preference = localStorage.getItem("unigentamos.canvas.sort") as Sort;
       if (sorts.includes(preference)) setSort(preference);
     } catch { /* Sorting works without browser storage. */ }
     const pop = () => {
-      if (window.location.pathname === base) void navigate(urlBoard(),true,urlView());
+      if (window.location.pathname === base) void navigate(urlBoard(),true,urlView(),urlCard());
     };
     const guard = (event:BeforeUnloadEvent) => {
       if (current.current?.dirty) { event.preventDefault(); event.returnValue = ""; }
@@ -235,7 +239,7 @@ export default function CanvasWorkspace() {
         <WorkspaceButton onClick={()=>void session.flush()}>Retry save</WorkspaceButton>}
     </div>}
     <div className={styles.editor} inert={busy || opening || undefined}>
-      <CanvasEditor key={session.board.id} board={session.board} entryView={entryView} onChange={board=>session.edit(board)} onBack={()=>void navigate(null)} saveStatus={session.status}/>
+      <CanvasEditor key={session.board.id} board={session.board} entryView={entryView} entryCard={entryCard} onChange={board=>session.edit(board)} onBack={()=>void navigate(null)} saveStatus={session.status}/>
     </div>
   </div>;
 

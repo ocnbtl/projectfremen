@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { listJsonFileSummaries, mutateJsonFile, readJsonFile } from "../../file-store";
 import { boardContents, boardNames, boardSummary, CanvasError, canvasId, type Board, type BoardSummary } from "./model";
+import { BOARD_PREFIX, boardSourceIndex } from "./placements";
 
-const PREFIX = "personal-canvas-board-";
+const PREFIX = BOARD_PREFIX;
 type SavedBoard = { board: Board; summary: BoardSummary };
 const key = (id: unknown) => PREFIX + canvasId(id) + ".json";
-const document = (board: Board): SavedBoard => ({board, summary: boardSummary(board)});
+const document = (board: Board) => ({board, summary: boardSummary(board), sourceIndexVersion:1, sourceIndex:boardSourceIndex(board)});
 
 export const listBoardSummaries = () => listJsonFileSummaries<BoardSummary>(PREFIX);
 export async function getBoard(id: unknown) {

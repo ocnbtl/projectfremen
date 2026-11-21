@@ -16,7 +16,12 @@ type TagPickerProps = CategoryProps & {
   onChange: (tagIds: string[]) => void;
 };
 
-export function TagPicker({categories, tagIds, onChange, onCategoriesChange, assignNew = false}: TagPickerProps & {assignNew?: boolean}) {
+type TagAvailability = {count:number; disabled:boolean};
+export function TagPicker({categories, tagIds, onChange, onCategoriesChange, assignNew = false, canCreate = true, availability}: TagPickerProps & {
+  assignNew?:boolean;
+  canCreate?:boolean;
+  availability?:Map<string,TagAvailability>;
+}) {
   const [categoryId, setCategoryId] = useState("");
   const [creating, setCreating] = useState<"category" | "tag" | null>(null);
   const [draft, setDraft] = useState("");
@@ -62,9 +67,11 @@ export function TagPicker({categories, tagIds, onChange, onCategoriesChange, ass
       {category.tags.length > 0 && <div className={styles.chips} role="group" aria-label={category.name + " tags"}>
         {category.tags.map(tag => {
           const selected = tagIds.includes(tag.id);
-          return <button type="button" key={tag.id} className={styles.chip} aria-pressed={selected}
+          const usage=availability?.get(tag.id);
+          return <button type="button" key={tag.id} className={styles.chip} aria-pressed={selected} aria-label={tag.name}
+            disabled={usage?.disabled} title={usage?`On ${usage.count} selected ${usage.count===1?"item":"items"}`:undefined}
             onClick={() => onChange(selected ? tagIds.filter(id => id !== tag.id) : [...tagIds, tag.id])}>
-            {selected && <IconCheck aria-hidden size={13}/>} {tag.name}
+            {selected && <IconCheck aria-hidden size={13}/>} {tag.name}{usage && <small>{usage.count}</small>}
           </button>;
         })}
       </div>}
@@ -78,7 +85,7 @@ export function TagPicker({categories, tagIds, onChange, onCategoriesChange, ass
         <button className={styles.add} type="button" disabled={!name || duplicate || siblings.length >= limit} onClick={add}>Add {creating}</button>
         <button type="button" onClick={() => start(null)}>Cancel</button>
       </div>
-    </div> : <div className={styles.actions}>
+    </div> : canCreate && <div className={styles.actions}>
       {category && <button type="button" disabled={category.tags.length >= canvasTagLimits.tags} onClick={() => start("tag")}><IconPlus aria-hidden size={14}/>New tag</button>}
       <button type="button" disabled={categories.length >= canvasTagLimits.categories} onClick={() => start("category")}><IconPlus aria-hidden size={14}/>New category</button>
     </div>}

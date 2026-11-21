@@ -1,5 +1,6 @@
 import { MODULE_ROUTES } from "../../native-objects/routes";
 import type { ModuleId, NativeObjectRef } from "../../native-objects/types";
+import { isBoardSourceModule, sourceFromUrl } from "./source-reference";
 
 /** Accept copied workspace object links, including specialized views outside the search index. */
 export function canvasWorkspaceLink(value:string, origin:string):NativeObjectRef | undefined {
@@ -12,7 +13,8 @@ export function canvasWorkspaceLink(value:string, origin:string):NativeObjectRef
     if (!entry) return;
     const [module,base]=entry;
     const parts=url.pathname.slice(base.length).split("/").filter(Boolean);
-    const id=url.searchParams.get("item") || url.searchParams.get("selected") || url.searchParams.get("task") || url.searchParams.get("interaction") || url.searchParams.get("travel") || parts.at(-1);
+    const sourceId=isBoardSourceModule(module) ? sourceFromUrl(module,url) : undefined;
+    const id=sourceId || url.searchParams.get("item") || url.searchParams.get("selected") || url.searchParams.get("task") || url.searchParams.get("interaction") || url.searchParams.get("travel") || parts.at(-1);
     if (!id || id.length>350) return;
     const route=url.pathname+url.search+url.hash;
     if(route.length>2048) return;

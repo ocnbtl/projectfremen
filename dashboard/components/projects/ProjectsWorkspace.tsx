@@ -38,6 +38,7 @@ import DetailTabs, { DetailTabPanel, type DetailTab } from "../operational/Detai
 import SystemState from "../operational/SystemState";
 import LinkedDecisionsPanel from "../operational/LinkedDecisionsPanel";
 import LinkedFollowUpsPanel from "../operational/LinkedFollowUpsPanel";
+import UsedOnBoards from "../canvas/UsedOnBoards";
 import { usePersonalOpsDecisions } from "../operational/usePersonalOpsDecisions";
 import { usePersonalOpsFollowUps } from "../operational/usePersonalOpsFollowUps";
 import {
@@ -2694,6 +2695,7 @@ export default function ProjectsWorkspace({
         <DetailTabPanel tabsId={tabsId} tabId="overview" active={activeTab === "overview"}>{renderOverview(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="activity" active={visibleProjectTab(activeTab) === "activity"}>{renderTimeline(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="links" active={visibleProjectTab(activeTab) === "links"}>
+          <UsedOnBoards key={item.project.id} module="projects" ids={[item.project.id,item.project.slug,item.project.legacyKey]}/>
           <div className={styles.projectLinks}><div className={styles.linkColumn}>{renderPeople(item)}{renderFilesLinks(item)}</div><div className={styles.linkColumn}>{renderNotesDecisions(item)}{renderReviewCoverage(item)}</div><RelatedRecords module="projects" type="project" id={item.project.id} hideEmpty /></div>
         </DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="properties" active={activeTab === "properties"}>{renderProperties(item)}</DetailTabPanel>

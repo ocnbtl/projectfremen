@@ -5,6 +5,7 @@ import MediaReviewSheet from "./MediaReviewSheet";
 import MediaBulkEditSheet from "./MediaBulkEditSheet";
 import {applyMediaBulkEdit,type MediaBulkEdit} from "../../lib/modules/media/bulk-edit";
 import MediaDetailsFields from "./MediaDetailsFields";
+import UsedOnBoards from "../canvas/UsedOnBoards";
 import CopyAdPrompt from "./CopyAdPrompt";
 import {MEDIA_PURPOSES,mediaSearchText} from "../../lib/modules/media/organization";
 import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
@@ -485,6 +486,7 @@ export default function MediaLibrary({
             <MediaDetailsFields value={{...profile,title,description}} context={context?{...context,refs:context.refs.filter(ref=>ref.objectId!==selected.fields.id&&ref.objectId!==selected.objectId)}:undefined} onChange={patch=>{if(patch.title!==undefined)setTitle(patch.title);if(patch.description!==undefined)setDescription(patch.description);const {title:_title,description:_description,...metadata}=patch;setProfile({...profile,...metadata});}}/>
             <label>Alt text<input value={profile.altText} onChange={e=>setProfile({...profile,altText:e.target.value})}/></label>
             <label>Notes<textarea aria-label="Media notes" rows={3} maxLength={20000} value={notes} onChange={e=>setNotes(e.target.value)}/></label>
+            <UsedOnBoards key={selected.objectId} module="media" ids={[String(selected.fields.id || ""),selected.objectId]}/>
             <div className="work-actions">
               <Button intent="primary" busy={busy} onClick={() => void save()}>
                 Save details

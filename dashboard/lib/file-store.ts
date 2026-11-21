@@ -1,5 +1,5 @@
 import { constants as fsConstants } from "node:fs";
-import { access, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const STATIC_DATA_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), "data");
@@ -438,4 +438,30 @@ export async function isEphemeralDataDirActive(): Promise<boolean> {
   }
   const dataDir = await getDataDirectory();
   return path.resolve(/* turbopackIgnore: true */ dataDir).startsWith(path.resolve(/* turbopackIgnore: true */ FALLBACK_DATA_DIR));
+}
+
+/** Read one bounded page with a server-defined projection of app_state documents. */
+export async function queryJsonFilePage<Row>(options: {
+  prefix:string; after:string; limit:number; select:string; or:string;
+  local:(key:string, version:string)=>Promise<Row>;
+}): Promise<Row[]> {
+  const {prefix,after,limit,select,or,local} = options;
+  if (!/^[a-z0-9-]+-$/.test(prefix) || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("Invalid document page");
+  const config = getSupabaseConfig();
+  if (config) {
+    const query = new URLSearchParams({select, or, key:"like." + prefix + "*.json", order:"key.asc", limit:String(limit)});
+    if (after) query.append("key","gt." + after);
+    const response = await fetch(config.url + "/rest/v1/app_state?" + query, {headers:supabaseHeaders(config), cache:"no-store"});
+    if (!response.ok) throw new Error("Unable to load document index");
+    return await response.json() as Row[];
+  }
+  const dir = await getDataDirectory();
+  const names = (await readdir(/* turbopackIgnore: true */ dir)).filter(name =>
+    name.startsWith(prefix) && name.endsWith(".json") && name > after
+  ).sort().slice(0,limit);
+  return Promise.all(names.map(async name => {
+    // Atomic replacements change the file identity, including across local app processes.
+    const info = await stat(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ dir,name), {bigint:true});
+    return local(name,[info.ino,info.mtimeNs,info.size].join(":"));
+  }));
 }

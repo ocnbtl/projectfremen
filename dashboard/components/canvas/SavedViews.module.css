@@ -40,6 +40,11 @@
 .open small { color: #526779; font-size: 11px; }
 .row .manage { flex: none; width: 36px; }
 .row .manage[aria-expanded=true] { background: #edf3f8; }
+.sequence {display:flex;gap:6px;flex-wrap:wrap}
+.sequence small {width:100%;font-size:12px;color:#526779}
+.details .include {display:flex;align-items:center;gap:7px}
+.include input {width:17px;height:17px;accent-color:var(--board-blue)}
+.sequence button {flex:1 1 auto;width:auto;gap:5px;border:1px solid var(--board-border);background:#f2f6fa}
 
 .details {
   display: grid;

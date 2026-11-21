@@ -24,6 +24,7 @@ import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/Detail
 import EvidenceChecklist from "./operational/EvidenceChecklist";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedNotesPanel from "./operational/LinkedNotesPanel";
+import UsedOnBoards from "./canvas/UsedOnBoards";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import ObjectHeader from "./operational/ObjectHeader";
@@ -1502,6 +1503,7 @@ export default function MediaWorkspace({
         </DetailTabPanel>
 
         <DetailTabPanel tabsId={tabsId} tabId="usage" active={activeTab === "usage"}>
+          <UsedOnBoards key={asset.id} module="media" ids={[asset.id]}/>
           <div className={styles.overviewGrid}>
             <section className={styles.panel} data-wide="true">
               <SystemState

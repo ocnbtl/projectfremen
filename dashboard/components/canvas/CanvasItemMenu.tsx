@@ -1,6 +1,6 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
-import { IconAdjustments, IconArrowUpRight, IconCheck, IconDots, IconPencil } from "@tabler/icons-react";
+import { IconAdjustments, IconArrowUpRight, IconCheck, IconDots, IconMapPin, IconPencil } from "@tabler/icons-react";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { canvasAppearances, defaultCanvasAppearance, type CanvasAppearance, type CanvasNode } from "../../lib/modules/canvas/model";
 import styles from "./CanvasItem.module.css";
@@ -11,10 +11,11 @@ type Props = {
   edit:()=>void;
   style:()=>void;
   open:()=>void;
+  pins?:()=>void;
   setAppearance:(value:CanvasAppearance)=>void;
 };
 
-export function CanvasItemMenu({item,label,edit,open,style,setAppearance}:Props) {
+export function CanvasItemMenu({item,label,edit,open,style,setAppearance,pins}:Props) {
   const [visible,setVisible]=useState(false);
   const menu=useRef<HTMLDivElement>(null);
   const initialFocus=useRef<"first"|"last">("first");
@@ -62,6 +63,7 @@ export function CanvasItemMenu({item,label,edit,open,style,setAppearance}:Props)
       onCloseAutoFocus={e=>{if(openingPanel.current)e.preventDefault();openingPanel.current=false;}}
       onKeyDown={navigate}>
       <button tabIndex={-1} role="menuitem" type="button" onClick={()=>showPanel(edit)}><IconPencil aria-hidden size={17}/>Edit</button>
+      {pins && <button tabIndex={-1} role="menuitem" type="button" onClick={()=>showPanel(pins)}><IconMapPin aria-hidden size={17}/>Image pins</button>}
       {item.ref ? <a tabIndex={-1} role="menuitem" href={item.ref.route} target="_blank" rel="noopener noreferrer" onClick={()=>setVisible(false)}><IconArrowUpRight aria-hidden size={17}/>Open</a>
         : <button tabIndex={-1} role="menuitem" type="button" onClick={()=>showPanel(open)}><IconArrowUpRight aria-hidden size={17}/>Open</button>}
       <button tabIndex={-1} role="menuitem" type="button" onClick={()=>showPanel(style)}><IconAdjustments aria-hidden size={17}/>Frame settings</button>

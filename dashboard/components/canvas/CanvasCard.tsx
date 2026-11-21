@@ -1,10 +1,11 @@
 "use client";
-import { createContext, memo, useContext } from "react";
+import { createContext, memo, useContext, useState } from "react";
 import { Handle, NodeResizer, Position, useStore, type Node, type NodeProps } from "@xyflow/react";
 import { IconCheck, IconLock } from "@tabler/icons-react";
 import type { CanvasNode } from "../../lib/modules/canvas/model";
 import Icon from "../icons/UnigentamosIcon";
-import { CanvasMediaThumbnail,canvasModuleIcons } from "./CanvasIntake";
+import { canvasModuleIcons } from "./CanvasIntake";
+import { PinImage, PinMarkers } from "./ImagePins";
 import { CanvasItemMenu } from "./CanvasItemMenu";
 import { colors } from "./board-layout";
 import { maxCardSize, minCardSize } from "./alignment";
@@ -18,11 +19,13 @@ export const BoardActions=createContext({
   resize:(_id:string,_rect:Layout,_finished:boolean)=>{},
   appearance:(_id:string,_value:NonNullable<CanvasNode["appearance"]>)=>{},
   style:(_id:string)=>{},
+  pins:(_id:string,_pinId?:string)=>{},
   edit:(_id:string)=>{},open:(_id:string)=>{},originalLoaded:(_id:string,_width:number,_height:number)=>{}
 });
 
 export const CanvasCard=memo(function CanvasCard({data,selected,id}:NodeProps<FlowCard>) {
   const {item,focus,inspectOriginal}=data, actions=useContext(BoardActions);
+  const [imageAvailable,setImageAvailable]=useState(false);
   const tint=item.fillColor || colors[item.color as keyof typeof colors] || colors.paper;
   const target=item.ref,media=target?.module==="media";
   const detailed=useStore(state=>{
@@ -41,9 +44,9 @@ export const CanvasCard=memo(function CanvasCard({data,selected,id}:NodeProps<Fl
       onResizeEnd={(_,rect)=>actions.resize(id,rect,true)}/>
     <Handle type="target" position={Position.Left} aria-label="Incoming connection"/>
     <Handle type="source" position={Position.Right} aria-label="Outgoing connection"/>
-    {media ? <div className={css.art} role="img" aria-label={target.label}>
-      <CanvasMediaThumbnail target={target} full={detailed || (inspectOriginal && !item.imageSize)} onOriginal={(w,h)=>actions.originalLoaded(id,w,h)}/>
-    </div> : <div className={css.copy}>
+    {media ? <PinImage target={target} full={detailed || (inspectOriginal && !item.imageSize)} onAvailability={setImageAvailable} onOriginal={(w,h)=>actions.originalLoaded(id,w,h)}>
+      {!focus && Boolean(item.imagePins?.length) && <PinMarkers pins={item.imagePins!} open={pinId=>actions.pins(id,pinId)}/>}
+    </PinImage> : <div className={css.copy}>
       {target && <Icon role={canvasModuleIcons[target.module]} size={20}/>}
       {body && <span>{body}</span>}
     </div>}
@@ -53,7 +56,8 @@ export const CanvasCard=memo(function CanvasCard({data,selected,id}:NodeProps<Fl
         {item.used && <IconCheck size={14} className={styles.used} aria-label="Used"/>}
         {item.locked && <IconLock size={14} aria-label="Position locked"/>}
       </div>
-      <CanvasItemMenu item={item} label={label} edit={()=>actions.edit(id)} open={()=>actions.open(id)} style={()=>actions.style(id)} setAppearance={value=>actions.appearance(id,value)}/>
+      <CanvasItemMenu item={item} label={label} edit={()=>actions.edit(id)} open={()=>actions.open(id)} style={()=>actions.style(id)} setAppearance={value=>actions.appearance(id,value)}
+        pins={imageAvailable || item.imagePins?.length?()=>actions.pins(id):undefined}/>
       {media && item.body && <span className={styles.caption} title={item.body}>{item.body}</span>}
     </div>}
   </div>;

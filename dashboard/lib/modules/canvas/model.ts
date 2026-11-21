@@ -1,6 +1,9 @@
 import { MODULE_ROUTES } from "../../native-objects/routes";
 import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
 
+export type ImagePin = {id:string; x:number; y:number; text:string};
+export const imagePinLimits = {count:100, text:2000} as const;
+
 export type CanvasNode = {
   id: string;
   kind: "sticky" | "text" | "highlight" | "object";
@@ -21,6 +24,7 @@ export type CanvasNode = {
   fillColor?: string;
   locked?: boolean;
   imageSize?: {width:number;height:number};
+  imagePins?: ImagePin[];
   ref?: NativeObjectRef;
 };
 export type CanvasAppearance = NonNullable<CanvasNode["appearance"]>;
@@ -40,10 +44,13 @@ export type CanvasEdge = {
 export type CanvasViewOrganizer = {groupBy: string; sortBy: string; filters: string[]; search: string};
 export type CanvasView = {
   id: string; name: string; x: number; y: number; zoom: number;
+  frameSize?: {width: number; height: number};
+  inSequence?: boolean;
   mode?: "board" | "gallery";
   organizer?: CanvasViewOrganizer;
 };
 export const canvasViewLimits = {count: 100, name: 160, search: 240, position: 1e8, minZoom: .002, maxZoom: 8} as const;
+export const sequenceViews=(views:CanvasView[])=>views.filter(view=>view.inSequence!==false);
 export const canvasTagLimits = {categories:64,tags:128,name:80} as const;
 export type CanvasCategory = {id:string;name:string;tags:{id:string;name:string}[]};
 export type Board = {
@@ -76,7 +83,7 @@ function number(value: unknown, min: number, max: number) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) throw new CanvasError("A canvas position or size is outside the supported range.");
   return value;
 }
-function option<T extends string>(value: unknown, allowed: readonly T[]): T {
+function option<T extends string | boolean>(value: unknown, allowed: readonly T[]): T {
   if (!allowed.includes(value as T)) throw new CanvasError("Choose a supported canvas option.");
   return value as T;
 }
@@ -169,6 +176,15 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
       tagIds=[...new Set(node.tagIds.map(canvasId))];
       if(tagIds.some(id=>!tags.has(id)))throw new CanvasError("Choose tags from this board.");
     }
+    const ref = kind === "object" ? reference(node.ref) : undefined;
+    let imagePins:ImagePin[] | undefined;
+    if (node.imagePins !== undefined) {
+      if (ref?.module !== "media" || ref.objectType === "workspace_link") throw new CanvasError("Choose a Media image for pinned notes.");
+      imagePins = entries(node.imagePins, imagePinLimits.count, pin => ({
+        id:canvasId(pin.id), x:number(pin.x,0,1), y:number(pin.y,0,1),
+        text:string(pin.text,imagePinLimits.text,"pin note",true).trim()
+      }));
+    }
     return {
       id: canvasId(node.id), kind, x: number(node.x, -1e7, 1e7), y: number(node.y, -1e7, 1e7),
       width: number(node.width, 1, 100000), height: number(node.height, 1, 100000),
@@ -182,7 +198,8 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
       ...(node.fillColor !== undefined ? {fillColor:node.fillColor as string} : {}),
       ...(node.locked !== undefined ? {locked:node.locked} : {}),
       ...(kind === "object" && node.imageSize ? {imageSize:{width:number(record(node.imageSize).width,1,100000),height:number(record(node.imageSize).height,1,100000)}} : {}),
-      ...(kind === "object" ? {ref: reference(node.ref)} : {})
+      ...(ref ? {ref} : {}),
+      ...(imagePins ? {imagePins} : {})
     };
   });
   const ids = new Set(nodes.map(node => node.id));
@@ -197,6 +214,11 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
     id: canvasId(view.id), name: string(view.name, canvasViewLimits.name, "view name", true).trim(),
     x: number(view.x, -canvasViewLimits.position, canvasViewLimits.position), y: number(view.y, -canvasViewLimits.position, canvasViewLimits.position),
     zoom: number(view.zoom, canvasViewLimits.minZoom, canvasViewLimits.maxZoom),
+    ...(view.inSequence===undefined?{}:{inSequence:option(view.inSequence,[true,false] as const)}),
+    ...(view.frameSize === undefined ? {} : {frameSize: {
+      width: number(record(view.frameSize).width, 1, 100000),
+      height: number(record(view.frameSize).height, 1, 100000)
+    }}),
     ...(view.mode === undefined ? {} : {mode: option(view.mode, ["board", "gallery"] as const)}),
     ...(view.organizer === undefined ? {} : {organizer: viewOrganizer(view.organizer, categoryIds, tags)})
   }));

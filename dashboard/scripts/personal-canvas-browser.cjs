@@ -248,6 +248,14 @@ async function main(){
  await page.getByLabel("Tag name").fill("Nike");await btn("Add tag").click();
  await btn("Apply").click();
  await expect.poll(async()=>(await read()).at(-1).tagIds?.length).toBe(1);
+ // One selected card already has Nike. Add the missing assignments, then undo the complete operation.
+ const beforeBulk=await read();
+ await btn("Select all cards").click();await btn("Tag selected items").click();
+ const batch=page.getByRole("dialog",{name:"Tag selected items"});
+ await batch.getByRole("button",{name:"Nike",exact:true}).click();await btn("Apply tags").click();
+ const nikeId=beforeBulk.at(-1).tagIds[0];
+ await expect.poll(async()=>(await read()).every(n=>n.tagIds?.includes(nikeId))).toBe(true);
+ await btn("Undo").click();await expect.poll(async()=>await read()).toEqual(beforeBulk);
  await btn("Organize board").click();
  const organizer=page.getByRole("dialog",{name:"Board organizer"});
  await organizer.getByText("Filter & manage tags").click();await organizer.getByRole("button",{name:"Nike",exact:true}).click();
@@ -298,16 +306,30 @@ async function main(){
  await btn("Delete view").click();await btn("Confirm delete").click();await expect.poll(async()=>(await savedViews()).some(v=>v.id===savedGallery.id)).toBe(false);
  await btn("Close panel").click();await btn("Undo").click();
  await expect.poll(async()=>(await savedViews())[0]?.id).toBe(savedGallery.id);
+ // Tag two filtered items directly from the mobile gallery; a third stays outside the batch.
+ await gallery.getByRole("button",{name:"Select",exact:true}).click();
+ for(const i of [2,4])await gallery.getByRole("button",{name:"Select Distant "+i,exact:true}).click();
+ await btn("Tag selection").click();await btn("New tag").click();await page.getByLabel("Tag name").fill("Shortlist");await btn("Add tag").click();
+ await btn("Apply tags").click();
+ await expect.poll(async()=>(await read()).filter(n=>n.title.startsWith("Distant ")&&n.tagIds?.length).map(n=>n.title)).toEqual(["Distant 2","Distant 4"]);
+ await btn("Tag selection").click();await btn("Remove tags").click();await batch.getByRole("button",{name:"Shortlist",exact:true}).click();
+ await btn("Apply tags").click();
+ await expect.poll(async()=>(await read()).some(n=>n.title.startsWith("Distant ")&&n.tagIds?.length)).toBe(false);
+ await btn("Undo").click();await expect.poll(async()=>(await read()).filter(n=>n.title.startsWith("Distant ")&&n.tagIds?.length).length).toBe(2);
+ await btn("Undo").click();await expect.poll(async()=>await read()).toEqual(originalItems);
+ await btn("Finish selecting").click();
  await btn("Adjust").click();await btn("Clear").click();
  await expect(btn("Open organized gallery")).toHaveCount(0);
  await expect(btn("Clear board filter")).toHaveCount(0);
  assert.deepEqual(await read(),originalItems,"Organizing, locating and clearing preserve board contents and positions.");
  console.log("PASS large gallery, numeric title sorting, item location, discarded draft, mobile fit and non-destructive Clear.");
  console.log("PASS saved gallery deep link, persistent settings, renamed and reordered bookmark, confirmed deletion and undo.");
+ console.log("PASS bulk tagging from the board and mobile gallery, existing assignments, new tag, targeted removal and whole-batch Undo.");
  const firstBoard=await board();assert.equal((firstBoard.categories||[]).length,0);
  console.log("PASS category and tag creation, assignment, board-isolated persistence, organizer and non-destructive canvas filtering.");
  console.log("PASS shortcut duplication and independent groups, exact spacing, custom stroke and fill, position locks, outlined new text and saved timestamp.");
  console.log("PASS live drag guides and snap, tap and box selection, moving a subset together, alignment, equal gaps on both axes, original sizes and undo.");
+ await require("./canvas-image-pins-browser.cjs")(page,context,base,headers,last);
  assert.deepEqual(errors,[]);console.log("PASS 40 distinct images, paste/drop/reuse, real Media links and thumbnails, drag, Undo/Redo, notes, typed connections, saved views, group and used state, navigation and mobile controls.");
 }
 main().catch(async e=>{console.error(e);if(page)await page.screenshot({path:path.join(output,"failure.png")}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

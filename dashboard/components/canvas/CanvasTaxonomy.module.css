@@ -29,6 +29,15 @@
 .chips .chip[aria-pressed=true] { border-color: #a6bed6; color: #234f7c; background: #e7f0f9; }
 .chips .filterTag { border-color: var(--tag-line); color: var(--tag-ink); background: var(--tag-bg); }
 .picker svg, .organizer svg { flex: none; }
+.bulkTags{display:grid;gap:12px;min-width:0}
+.bulkTags p{margin:0;font-size:12px;line-height:1.45;color:#4c6171}
+.bulkTags .bulkMode{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border-radius:10px;background:#eff3f6}
+.bulkMode button{min-width:0}
+.bulkTags footer{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--board-border);padding-top:10px}
+.bulkTags footer span{color:#506579;font-size:12px}
+.bulkTags footer button{color:white;background:var(--board-blue);width:auto;padding-inline:10px}
+.bulkTags footer button:hover{background:#204b7b;color:white}
+.bulkTags .chip small{font-variant-numeric:tabular-nums;color:#425c70;background:#edf1f4;padding:1px 4px;border-radius:4px}
 .assigned { list-style: none; margin: 0; padding: 0; }
 .assigned li { background: #edf3f7; padding: 3px 7px; border-radius: 6px; color: #41576c; font-size: 12px; overflow-wrap: anywhere; }
 :global(section[role=dialog]):has(> .organizer) {

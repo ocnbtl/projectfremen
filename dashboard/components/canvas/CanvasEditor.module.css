@@ -28,7 +28,7 @@
 .tools{left:14px;top:14px}
 .tools i,.navigation i{display:block;width:1px;height:18px;background:var(--board-border);margin:0 3px}
 .navigation{left:16px;bottom:18px}
-.selection{top:14px;right:14px}
+.selection{top:14px;right:14px;max-width:calc(100% - 28px);box-sizing:border-box;flex-wrap:wrap;justify-content:flex-end}
 .tools button,.navigation button,.selection button{width:auto}
 .tools:global(.people-object-picker-trigger),.tools :global(.people-object-picker-trigger){max-width:120px;min-height:35px}
 .empty{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;width:min(90%,400px);color:#516b85}

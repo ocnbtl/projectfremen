@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from "react";
-import { IconArrowDown, IconArrowUp, IconBookmark, IconDots, IconFocus2, IconTrash } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconBookmark, IconDots, IconFileExport, IconFocus2, IconPresentation, IconTrash } from "@tabler/icons-react";
 import type { Viewport } from "@xyflow/react";
-import { canvasViewLimits, type CanvasView, type CanvasViewOrganizer } from "../../lib/modules/canvas/model";
+import { canvasViewLimits, sequenceViews, type CanvasView, type CanvasViewOrganizer } from "../../lib/modules/canvas/model";
 import { Panel } from "./CanvasPanels";
 import styles from "./SavedViews.module.css";
 
@@ -11,11 +11,14 @@ type Props = {
   organizer: CanvasViewOrganizer;
   changeViews: (update: (views: CanvasView[]) => CanvasView[]) => void;
   currentViewport: () => Viewport | undefined;
+  frameSize: () => CanvasView["frameSize"];
+  present: () => void;
+  exportPdf: () => void;
   open: (view: CanvasView) => void;
   close: () => void;
 };
 
-export function SavedViews({ views, mode, organizer, changeViews, currentViewport, open, close }: Props) {
+export function SavedViews({ views, mode, organizer, changeViews, currentViewport, frameSize, present, exportPdf, open, close }: Props) {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState("");
   const [rename, setRename] = useState("");
@@ -25,6 +28,7 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
   const manageButtons = useRef(new Map<string, HTMLButtonElement>());
   const detailsId = useId();
   const full = views.length >= canvasViewLimits.count;
+  const included = sequenceViews(views).length;
 
   function readFraming() {
     const viewport = currentViewport();
@@ -32,7 +36,7 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
       const { x, y, zoom } = viewport;
       if ([x, y, zoom].every(Number.isFinite) && Math.abs(x) <= canvasViewLimits.position && Math.abs(y) <= canvasViewLimits.position
           && zoom >= canvasViewLimits.minZoom && zoom <= canvasViewLimits.maxZoom) {
-        return {x, y, zoom, mode, organizer: {...organizer, filters: [...organizer.filters]}};
+        return {x, y, zoom, mode, frameSize: frameSize(), organizer: {...organizer, filters: [...organizer.filters]}};
       }
     }
     setStatus("Move or zoom the board, then try saving the view again.");
@@ -80,6 +84,11 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
         {full && <small>This board has reached its limit of {canvasViewLimits.count} saved views.</small>}
         <button className={styles.save} type="submit" disabled={full || !newName.trim()}>Save current view</button>
       </form>
+      {views.length > 0 && <div className={styles.sequence}>
+        <small>{included ? included+" of "+views.length+" in sequence" : "0 views in sequence. Open Manage on a view to include it."}</small>
+        <button type="button" disabled={!included} onClick={present}><IconPresentation size={17}/>Present views</button>
+        <button type="button" disabled={!included} onClick={exportPdf}><IconFileExport size={17}/>Export PDF</button>
+      </div>}
       {views.length > 0 ? <ul className={styles.list} aria-label="Views on this board">
         {views.map((view, index) => {
           const editing = editingId === view.id;
@@ -99,6 +108,10 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
               </button>
             </div>
             {editing && <div className={styles.details} id={detailsId} role="group" aria-label={"Manage " + view.name}>
+              <label className={styles.include}><input type="checkbox" checked={view.inSequence!==false} onChange={event=>{
+                const inSequence=event.target.checked;
+                changeViews(current=>current.map(item=>item.id===view.id?{...item,inSequence}:item));
+              }}/>Include in sequence</label>
               <form className={styles.rename} onSubmit={event => {
                 event.preventDefault();
                 const name = rename.trim();
@@ -116,6 +129,7 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
                 if (!framing) return;
                 const settings = view.organizer;
                 if (framing.x === view.x && framing.y === view.y && framing.zoom === view.zoom && framing.mode === view.mode
+                    && framing.frameSize?.width === view.frameSize?.width && framing.frameSize?.height === view.frameSize?.height
                     && settings?.groupBy === organizer.groupBy && settings.sortBy === organizer.sortBy
                     && settings.search === organizer.search && settings.filters.length === organizer.filters.length
                     && settings.filters.every((id, index) => id === organizer.filters[index])) {

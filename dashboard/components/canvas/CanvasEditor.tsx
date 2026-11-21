@@ -16,20 +16,25 @@ import type { NativeObjectRef } from "../../lib/native-objects/types";
 import { addObjects, bounds, duplicateItems, makeNode, tile, unusedGroupName, withoutSelection, keyOf } from "./board-layout";
 import { snapResize,snapTranslation,spaceEvenly,type AlignmentGuide } from "./alignment";
 import { BoardActions, CanvasCard, type FlowCard } from "./CanvasCard";
+import { ImagePinsPanel } from "./ImagePins";
 import { CanvasObjectPicker, useCanvasMediaImport } from "./CanvasIntake";
 import { CardFields, EdgeFields, Panel } from "./CanvasPanels";
 import { SavedViews } from "./SavedViews";
+import dynamic from "next/dynamic";
 import { FrameFields,withFrame,type FrameStyle } from "./FrameFields";
 import { CanvasSaveStatus } from "./CanvasSaveStatus";
 import { ItemTags, BoardOrganizer } from "./CanvasTaxonomy";
 import { defaultOrganizerOptions, organizerRows, type OrganizerOptions } from "./organizer-rows";
 import { OrganizedGallery } from "./OrganizedGallery";
+import { BulkTagPanel } from "./BulkTagPanel";
+import { applyBoardTags } from "./board-tags";
 import { useCanvasMediaDetails, displayMediaDetails, linkedMediaId } from "./useCanvasMediaDetails";
 import css from "./CanvasEditor.module.css";
 
-type Props={board:Board;entryView?:string;onChange:(board:Board)=>void;onBack:()=>void;saveStatus:string};
+type Props={board:Board;entryView?:string;entryCard?:string;onChange:(board:Board)=>void;onBack:()=>void;saveStatus:string};
 type Layout=Pick<CanvasNode,"x"|"y"|"width"|"height">;
 const nodeTypes={card:CanvasCard};
+const CanvasPresentation=dynamic(()=>import("./CanvasSequence").then(module=>module.CanvasPresentation),{ssr:false});
 const emptySelection:string[]=[];
 // Supply the artwork bounds and its two 10-unit connectors even when the card is offscreen.
 // React Flow otherwise includes unmeasured cards in every drag selection.
@@ -52,12 +57,13 @@ function lastViewport(id:string):Viewport|undefined {
 function isField(el:EventTarget|null){
   return el instanceof HTMLElement && Boolean(el.closest("input,textarea,select,[contenteditable=true],[role=dialog],[role=listbox]"));
 }
-export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus}:Props){
+export default function CanvasEditor({board,entryView,entryCard,onChange,onBack,saveStatus}:Props){
   const latest=useRef(board); latest.current=board;
   const edits=useRef(onChange); edits.current=onChange;
   const previous=useRef<Board[]>([]), next=useRef<Board[]>([]);
   const frame=useRef<HTMLDivElement>(null), uploadInput=useRef<HTMLInputElement>(null);
   const flow=useRef<ReactFlowInstance<FlowCard,Edge>|null>(null);
+  const [flowReady,setFlowReady]=useState(false);
   const [entryBookmark]=useState(()=>board.views.find(v=>v.id===entryView));
   const [initialView]=useState(()=>entryBookmark || lastViewport(board.id));
   const [zoom,setZoom]=useState(initialView?.zoom||1);
@@ -77,16 +83,25 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const arrangeTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   useEffect(()=>()=>clearTimeout(arrangeTimer.current),[]);
   const [reading,setReading]=useState("");
+  const [initialPin,setInitialPin]=useState<string>();
   const [gap,setGap]=useState("");
   const [frameDraft,setFrameDraft]=useState<FrameStyle>({});
   const [hand,setHand]=useState(false),[panel,setPanel]=useState(""),[name,setName]=useState("");
   const [ids,setIds]=useState<string[]>([]),[edgeIds,setEdgeIds]=useState<string[]>([]);
   const [editing,setEditing]=useState(""),[connectFrom,setConnectFrom]=useState("");
   const [tagDraft,setTagDraft]=useState<string[]>();
+  const [tagTargets,setTagTargets]=useState<string[]>([]);
+  const bulkItems=useMemo(()=>{
+    if(panel!=="bulk-tags")return [];
+    const targets=new Set(tagTargets);
+    return board.nodes.filter(node=>targets.has(node.id));
+  },[board.nodes,panel,tagTargets]);
   const [categoryDraft,setCategoryDraft]=useState<CanvasCategory[]>();
   const [fromOrganizer,setFromOrganizer]=useState(false);
   const [organization,setOrganization]=useState<OrganizerOptions>(entryBookmark?.organizer??defaultOrganizerOptions);
   const [gallery,setGallery]=useState(entryBookmark?.mode==="gallery");
+  const [presenting,setPresenting]=useState(false);
+  const frameSize=()=>({width:frame.current?.clientWidth||960,height:frame.current?.clientHeight||600});
   const unfilteredCamera=useRef<Viewport|undefined>(undefined);
   const sharedMedia=useCanvasMediaDetails(board.nodes);
   const displayNodes=useMemo(()=>board.nodes.map(n=>{
@@ -101,6 +116,19 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const visibleIds=useMemo(()=>isFiltered && organized ? new Set(organized.orderedIds) : null,[isFiltered,organized]);
   const visibleBoardNodes=useMemo(()=>visibleIds ? board.nodes.filter(n=>visibleIds.has(n.id)) : board.nodes,[board.nodes,visibleIds]);
   const [notice,setNotice]=useState(""),[drop,setDrop]=useState(false);
+  async function exportPdf(){
+    const preview=window.open("about:blank","_blank");
+    if(!preview){setNotice("Allow this site to open a tab for the PDF preview.");return;}
+    preview.opener=null;
+    preview.document.title=board.title+" — PDF";
+    preview.document.body.textContent="Preparing saved views…";
+    try{
+      const {openSequencePrint}=await import("./CanvasSequence");
+      if(!preview.closed)openSequencePrint(preview,board,displayNodes,frameSize());
+    }catch{
+      if(!preview.closed)preview.document.body.textContent="The PDF preview could not be opened. Return to the board and try again.";
+    }
+  }
   const [live,setLive]=useState<Record<string,Partial<Layout>>>({});
   const resizing=useRef<{item:CanvasNode;start:Layout}|null>(null);
   const pointerDrag=useRef(false);
@@ -140,6 +168,18 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       void flow.current.setViewport(view,{duration:duration()});
     });
   },[]);
+  useEffect(()=>{
+    if (!flowReady || !entryCard) return;
+    if (!latest.current.nodes.some(node=>node.id===entryCard)) {
+      setNotice("This card is no longer on the board.");
+      return;
+    }
+    setOrganization(defaultOrganizerOptions);
+    setGallery(false);
+    setPanel("");
+    choose([entryCard]);
+    reframe([entryCard]);
+  },[choose,entryCard,flowReady,reframe]);
   const insertObjects=useCallback((refs:NativeObjectRef[],sizes?:Map<string,{width:number;height:number}>)=>{
     setOrganization(defaultOrganizerOptions);setGallery(false);unfilteredCamera.current=undefined;
     const current=latest.current,added=addObjects(current,refs,dropPoint.current||place(),sizes);
@@ -210,7 +250,10 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     change(b=>({...b,nodes:b.nodes.map(n=>n.id===id?{...n,appearance:value}:n)}));
   },[change]);
   const openStyle=useCallback((id:string)=>{choose([id]);setFrameDraft({});setPanel("appearance");},[choose]);
-  const actions=useMemo(()=>({startResize,resize:handleResize,edit,appearance,style:openStyle,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[appearance,edit,startResize,handleResize,originalLoaded,openStyle]);
+  const openPins=useCallback((id:string,pinId?:string)=>{
+    choose([id]);setEditing(id);setInitialPin(pinId);setPanel("pins");
+  },[choose]);
+  const actions=useMemo(()=>({startResize,resize:handleResize,edit,appearance,style:openStyle,pins:openPins,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[appearance,edit,startResize,handleResize,originalLoaded,openStyle,openPins]);
   const baseNodes=useMemo(()=>displayNodes.filter(n=>!visibleIds||visibleIds.has(n.id)).map((n):FlowCard=>{
     return {id:n.id,type:"card",position:{x:n.x,y:n.y},...cardGeometry(n.width,n.height),
       draggable:!n.locked && !hand && (!multiPick || ids.includes(n.id)),data:{item:n,focus,inspectOriginal:board.nodes.length===1 || (panel==="card" && editing===n.id)},
@@ -344,6 +387,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     return new Map(start.items.map(n=>[n.id,{x:n.x+result.delta.x,y:n.y+result.delta.y}]));
   }
   function show(p:string){setPanel(old=>old===p?"":p);setName("");setConnectFrom("");}
+  function openBulkTags(targets:string[]){setTagTargets(targets);setPanel("bulk-tags");}
   function applyOrganization(options:OrganizerOptions){
     setOrganization(options);choose([]);setConnectFrom("");setPanel("");
     if(!isFiltered && !hasGallery)unfilteredCamera.current=flow.current?.getViewport();
@@ -412,7 +456,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       <div className={css.boardSurface} inert={gallery} style={gallery?{visibility:"hidden"}:undefined}>
       <BoardActions.Provider value={actions}><ReactFlow<FlowCard,Edge> nodes={flowNodes} edges={flowEdges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
         onEdgesChange={changes=>setEdgeIds(old=>{const s=new Set(old);for(const c of changes)if(c.type==="select"){if(c.selected)s.add(c.id);else s.delete(c.id);}return [...s];})}
-        onInit={instance=>{flow.current=instance;}}
+        onInit={instance=>{flow.current=instance;setFlowReady(true);}}
         onPaneClick={()=>{choose([]);setPanel("");setConnectFrom("");}}
         onNodeClick={(event,n)=>{
           if(connectFrom){connect(connectFrom,n.id);return;}
@@ -465,6 +509,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       </div>
       </div>
       {gallery && organized && <OrganizedGallery results={organized} boardTitle={board.title}
+        onTag={openBulkTags}
         onBoard={()=>{setGallery(false);setPanel("");}} onOrganize={()=>setPanel("organizer")}
         onLocate={id=>{choose([id]);setGallery(false);setPanel("");reframe([id]);}}/>}
       {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel(fromOrganizer?"organizer":"")} restoreSize={edited.imageSize&&!edited.locked?()=>{patchNodes([edited.id],{...edited.imageSize});reframe([edited.id]);}:undefined} save={patch=>{
@@ -477,6 +522,11 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         close={()=>setPanel("")} onEdit={id=>{edit(id);setFromOrganizer(true);}}
         applied={organization} onApply={applyOrganization} onClear={()=>applyOrganization(defaultOrganizerOptions)}
         onCategoriesChange={categories=>change(b=>({...b,categories}))}/>}
+      {panel==="bulk-tags" && <BulkTagPanel key={JSON.stringify(tagTargets)} categories={board.categories??[]}
+        items={bulkItems} close={()=>setPanel("")}
+        apply={(op,tags,additions)=>{change(b=>applyBoardTags(b,tagTargets,op,tags,additions));setPanel("");}}/>}
+      {panel==="pins" && edited?.ref && <ImagePinsPanel key={edited.id+":"+(initialPin??"")} node={edited} initialPinId={initialPin}
+        save={imagePins=>patchNodes([edited.id],{imagePins})} close={()=>setPanel("")}/>}
       {panel==="read" && <Panel title={board.nodes.find(n=>n.id===reading)?.title || "Canvas item"} close={()=>setPanel("")}><p className={css.readBody}>{board.nodes.find(n=>n.id===reading)?.body || "No additional text."}</p></Panel>}
       {panel==="edge"&&edge && <EdgeFields key={edge.id} edge={edge} close={()=>setPanel("")} save={patch=>change(b=>({...b,edges:b.edges.map(e=>e.id===edge.id?{...e,...patch}:e)}))}/>}
       {panel==="arrange" && selected.length>1 && <Panel title="Arrange selection" close={()=>setPanel("")}>
@@ -510,6 +560,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         {selected.some(n=>n.group)&&<button type="button" onClick={()=>{patchNodes(ids,{group:""});setPanel("");}}>Ungroup selection</button>}
       </form></Panel>}
       {panel==="views" && <SavedViews views={board.views} organizer={organization} mode={gallery?"gallery":"board"} close={()=>setPanel("")}
+        frameSize={frameSize} present={()=>setPresenting(true)} exportPdf={exportPdf}
         currentViewport={()=>flow.current?.getViewport()}
         changeViews={update=>change(current=>{
           const views=update(current.views);
@@ -522,7 +573,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         {selected.length>1 && <><span className={css.pickCount} aria-live="polite">{selected.length} selected</span>
           <Action name="Arrange selection" label="Arrange" icon={<IconArrowsMove/>} disabled={movable.length<2} run={()=>show("arrange")}/></>}
         {one && <Action name="Connect to another card" icon={<IconLine/>} run={()=>{setConnectFrom(one.id);setMultiPick(false);setHand(false);}}/>}
-        {selected.length>0&&<><Action name="Selection appearance" label="Style" icon={<IconAdjustments/>} run={()=>{setFrameDraft({});show("appearance");}}/>
+        {selected.length>0&&<><Action name="Tag selected items" label="Tags" icon={<IconTags/>} run={()=>openBulkTags(selected.map(n=>n.id))}/>
+        <Action name="Selection appearance" label="Style" icon={<IconAdjustments/>} run={()=>{setFrameDraft({});show("appearance");}}/>
         <Action name="Duplicate selection" hint="Duplicate selection (Ctrl/⌘ D)" icon={<IconCopy/>} run={duplicate}/>
         <Action name={movable.length?"Lock position":"Unlock position"} hint="Toggle position lock (Ctrl/⌘ Shift L)" icon={movable.length?<IconLock/>:<IconLockOpen/>} active={!movable.length} run={lockSelection}/>
         <Action name="Group cards" hint="Group selection (Ctrl/⌘ G) · Ungroup (Ctrl/⌘ Shift G)" icon={<IconFrame/>} run={()=>{show("group");setName(one?.group||"");}}/>
@@ -541,5 +593,6 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       {!gallery && panel==="" && board.nodes.length>0 && visibleIds?.size===0 && <div className={css.empty}><IconTags size={28}/><h3>No matching items</h3></div>}
       {(connectFrom||media.message||notice||drop) && <div className={css.message} role="status">{drop?"Drop to add to Media and this board":connectFrom?"Choose the card to connect to":notice||media.message}{connectFrom&&<Action name="Cancel connection" run={()=>setConnectFrom("")} icon={<IconX/>}/>}</div>}
     </div>
+    {presenting && <CanvasPresentation board={board} nodes={displayNodes} fallbackSize={frameSize()} close={()=>setPresenting(false)} exportPdf={exportPdf}/>}
   </div>;
 }

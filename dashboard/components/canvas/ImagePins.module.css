@@ -1,0 +1,17 @@
+.surface {position:relative; width:100%; height:100%; min-height:0; container-type:size}
+.pixels {position:absolute; left:50%; top:50%; width:min(100cqw,calc(100cqh * var(--image-ratio))); aspect-ratio:var(--image-ratio); transform:translate(-50%,-50%); pointer-events:none}
+.surface .pixels button.marker {position:absolute; display:grid; place-items:center; width:40px; min-width:0; height:40px; min-height:0; padding:0; border:0; border-radius:50%; background:transparent; color:white; font:700 12px/1 var(--font-body,system-ui); pointer-events:auto; touch-action:manipulation; cursor:pointer; transform:translate(-50%,-50%) scale(var(--canvas-inverse-zoom,1))}
+.marker span {display:grid; place-items:center; min-width:21px; height:21px; padding-inline:2px; border-radius:50%; background:#214e7b; border:2px solid white; box-shadow:0 1px 4px #182a4266; box-sizing:border-box}
+.marker:focus-visible span {outline:2px solid #172f4c; outline-offset:2px}
+.preview {height:clamp(130px,27dvh,240px); background:#eaf0f4; border-radius:8px; --canvas-inverse-zoom:1}
+.preview button.place,.preview button.place:hover {position:absolute; inset:0; width:100%; height:100%; min-width:0; min-height:0; padding:0; border:0; border-radius:0; background:transparent; cursor:crosshair; pointer-events:auto; touch-action:manipulation}
+.crosshair {position:absolute; width:17px; height:17px; border-radius:50%; border:2px solid white; background:#214e7b61; box-shadow:0 0 0 1px #214e7b; transform:translate(-50%,-50%); pointer-events:none}
+.crosshair::after {content:""; position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%; background:white; transform:translate(-50%,-50%)}
+.controls {display:flex; align-items:center; gap:5px; justify-content:flex-end; flex-wrap:wrap}
+.controls .remove {color:#8a2934; margin-right:auto}
+.list {list-style:none; margin:0; padding:0}
+.list li+li {border-top:1px solid #e4eaf0}
+.list li button {display:flex; justify-content:flex-start; width:100%; gap:8px; text-align:left; align-items:baseline}
+.list b {color:#214e7b}
+.list span {min-width:0; white-space:pre-wrap; overflow-wrap:anywhere}
+@media(pointer:coarse){.surface .pixels button.marker,.list li button,.controls button{min-height:44px}.surface .pixels button.marker{width:44px}}

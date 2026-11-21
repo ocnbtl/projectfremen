@@ -8,6 +8,7 @@ import SelectField from "../ui/SelectField";
 import { Panel } from "./CanvasPanels";
 import { TagPicker, type CategoryProps } from "./CanvasTagPicker";
 import { OrganizerPreview } from "./OrganizerPreview";
+import { mergeTagAdditions } from "./board-tags";
 import { defaultOrganizerOptions, organizerRows, organizerTagTone, type OrganizerGroup, type OrganizerOptions } from "./organizer-rows";
 import styles from "./CanvasTaxonomy.module.css";
 
@@ -44,25 +45,6 @@ function GroupRows({group, onEdit}: {group: OrganizerGroup; onEdit: (id: string,
   </section>;
 }
 
-// Only additions are staged. An item edited from the organizer can add its own tags before returning.
-function mergeAdditions(categories: CanvasCategory[], additions: CanvasCategory[]) {
-  const categoryAliases = new Map<string, string>(), tagAliases = new Map<string, string>();
-  const merged = [...categories];
-  for (const extra of additions) {
-    const index = merged.findIndex(category => category.id === extra.id || category.name.toLowerCase() === extra.name.toLowerCase());
-    if (index === -1) { merged.push(extra); continue; }
-    const category = merged[index], tags = [...category.tags];
-    categoryAliases.set(extra.id, category.id);
-    for (const added of extra.tags) {
-      const saved = tags.find(tag => tag.id === added.id || tag.name.toLowerCase() === added.name.toLowerCase());
-      if (saved) tagAliases.set(added.id, saved.id);
-      else tags.push(added);
-    }
-    merged[index] = {...category, tags};
-  }
-  return {draftCategories: merged, categoryAliases, tagAliases};
-}
-
 export function BoardOrganizer({categories, nodes, applied, hidden = false, onApply, onClear, onEdit, close, onCategoriesChange}: CategoryProps & {
   boardId?: string;
   nodes: CanvasNode[];
@@ -85,7 +67,7 @@ export function BoardOrganizer({categories, nodes, applied, hidden = false, onAp
     lastRow.current = null;
   }, [hidden]);
 
-  const {draftCategories, categoryAliases, tagAliases} = useMemo(() => mergeAdditions(categories, additions), [categories, additions]);
+  const {draftCategories, categoryAliases, tagAliases} = useMemo(() => mergeTagAdditions(categories, additions), [categories, additions]);
   const filters = useMemo(() => options.filters.map(id => tagAliases.get(id) ?? id), [options.filters, tagAliases]);
   const search = options.search;
   const typeGroup = draftCategories.some(category => category.id === "kind") ? "item/type" : "kind";
