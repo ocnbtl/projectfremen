@@ -9,15 +9,17 @@ import {
   IconArrowBackUp, IconArrowForwardUp, IconArrowLeft, IconBookmark, IconCheck,
   IconBoxMultiple, IconAdjustments, IconArrowsMove, IconMagnet, IconFocus2, IconFrame, IconHandStop, IconHighlight, IconLayoutGrid, IconLine, IconMaximize,
   IconMinus, IconNote, IconPlus, IconPointer, IconSelectAll,
-  IconTrash, IconTypography, IconUpload, IconX
+  IconCopy, IconLock, IconLockOpen, IconTrash, IconTypography, IconUpload, IconX
 } from "@tabler/icons-react";
 import { defaultCanvasAppearance, canvasAppearances, type Board, type CanvasNode, type CanvasEdge } from "../../lib/modules/canvas/model";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
-import { addObjects, bounds, makeNode, tile, withoutSelection, keyOf } from "./board-layout";
+import { addObjects, bounds, duplicateItems, makeNode, tile, unusedGroupName, withoutSelection, keyOf } from "./board-layout";
 import { snapTranslation,spaceEvenly,type AlignmentGuide } from "./alignment";
 import { BoardActions, CanvasCard, type FlowCard } from "./CanvasCard";
 import { CanvasObjectPicker, useCanvasMediaImport } from "./CanvasIntake";
 import { CardFields, EdgeFields, Panel } from "./CanvasPanels";
+import { FrameFields,withFrame,type FrameStyle } from "./FrameFields";
+import { CanvasSaveStatus } from "./CanvasSaveStatus";
 import css from "./CanvasEditor.module.css";
 
 type Props={board:Board;entryView?:string;onChange:(board:Board)=>void;onBack:()=>void;saveStatus:string};
@@ -69,6 +71,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const arrangeTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   useEffect(()=>()=>clearTimeout(arrangeTimer.current),[]);
   const [reading,setReading]=useState("");
+  const [gap,setGap]=useState("");
+  const [frameDraft,setFrameDraft]=useState<FrameStyle>({});
   const [hand,setHand]=useState(false),[panel,setPanel]=useState(""),[name,setName]=useState("");
   const [ids,setIds]=useState<string[]>([]),[edgeIds,setEdgeIds]=useState<string[]>([]);
   const [editing,setEditing]=useState(""),[connectFrom,setConnectFrom]=useState("");
@@ -79,6 +83,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const groupDrag=useRef<{clientX:number;clientY:number;items:CanvasNode[]}|null>(null);
   const dropPoint=useRef<{x:number;y:number}|null>(null);
   const selected=board.nodes.filter(n=>ids.includes(n.id)), one=selected.length===1?selected[0]:undefined;
+  const movable=selected.filter(n=>!n.locked);
+  const lockedIds=useMemo(()=>new Set(board.nodes.filter(n=>n.locked).map(n=>n.id)),[board.nodes]);
   const edited=board.nodes.find(n=>n.id===editing),edge=board.edges.find(e=>e.id===edgeIds[0]);
   const duration=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:220;
   const change=useCallback((fn:(old:Board)=>Board)=>{
@@ -133,6 +139,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     change(b=>({...b,nodes:b.nodes.map(n=>targets.includes(n.id)?{...n,...patch}:n)}));
   }
   const handleResize=useCallback((id:string,rect:Layout)=>{
+    if(latest.current.nodes.find(n=>n.id===id)?.locked)return;
     const {x,y,width,height}=rect;
     change(b=>({...b,nodes:b.nodes.map(n=>n.id===id?{...n,x,y,width,height}:n)}));
     setLive({});
@@ -142,24 +149,27 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     const current=latest.current, item=current.nodes.find(n=>n.id===id);
     if(!item || item.imageSize || !width || !height || Math.max(width,height)>100000)return;
     // Preserve hand-sized images and multi-card layouts on boards made before native sizing.
-    const untouched=current.nodes.length===1 && item.width===220 && item.height===200;
+    const untouched=!item.locked && current.nodes.length===1 && item.width===220 && item.height===200;
     change(b=>({...b,nodes:b.nodes.map(n=>n.id===id?{...n,imageSize:{width,height},...(untouched?{width,height}:{})}:n)}));
     if(untouched)reframe([id]);
   },[change,reframe]);
   const appearance=useCallback((id:string,value:NonNullable<CanvasNode["appearance"]>)=>{
     change(b=>({...b,nodes:b.nodes.map(n=>n.id===id?{...n,appearance:value}:n)}));
   },[change]);
-  const actions=useMemo(()=>({resize:handleResize,edit,appearance,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[appearance,edit,handleResize,originalLoaded]);
+  const openStyle=useCallback((id:string)=>{choose([id]);setFrameDraft({});setPanel("appearance");},[choose]);
+  const actions=useMemo(()=>({resize:handleResize,edit,appearance,style:openStyle,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[appearance,edit,handleResize,originalLoaded,openStyle]);
   const baseNodes=useMemo(()=>board.nodes.map((n):FlowCard=>{
     return {id:n.id,type:"card",position:{x:n.x,y:n.y},...cardGeometry(n.width,n.height),
-      draggable:!hand && (!multiPick || ids.includes(n.id)),data:{item:n,focus,inspectOriginal:board.nodes.length===1 || (panel==="card" && editing===n.id)},
+      draggable:!n.locked && !hand && (!multiPick || ids.includes(n.id)),data:{item:n,focus,inspectOriginal:board.nodes.length===1 || (panel==="card" && editing===n.id)},
       selected:ids.includes(n.id),ariaLabel:n.title||n.kind,zIndex:n.kind==="highlight"?0:1};
   }),[board.nodes,ids,focus,panel,editing,multiPick,hand]);
   const flowNodes=useMemo(()=>baseNodes.map(n=>{
-    const p=live[n.id];if(!p)return n;
+    const preview=panel==="appearance" && n.selected && Object.keys(frameDraft).length>0;
+    const displayed=preview?{...n,data:{...n.data,item:withFrame(n.data.item,frameDraft)}}:n;
+    const p=live[n.id];if(!p)return displayed;
     const size=p.width!==undefined || p.height!==undefined ? cardGeometry(p.width??n.data.item.width,p.height??n.data.item.height) : undefined;
-    return {...n,...size,position:{x:p.x??n.position.x,y:p.y??n.position.y}};
-  }),[baseNodes,live]);
+    return {...displayed,...size,position:{x:p.x??n.position.x,y:p.y??n.position.y}};
+  }),[baseNodes,live,panel,frameDraft]);
   const flowEdges=useMemo(()=>board.edges.map((e):Edge=>({
     id:e.id,source:e.source,target:e.target,type:"default",label:e.label,selected:edgeIds.includes(e.id),
     markerEnd:e.symbol==="arrow"?{type:MarkerType.ArrowClosed,color:"#536981"}:e.symbol==="circle"?"canvas-end-circle":undefined,
@@ -183,6 +193,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     });
     const temporary:Record<string,Partial<Layout>>={},finished=new Map<string,{x:number;y:number}>();
     for(const c of changes){
+      if((c.type==="position" || c.type==="dimensions") && lockedIds.has(c.id))continue;
       if(c.type==="position" && c.position){
         temporary[c.id]=c.position;
         if(c.dragging===false)finished.set(c.id,c.position);
@@ -223,8 +234,25 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     choose([],[link.id]);setPanel("edge");setConnectFrom("");
   }
   function removeSelected(){
-    if(!ids.length&&!edgeIds.length)return;
-    change(b=>withoutSelection(b,new Set(ids),new Set(edgeIds)));choose([]);setPanel("");setConnectFrom("");
+    if(!movable.length && (selected.length || !edgeIds.length))return;
+    const lines=new Set(selected.length?[]:edgeIds);
+    change(b=>withoutSelection(b,new Set(movable.map(n=>n.id)),lines));choose(ids.filter(id=>lockedIds.has(id)));setPanel("");setConnectFrom("");
+  }
+  function duplicate(){
+    if(!selected.length)return;
+    const current=latest.current,copies=duplicateItems(current,selected,24/(flow.current?.getZoom()||1));
+    if(current.nodes.length+copies.nodes.length>1000 || current.edges.length+copies.edges.length>4000){
+      setNotice("There isn’t room on this board for the entire selection.");return;
+    }
+    change(b=>({...b,nodes:[...b.nodes,...copies.nodes],edges:[...b.edges,...copies.edges]}));
+    choose(copies.nodes.map(n=>n.id));setPanel("");
+  }
+  function lockSelection(){
+    if(selected.length)patchNodes(ids,{locked:movable.length>0});
+  }
+  function quickGroup(ungroup:boolean){
+    if(ungroup && selected.some(n=>n.group))patchNodes(ids,{group:""});
+    else if(!ungroup && selected.length>1)patchNodes(ids,{group:unusedGroupName("Group",new Set(board.nodes.map(n=>n.group)))});
   }
   const groups=useMemo(()=>{
     const map=new Map<string,CanvasNode[]>();for(const n of board.nodes)if(n.group){const group=map.get(n.group)||[];group.push({...n,...live[n.id]});map.set(n.group,group);}
@@ -235,13 +263,16 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     arrangeTimer.current=setTimeout(()=>setArranging(false),210);
   }
   function placeSelection(axis:"x"|"y",placement:"start"|"center"|"end"|"space"){
-    if(selected.length<(placement==="space"?3:2))return;
+    const exactGap=gap.trim()===""?undefined:Number(gap);
+    if(movable.length<(placement==="space" && exactGap===undefined?3:2))return;
+    if(placement==="space" && exactGap!==undefined && (!Number.isFinite(exactGap)||exactGap<0||exactGap>10000))return;
     const size=axis==="x"?"width":"height";
-    const box=bounds(selected);
-    const moved=placement==="space"?spaceEvenly(selected,axis):selected.map(n=>({
+    const box=bounds(movable);
+    const moved=placement==="space"?spaceEvenly(movable,axis,exactGap):movable.map(n=>({
       ...n,[axis]:box[axis]+(box[size]-n[size])*(placement==="start"?0:placement==="center"?.5:1)
     }));
     const positions=new Map(moved.map(n=>[n.id,{x:n.x,y:n.y}]));
+    if(moved.some(n=>Math.abs(n.x)>1e7||Math.abs(n.y)>1e7)){setNotice("That spacing would extend beyond the board.");return;}
     animatePlacement();
     change(b=>({...b,nodes:b.nodes.map(n=>positions.has(n.id)?{...n,...positions.get(n.id)}:n)}));
   }
@@ -249,7 +280,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     setIds(old=>old.includes(id)?old.filter(other=>other!==id):[...old,id]);setEdgeIds([]);
   }
   function arrange(){
-    const items=selected.length>1?selected:board.nodes;if(!items.length)return;
+    const items=(selected.length>1?selected:board.nodes).filter(n=>!n.locked);if(items.length<2)return;
     animatePlacement();
     const arranged=new Map(tile(items,bounds(items)).map(n=>[n.id,n]));
     change(b=>({...b,nodes:b.nodes.map(n=>arranged.get(n.id)||n)}));reframe(items.map(n=>n.id));
@@ -273,9 +304,22 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   };
   useEffect(()=>{const listener=(e:ClipboardEvent)=>paste.current(e);document.addEventListener("paste",listener);return()=>document.removeEventListener("paste",listener);},[]);
   useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(""),4500);return()=>clearTimeout(t);},[notice]);
+  const shortcut=useRef((_:KeyboardEvent)=>{});
+  shortcut.current=e=>{
+    if(!(e.metaKey||e.ctrlKey)||e.altKey||e.isComposing||e.defaultPrevented||panel||isField(e.target))return;
+    const editor=frame.current?.parentElement;
+    if(e.target!==document.body && (!(e.target instanceof Element)||!editor?.contains(e.target)||e.target.closest("[role=menu]")))return;
+    const key=e.key.toLowerCase();
+    if(key==="d" && !e.shiftKey && selected.length){e.preventDefault();if(!e.repeat)duplicate();}
+    else if(key==="g" && selected.length){e.preventDefault();if(!e.repeat)quickGroup(e.shiftKey);}
+    else if(key==="l" && e.shiftKey && selected.length){e.preventDefault();if(!e.repeat)lockSelection();}
+    else if(key==="a" && !e.shiftKey){e.preventDefault();choose(board.nodes.map(n=>n.id));}
+    else if(key==="z" || (key==="y"&&!e.shiftKey)){e.preventDefault();restore(key==="y"||e.shiftKey);}
+  };
+  useEffect(()=>{const handle=(e:KeyboardEvent)=>shortcut.current(e);document.addEventListener("keydown",handle,true);return()=>document.removeEventListener("keydown",handle,true);},[]);
   const selectionCount=selected.length+edgeIds.length;
   return <div className={css.editor} style={{"--canvas-inverse-zoom":1/zoom,"--footer-scale":Math.min(3,1/zoom)} as React.CSSProperties} data-arranging={arranging||undefined} data-multi={ids.length>1||undefined} aria-label="Canvas editor" onKeyDown={e=>{
-    if(isField(e.target) || (e.target instanceof HTMLElement && e.target.closest("button,a,[role=menu]")))return;
+    if(e.defaultPrevented || isField(e.target) || (e.target instanceof HTMLElement && e.target.closest("button,a,[role=menu]")))return;
     if(multiPick && (e.key==="Enter" || e.key===" ")){
       const id=(e.target as HTMLElement).closest<HTMLElement>(".react-flow__node")?.dataset.id;
       if(id){e.preventDefault();togglePicked(id);return;}
@@ -286,7 +330,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   }}>
     <header className={css.bar}>
       <Action name="Back to boards" icon={<IconArrowLeft/>} run={onBack} disabled={media.busy}/>
-      <div className={css.heading}><h2>{board.title}</h2><span role="status">{saveStatus}</span></div>
+      <div className={css.heading}><h2>{board.title}</h2></div>
+      <CanvasSaveStatus status={saveStatus} updatedAt={board.updatedAt}/>
       <div className={css.history}><Action name="Undo" icon={<IconArrowBackUp/>} disabled={!previous.current.length} run={()=>restore()}/><Action name="Redo" icon={<IconArrowForwardUp/>} disabled={!next.current.length} run={()=>restore(true)}/></div>
       <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
       <Action name="Saved views" icon={<IconBookmark/>} label="Views" active={panel==="views"} run={()=>show("views")}/>
@@ -327,7 +372,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         )}</svg>}{groups.map(({name:label,items,box})=><div key={label} className={css.group} style={{left:box.x-14,top:box.y-34,width:box.width+28,height:box.height+48}}>
           <button type="button" className="nodrag nopan" aria-label={"Select group "+label} onPointerDown={e=>{
             if(e.button!==0)return;e.stopPropagation();e.currentTarget.setPointerCapture(e.pointerId);
-            groupDrag.current={clientX:e.clientX,clientY:e.clientY,items};choose(items.map(i=>i.id));setPanel("");
+            const movableItems=items.filter(n=>!n.locked);
+            groupDrag.current=movableItems.length?{clientX:e.clientX,clientY:e.clientY,items:movableItems}:null;choose(items.map(i=>i.id));setPanel("");
           }} onPointerMove={e=>{if(groupDrag.current)setLive(Object.fromEntries(groupPosition(e)));}}
           onPointerUp={e=>{
             const positions=groupPosition(e),start=groupDrag.current;groupDrag.current=null;setLive({});setGuides([]);
@@ -350,7 +396,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         <Action name="Upload media" icon={<IconUpload/>} disabled={media.busy} run={()=>uploadInput.current?.click()}/>
         <input ref={uploadInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void media.importFiles(files);}}/>
       </div>
-      {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel("")} restoreSize={edited.imageSize?()=>{patchNodes([edited.id],{...edited.imageSize});reframe([edited.id]);}:undefined} save={patch=>patchNodes([edited.id],patch)}/>}
+      {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel("")} restoreSize={edited.imageSize&&!edited.locked?()=>{patchNodes([edited.id],{...edited.imageSize});reframe([edited.id]);}:undefined} save={patch=>patchNodes([edited.id],patch)}/>}
       {panel==="read" && <Panel title={board.nodes.find(n=>n.id===reading)?.title || "Canvas item"} close={()=>setPanel("")}><p className={css.readBody}>{board.nodes.find(n=>n.id===reading)?.body || "No additional text."}</p></Panel>}
       {panel==="edge"&&edge && <EdgeFields key={edge.id} edge={edge} close={()=>setPanel("")} save={patch=>change(b=>({...b,edges:b.edges.map(e=>e.id===edge.id?{...e,...patch}:e)}))}/>}
       {panel==="arrange" && selected.length>1 && <Panel title="Arrange selection" close={()=>setPanel("")}>
@@ -362,13 +408,20 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
             })}
           </div>)}
         </div>
-        {selected.length>=3 && <div className={css.spacing}><button type="button" onClick={()=>placeSelection("x","space")}>Space horizontally</button>
-          <button type="button" onClick={()=>placeSelection("y","space")}>Space vertically</button></div>}
+        <label>Gap (px)<input type="number" min="0" max="10000" step="any" placeholder="Auto" value={gap} onChange={e=>setGap(e.target.value)}/></label>
+        <div className={css.spacing}>{(["x","y"] as const).map(axis=><button type="button" key={axis}
+          disabled={gap===""?movable.length<3:Number(gap)<0||Number(gap)>10000}
+          onClick={()=>placeSelection(axis,"space")}>{axis==="x"?"Space horizontally":"Space vertically"}</button>)}</div>
       </Panel>}
-      {panel==="appearance" && selected.length>1 && <Panel title="Selection appearance" close={()=>setPanel("")}>
+      {panel==="appearance" && selected.length>0 && <Panel title="Selection appearance" close={()=>setPanel("")}>
         <div className={css.spacing}>{(["plain","outline","card"] as const).map(value=><button type="button" key={value}
           aria-pressed={selected.every(n=>(n.appearance ?? defaultCanvasAppearance(n))===value)}
-          onClick={()=>patchNodes(ids,{appearance:value})}>{canvasAppearances[value]}</button>)}</div>
+          onClick={()=>{patchNodes(ids,{appearance:value});setFrameDraft({});}}>{canvasAppearances[value]}</button>)}</div>
+        <FrameFields nodes={selected} draft={frameDraft} onChange={setFrameDraft}/>
+        {Object.keys(frameDraft).length>0 && <button type="button" className={css.primary} onClick={()=>{
+          const targets=new Set(ids);
+          change(b=>({...b,nodes:b.nodes.map(n=>targets.has(n.id)?withFrame(n,frameDraft):n)}));setFrameDraft({});
+        }}>Apply frame</button>}
       </Panel>}
       {panel==="group" && <Panel title="Group cards" close={()=>setPanel("")}><form onSubmit={e=>{e.preventDefault();if(name.trim()){patchNodes(ids,{group:name.trim()});setPanel("");}}}>
         <label>Group name<input autoFocus required maxLength={160} list="canvas-group-names" value={name} onChange={e=>setName(e.target.value)}/></label>
@@ -387,12 +440,14 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         </form></Panel>}
       {!focus && selectionCount>0 && !panel && !connectFrom && <div className={css.selection} role="toolbar" aria-label="Selection actions">
         {selected.length>1 && <><span className={css.pickCount} aria-live="polite">{selected.length} selected</span>
-          <Action name="Arrange selection" label="Arrange" icon={<IconArrowsMove/>} run={()=>show("arrange")}/>
-          <Action name="Selection appearance" label="Style" icon={<IconAdjustments/>} run={()=>show("appearance")}/></>}
+          <Action name="Arrange selection" label="Arrange" icon={<IconArrowsMove/>} disabled={movable.length<2} run={()=>show("arrange")}/></>}
         {one && <Action name="Connect to another card" icon={<IconLine/>} run={()=>{setConnectFrom(one.id);setMultiPick(false);setHand(false);}}/>}
-        {selected.length>0&&<><Action name="Group cards" icon={<IconFrame/>} run={()=>{show("group");setName(one?.group||"");}}/>
+        {selected.length>0&&<><Action name="Selection appearance" label="Style" icon={<IconAdjustments/>} run={()=>{setFrameDraft({});show("appearance");}}/>
+        <Action name="Duplicate selection" hint="Duplicate selection (Ctrl/⌘ D)" icon={<IconCopy/>} run={duplicate}/>
+        <Action name={movable.length?"Lock position":"Unlock position"} hint="Toggle position lock (Ctrl/⌘ Shift L)" icon={movable.length?<IconLock/>:<IconLockOpen/>} active={!movable.length} run={lockSelection}/>
+        <Action name="Group cards" hint="Group selection (Ctrl/⌘ G) · Ungroup (Ctrl/⌘ Shift G)" icon={<IconFrame/>} run={()=>{show("group");setName(one?.group||"");}}/>
         <Action name={selected.every(n=>n.used)?"Mark unused":"Mark used"} icon={<IconCheck/>} active={selected.every(n=>n.used)} run={()=>patchNodes(ids,{used:!selected.every(n=>n.used)})}/></>}
-        <Action name="Remove selection from board" icon={<IconTrash/>} run={removeSelected}/>
+        <Action name="Remove selection from board" disabled={selected.length>0&&!movable.length} icon={<IconTrash/>} run={removeSelected}/>
       </div>}
       <div className={css.navigation} role="toolbar" aria-label="Board navigation">
         <Action name="Snap to align" icon={<IconMagnet/>} active={snap} run={()=>{setSnap(v=>!v);setGuides([]);}}/>

@@ -1,4 +1,4 @@
-import type { Board } from "../../lib/modules/canvas/model";
+import { boardContents,type Board } from "../../lib/modules/canvas/model";
 import { buildCsrfHeaders, buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 
 const endpoint = "/api/personal/canvas";
@@ -25,8 +25,8 @@ export async function getBoard(id: string) {
 }
 
 function sameContent(a: Board, b: Board) {
-  return a.title === b.title && a.folder === b.folder &&
-    JSON.stringify([a.nodes, a.edges, a.views]) === JSON.stringify([b.nodes, b.edges, b.views]);
+  // A retried save can return the same frame fields in the server's canonical key order.
+  return JSON.stringify(boardContents(a)) === JSON.stringify(boardContents(b));
 }
 
 export class BoardSession {

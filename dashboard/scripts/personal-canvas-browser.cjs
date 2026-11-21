@@ -70,6 +70,8 @@ async function main(){
  await expect.poll(()=>art.evaluate(i=>i.naturalWidth)).toBe(1080);
  const imageBox=await art.boundingBox(),controlBox=await control.boundingBox();assert(Math.abs(imageBox.width/imageBox.height-1080/1350)<.01);
  assert(controlBox.y>=imageBox.y+imageBox.height-1);
+ const titleBox=await ad.locator("strong").boundingBox();
+ assert(Math.abs(titleBox.y+titleBox.height/2-controlBox.y-controlBox.height/2)<1.5,"Title and item menu align at this zoom");
  await btn("Focus mode").click();await expect(control).toHaveCount(0);await expect(art).toBeVisible();await btn("Focus mode").click();
  const beforeTabs=context.pages().length;await ad.getByRole("img",{name:"Ad 39.png"}).click();await expect(ad).toHaveClass(/selected/);assert.equal(context.pages().length,beforeTabs);
  await control.focus();await page.keyboard.press("ArrowDown");await page.keyboard.press("End");await page.keyboard.press("ArrowUp");await page.keyboard.press("Enter");
@@ -201,6 +203,46 @@ async function main(){
  await boxSelect(cards[0],cards[1],true);
  await expect(page.getByText("2 selected",{exact:true})).toBeVisible();
  await expect(cards[2]).not.toHaveClass(/selected/);
+ await page.keyboard.press("Control+g");await expect.poll(async()=>(await read())[0].group).toBe("Group");
+ await page.keyboard.press("Control+d");await expect.poll(async()=>(await read()).length).toBe(75);
+ let copies=(await read()).slice(-2);
+ assert(copies.every(n=>n.group==="Group copy"));
+ assert.deepEqual(copies.map(n=>[n.ref.objectId,n.width,n.height]),layout.slice(0,2).map(n=>[n.ref.objectId,n.width,n.height]));
+ await page.keyboard.press("Control+Shift+g");await expect.poll(async()=>(await read()).slice(-2).map(n=>n.group)).toEqual(["",""]);
+ await btn("Arrange selection").click();await page.getByLabel("Gap (px)").fill("36");
+ for(const [axis,size,label] of [["x","width","Space horizontally"],["y","height","Space vertically"]]){
+   await btn(label).click();await expect.poll(async()=>{const [a,b]=(await read()).slice(-2);return b[axis]-a[axis]-a[size];}).toBeCloseTo(36,6);
+ }
+ await btn("Close panel").click();await btn("Selection appearance").click();await btn("Card").click();
+ await page.getByLabel("Border color").fill("#334455");await page.getByLabel("Card fill").fill("#f2e1ca");
+ const thickness=page.getByRole("slider");await thickness.focus();await thickness.press("Home");
+ for(let i=0;i<12;i++)await thickness.press("ArrowRight");
+ const framedCopy=page.locator('.react-flow__node[data-id="'+copies[0].id+'"] [data-media]');
+ await expect.poll(()=>framedCopy.evaluate(el=>getComputedStyle(el).getPropertyValue("--frame-width").trim())).toBe("6px");
+ assert.equal((await read()).at(-1).strokeWidth,undefined);
+ await btn("Apply frame").click();
+ await expect.poll(async()=>(await read()).slice(-2).map(n=>[n.fillColor,n.strokeColor,n.strokeWidth])).toEqual(Array(2).fill(["#f2e1ca","#334455",6]));
+ await btn("Close panel").click();await btn("Lock position").click();await expect.poll(async()=>(await read()).slice(-2).every(n=>n.locked)).toBe(true);
+ await expect(btn("Arrange selection")).toBeDisabled();
+ copies=(await read()).slice(-2);
+ const lockedCopy=page.locator('.react-flow__node[data-id="'+copies[0].id+'"]');
+ await expect(lockedCopy).not.toHaveClass(/draggable/);
+ const position=await lockedCopy.boundingBox(), fixed=copies.map(n=>[n.x,n.y,n.width,n.height]);
+ await page.mouse.move(position.x+position.width/2,position.y+position.height/2);await page.mouse.down();
+ await page.mouse.move(position.x+position.width/2+50,position.y+position.height/2+30,{steps:8});await page.mouse.up();
+ assert.deepEqual((await read()).slice(-2).map(n=>[n.x,n.y,n.width,n.height]),fixed);
+ await page.keyboard.press("Control+Shift+l");await expect.poll(async()=>(await read()).slice(-2).every(n=>!n.locked)).toBe(true);
+ await btn("Add text").click();await page.getByLabel("Text",{exact:true}).fill("Headline");await btn("Apply").click();
+ await expect.poll(async()=>(await read()).at(-1).appearance).toBe("outline");
+ await btn("Save status: Saved").click();await expect(page.locator("time[datetime]").last()).toBeVisible();
+ await page.keyboard.press("Escape");await page.reload();
+ const restored=await read();assert.equal(restored.at(-2).strokeWidth,6);assert.equal(restored.at(-1).body,"Headline");
+ const api=base+"/api/personal/canvas";
+ await page.route(api,route=>route.request().method()==="PUT"?route.abort():route.continue());
+ await btn("Add sticky note").click();await expect(btn("Save status: Saving…")).toBeVisible();
+ await expect(btn("Save status: Unsaved changes")).toBeVisible();await page.unroute(api);
+ await btn("Retry save").click();await expect(btn("Save status: Saved")).toBeVisible();
+ console.log("PASS shortcut duplication and independent groups, exact spacing, custom stroke and fill, position locks, outlined new text and saved timestamp.");
  console.log("PASS live drag guides and snap, tap and box selection, moving a subset together, alignment, equal gaps on both axes, original sizes and undo.");
  assert.deepEqual(errors,[]);console.log("PASS 40 distinct images, paste/drop/reuse, real Media links and thumbnails, drag, Undo/Redo, notes, typed connections, saved views, group and used state, navigation and mobile controls.");
 }

@@ -4,36 +4,35 @@
   box-shadow:none;
 }
 .item[data-kind][data-appearance="outline"] {
-  border:1.5px solid color-mix(in srgb,var(--tint),#35495a 58%);
+  border:var(--frame-width,1.5px) solid var(--frame-stroke,color-mix(in srgb,var(--tint),#35495a 58%));
   border-radius:5px;
   background:transparent;
   box-shadow:none;
 }
 .item[data-kind][data-appearance="card"] {
-  border:1px solid color-mix(in srgb,var(--tint),#435466 26%);
+  border:var(--frame-width,1px) solid var(--frame-stroke,color-mix(in srgb,var(--tint),#435466 26%));
   border-radius:10px;
   background:var(--tint);
   box-shadow:0 3px 9px #20344d20;
 }
 /* A frame sits outside the artwork so its dimensions still match the original. */
 .item[data-kind][data-media][data-appearance] {border:0;border-radius:0}
-.item[data-kind][data-media][data-appearance="outline"] {box-shadow:0 0 0 calc(2px * var(--canvas-inverse-zoom,1)) #607587}
+.item[data-kind][data-media][data-appearance="outline"] {box-shadow:0 0 0 var(--frame-width,calc(2px * var(--canvas-inverse-zoom,1))) var(--frame-stroke,#607587)}
 .item[data-kind][data-media][data-appearance="card"] {
-  box-shadow:0 0 0 calc(4px * var(--canvas-inverse-zoom,1)) var(--tint),0 4px 14px calc(3px * var(--canvas-inverse-zoom,1)) #182c4030;
+  --card-rim:calc(3px * var(--canvas-inverse-zoom,1));
+  box-shadow:0 0 0 var(--card-rim) var(--tint),0 0 0 calc(var(--card-rim) + var(--frame-width,calc(1px * var(--canvas-inverse-zoom,1)))) var(--frame-stroke,var(--tint)),0 4px 14px calc(3px * var(--canvas-inverse-zoom,1)) #182c4030;
 }
 .footer {
   position:absolute;
   inset:100% 0 auto;
-  height:calc(48px * var(--canvas-inverse-zoom,1));
+  margin-top:calc(3px * var(--canvas-inverse-zoom,1));
   pointer-events:none;
 }
 .metadata {
   display:flex;
-  align-content:start;
   align-items:center;
-  flex-wrap:wrap;
+  min-height:calc(44px * var(--canvas-inverse-zoom,1));
   gap:2px 5px;
-  margin-top:calc(6px * var(--footer-scale,1));
   margin-right:calc(44px * var(--canvas-inverse-zoom,1));
   font-size:clamp(11px,5cqw,calc(13px * var(--footer-scale,1)));
 }
@@ -44,12 +43,12 @@
   white-space:nowrap;
 }
 .metadata strong {font:inherit;font-weight:550;color:#304456}
-.caption {flex-basis:100%;font-size:.94em;color:#495968}
+.caption {display:block;font-size:calc(12px * var(--footer-scale,1));color:#495968}
 .used {color:#397659;flex:none}
 .footer .trigger {
   pointer-events:auto;
   position:absolute;
-  top:calc(4px * var(--canvas-inverse-zoom,1));
+  top:0;
   right:0;
   transform:scale(var(--canvas-inverse-zoom,1));
   transform-origin:top right;

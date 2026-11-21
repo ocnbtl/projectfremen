@@ -4,6 +4,7 @@ import { IconX } from "@tabler/icons-react";
 import { canvasAppearances, defaultCanvasAppearance, type CanvasAppearance, type CanvasEdge, type CanvasNode } from "../../lib/modules/canvas/model";
 import SelectField from "../ui/SelectField";
 import { colors } from "./board-layout";
+import { FrameFields,type FrameStyle } from "./FrameFields";
 import css from "./CanvasEditor.module.css";
 
 export function Panel({title,close,children}:{title:string;close:()=>void;children:ReactNode}) {
@@ -20,13 +21,15 @@ export function Panel({title,close,children}:{title:string;close:()=>void;childr
 export function CardFields({node,save,close,restoreSize}:{node:CanvasNode;restoreSize?:()=>void;save:(patch:Partial<CanvasNode>)=>void;close:()=>void}){
   const [title,setTitle]=useState(node.title),[body,setBody]=useState(node.body),[color,setColor]=useState(node.color);
   const [appearance,setAppearance]=useState(node.appearance);
+  const [frame,setFrame]=useState<FrameStyle>({});
   return <Panel title={node.kind==="object"?"Edit card":"Edit "+node.kind} close={close}>
-    <form onSubmit={e=>{e.preventDefault();save({title:title.trim()||node.ref?.label||"",body:body.trim(),color,...(appearance ? {appearance} : {})});close();}}>
+    <form onSubmit={e=>{e.preventDefault();save({title:title.trim()||node.ref?.label||"",body:body.trim(),color,...frame,...(appearance || Object.keys(frame).length ? {appearance:appearance??defaultCanvasAppearance(node)} : {})});close();}}>
       <label>Title<input autoFocus value={title} maxLength={240} onChange={e=>setTitle(e.target.value)}/></label>
       <label>{node.kind==="object"?"Caption":"Text"}<textarea rows={3} value={body} maxLength={4000} onChange={e=>setBody(e.target.value)}/></label>
       <label>Appearance<SelectField portalToBody value={appearance ?? defaultCanvasAppearance(node)} onChange={e=>setAppearance(e.target.value as CanvasAppearance)}>
         {Object.entries(canvasAppearances).map(([value,label])=><option key={value} value={value}>{label}</option>)}
       </SelectField></label>
+      <FrameFields nodes={[{...node,appearance,color}]} draft={frame} onChange={setFrame}/>
       {restoreSize && node.imageSize && <button type="button" onClick={()=>{restoreSize();close();}}>Original size · {node.imageSize.width} × {node.imageSize.height}</button>}
       {node.ref?.module!=="media" && <div className={css.swatches} role="group" aria-label="Card color">{Object.entries(colors).map(([name,hex])=><button type="button" key={name} title={name} aria-label={name} aria-pressed={color===name} style={{background:hex}} onClick={()=>setColor(name)}/>)}</div>}
       <button className={css.primary} type="submit">Apply</button>

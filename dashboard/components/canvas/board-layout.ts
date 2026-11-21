@@ -21,7 +21,33 @@ export function tile(nodes: CanvasNode[], origin: {x:number;y:number}, columns=M
 }
 export function makeNode(kind: CanvasNode["kind"], point:{x:number;y:number}, ref?: NativeObjectRef):CanvasNode {
   return {id:crypto.randomUUID(),kind,...point,width:kind==="highlight"?320:220,height:kind==="object"?200:kind==="highlight"?176:136,
-    title:ref?.label || "",body:"",color:kind==="sticky"?"butter":kind==="highlight"?"mint":"paper",group:"",used:false,...(ref?{ref}:{})};
+    title:ref?.label || "",body:"",color:kind==="sticky"?"butter":kind==="highlight"?"mint":"paper",group:"",used:false,...(kind==="text"?{appearance:"outline" as const}:{}),...(ref?{ref}:{})};
+}
+
+export function unusedGroupName(base:string, taken:Set<string>) {
+  let name=base;
+  for(let i=2;taken.has(name);i++)name=base+" "+i;
+  return name;
+}
+
+export function duplicateItems(board:Board,selection:CanvasNode[],offset:number) {
+  const ids=new Map(selection.map(node=>[node.id,crypto.randomUUID()]));
+  const taken=new Set(board.nodes.map(node=>node.group));
+  const groups=new Map<string,string>();
+  const dx=Math.min(offset,...selection.map(n=>1e7-n.x));
+  const dy=Math.min(offset,...selection.map(n=>1e7-n.y));
+  const nodes=selection.map(node=>{
+    if(node.group && !groups.has(node.group)){
+      const name=unusedGroupName(node.group.slice(0,145)+" copy",taken);
+      groups.set(node.group,name);taken.add(name);
+    }
+    return {...node,id:ids.get(node.id)!,x:node.x+dx,y:node.y+dy,group:groups.get(node.group)||"",locked:false};
+  });
+  const edges=board.edges.flatMap(edge=>{
+    const source=ids.get(edge.source),target=ids.get(edge.target);
+    return source && target ? [{...edge,id:crypto.randomUUID(),source,target}] : [];
+  });
+  return {nodes,edges};
 }
 export function addObjects(board:Board, refs:NativeObjectRef[], origin:{x:number;y:number}, sizes?:Map<string,{width:number;height:number}>){
   const seen=new Set(board.nodes.flatMap(n=>n.ref?[keyOf(n.ref)]:[]));

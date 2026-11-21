@@ -14,6 +14,10 @@ export type CanvasNode = {
   group: string;
   used: boolean;
   appearance?: "plain" | "outline" | "card";
+  strokeColor?: string;
+  strokeWidth?: number;
+  fillColor?: string;
+  locked?: boolean;
   imageSize?: {width:number;height:number};
   ref?: NativeObjectRef;
 };
@@ -99,12 +103,20 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
     const color = string(node.color, 32, "item color");
     if (!/^(?:#[\da-f]{3,8}|[a-z][a-z\d-]{0,31})$/i.test(color)) throw new CanvasError("Choose an item color.");
     if (typeof node.used !== "boolean") throw new CanvasError("Choose a valid used status.");
+    for (const color of [node.strokeColor,node.fillColor]) {
+      if (color !== undefined && (typeof color !== "string" || !/^#[\da-f]{6}$/i.test(color))) throw new CanvasError("Choose a valid frame color.");
+    }
+    if (node.locked !== undefined && typeof node.locked !== "boolean") throw new CanvasError("Choose a valid lock setting.");
     return {
       id: canvasId(node.id), kind, x: number(node.x, -1e7, 1e7), y: number(node.y, -1e7, 1e7),
       width: number(node.width, 1, 100000), height: number(node.height, 1, 100000),
       title: string(node.title, 500, "item title"), body: string(node.body, 32000, "item text"),
       group: string(node.group, 160, "group"), color, used: node.used,
       ...(node.appearance !== undefined ? {appearance:option(node.appearance, ["plain","outline","card"] as const)} : {}),
+      ...(node.strokeColor !== undefined ? {strokeColor:node.strokeColor as string} : {}),
+      ...(node.strokeWidth !== undefined ? {strokeWidth:number(node.strokeWidth,0,32)} : {}),
+      ...(node.fillColor !== undefined ? {fillColor:node.fillColor as string} : {}),
+      ...(node.locked !== undefined ? {locked:node.locked} : {}),
       ...(kind === "object" && node.imageSize ? {imageSize:{width:number(record(node.imageSize).width,1,100000),height:number(record(node.imageSize).height,1,100000)}} : {}),
       ...(kind === "object" ? {ref: reference(node.ref)} : {})
     };

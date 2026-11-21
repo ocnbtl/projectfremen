@@ -64,17 +64,17 @@ export function snapTranslation(
   return { delta, guides };
 }
 
-export function spaceEvenly<T extends Rect>(nodes: readonly T[], axis: Axis): T[] {
-  if (nodes.length < 3) return [...nodes];
+export function spaceEvenly<T extends Rect>(nodes: readonly T[], axis: Axis, exactGap?:number): T[] {
+  if (nodes.length < (exactGap===undefined?3:2)) return [...nodes];
   const ordered = [...nodes].sort((a, b) => a[axis] - b[axis]);
   const last = ordered[ordered.length - 1];
   const extent = last[axis] + last[size[axis]] - ordered[0][axis];
   const free = extent - ordered.reduce((sum, node) => sum + node[size[axis]], 0);
-  const gap = free >= 0 ? free / (ordered.length - 1) : overlapGap;
+  const gap = exactGap ?? (free >= 0 ? free / (ordered.length - 1) : overlapGap);
   const positions = new Map<string, number>();
   let cursor = ordered[0][axis];
   for (const node of ordered) {
-    positions.set(node.id, node === last && free >= 0 ? last[axis] : cursor);
+    positions.set(node.id, exactGap===undefined && node === last && free >= 0 ? last[axis] : cursor);
     cursor += node[size[axis]] + gap;
   }
   return nodes.map(node => {

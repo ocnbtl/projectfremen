@@ -7,6 +7,8 @@ require.extensions[".ts"] = (module, filename) => module._compile(
   }).outputText, filename,
 );
 const { snapTranslation, spaceEvenly } = require("../components/canvas/alignment.ts");
+const { duplicateItems,makeNode } = require("../components/canvas/board-layout.ts");
+const { boardContents } = require("../lib/modules/canvas/model.ts");
 const rect = (id, x, y, width, height) => Object.freeze({ id, x, y, width, height });
 
 const moving = rect("moving", 0, 0, 40, 60);
@@ -58,3 +60,15 @@ const spread = spaceEvenly(overlapping, "x");
 assert.deepEqual(spread.map(n => n.x), [0, 124, 188]);
 assert.deepEqual(spread.map(n => [n.y, n.width, n.height]), overlapping.map(n => [n.y, n.width, n.height]));
 console.log("PASS canvas edge and center guides, zoom tolerance, rigid selections and equal edge spacing.");
+assert.deepEqual(spaceEvenly([last,first],"x",0).map(n=>n.x),[10,-10]);
+const a={...makeNode("text",{x:15,y:30}),strokeColor:"#102030",strokeWidth:3,locked:true,group:"Ads"};
+const b={...makeNode("sticky",{x:55,y:60}),group:"Ads"},c=makeNode("text",{x:20,y:90});
+const wire=(source,target)=>({id:crypto.randomUUID(),source:source.id,target:target.id,label:"Next",style:"dashed",symbol:"arrow"});
+const board={title:"Fixture",folder:"",nodes:[a,b,c],edges:[wire(a,b),wire(b,c)],views:[]};
+const copies=duplicateItems(board,[a,b],24);
+assert.equal(copies.edges.length,1);assert.deepEqual([copies.edges[0].source,copies.edges[0].target],copies.nodes.map(n=>n.id));
+assert(copies.nodes.every(n=>n.group==="Ads copy"&&!n.locked));assert.equal(copies.nodes[0].x,39);
+assert.equal(copies.nodes[0].appearance,"outline");assert.equal(copies.nodes[0].strokeWidth,3);
+assert.deepEqual(boardContents({...board,...copies}).nodes,copies.nodes);
+assert.throws(()=>boardContents({...board,nodes:[{...a,strokeColor:"invalid"}]}));
+console.log("PASS exact gaps and independent duplicates with retained styles and internal connections.");
