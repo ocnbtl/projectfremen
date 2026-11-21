@@ -35,6 +35,7 @@ module.exports = async function testLibrary({temp, adText, ad, note, writeRecord
       Object.defineProperty(navigator, "clipboard", {value:{writeText:async text => { window.fixtureCopies.push(text); }}});
     });
     const page = await context.newPage();
+    page.on("pageerror",error=>console.error("Browser error:",error.message));
     const settings = base + "/admin/personal/settings";
     await page.goto(settings);
     const sections = page.getByRole("navigation", {name:"Settings sections"});
@@ -65,16 +66,21 @@ module.exports = async function testLibrary({temp, adText, ad, note, writeRecord
     await page.getByLabel("Reading text size").selectOption("larger");
     await expect(page.locator("html")).toHaveAttribute("data-reading-size","larger");
     await page.goto(settings + "/regional");
-    await page.getByLabel("Clock",{exact:true}).selectOption("24");
-    await page.getByLabel("First day of the week",{exact:true}).selectOption("monday");
+    const mainSettings=page.getByRole("main",{name:"Personal settings"});
+    const clock=mainSettings.getByRole("combobox",{name:"Clock",exact:true});
+    try { await clock.selectOption("24",{timeout:10000}); }
+    catch(error){console.error(page.url(),await page.locator("select").evaluateAll(rows=>rows.map(row=>({name:row.getAttribute("aria-label"),value:row.value}))));throw error;}
+    await mainSettings.getByLabel("First day of the week",{exact:true}).selectOption("monday");
     await page.goto(settings + "/navigation");
-    await page.getByLabel("After sign-in and from the home logo",{exact:true}).selectOption("/admin/notes");
+    await mainSettings.getByLabel("After sign-in and from the home logo",{exact:true}).selectOption("/admin/notes");
     await expect(page.getByRole("link",{name:"Unigentamos home"})).toHaveAttribute("href","/admin/notes");
     await page.goto(settings + "/planning");
-    await page.getByLabel("Task kind",{exact:true}).selectOption("routine");
-    await page.getByRole("switch",{name:"Start new tasks on the selected day"}).check();
-    await page.getByLabel("Appointments",{exact:true}).selectOption("30");
-    await page.getByRole("link",{name:"Manage calendars and subscriptions"}).click();
+    await mainSettings.getByLabel("Task kind",{exact:true}).selectOption("routine");
+    const scheduled=mainSettings.getByRole("switch",{name:"Start new tasks on the selected day"});
+    await scheduled.click();await expect(scheduled).toBeChecked();
+    await mainSettings.getByLabel("Appointments",{exact:true}).selectOption("30");
+    await expect(mainSettings.getByLabel("Appointments",{exact:true})).toHaveValue("30");
+    await mainSettings.getByRole("link",{name:"Manage calendars and subscriptions"}).click();
     await expect(page.getByRole("dialog").last()).toBeVisible();
     await page.keyboard.press("Escape");
     await page.getByRole("button",{name:"Add event",exact:true}).click();

@@ -57,7 +57,7 @@ function Choice({
   return (
     <label className={styles.preferenceRow}>
       <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
+      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map(([v, label]) => (
           <option key={v} value={v}>
             {label}
