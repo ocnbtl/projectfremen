@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
@@ -460,7 +461,7 @@ export default function NoteDecisionsView({
           <div className={styles.decisionCard}>
             <div>
               <strong>{primaryDecision.title}</strong>
-              <p>{primaryDecision.question}</p>
+              <p><WritingValue>{primaryDecision.question}</WritingValue></p>
             </div>
             <dl className={styles.facts}>
               <div><dt>Decision state</dt><dd>{cleanLabel(primaryDecision.decisionState)}</dd></div>
@@ -471,7 +472,7 @@ export default function NoteDecisionsView({
             {primaryDecision.finalDecision && (
               <div className={styles.excerpt}>
                 <span>Outcome / recommendation</span>
-                <p>{primaryDecision.finalDecision}</p>
+                <p><WritingValue>{primaryDecision.finalDecision}</WritingValue></p>
               </div>
             )}
             <Link className={styles.primaryLink} href={primaryDecisionRoute}>

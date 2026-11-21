@@ -1,0 +1,51 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const ts = require("typescript");
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), "writing-usage-"));
+Object.assign(process.env, {FREMEN_DATA_DIR:temp, FREMEN_REQUIRE_SUPABASE:"false", SUPABASE_URL:"", SUPABASE_SERVICE_ROLE_KEY:""});
+require.extensions[".ts"] = (mod, filename) => mod._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+  compilerOptions:{module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2022, esModuleInterop:true}
+}).outputText, filename);
+let signedIn = true;
+const session = require.resolve("../lib/admin-session.ts");
+require.cache[session] = {id:session, filename:session, loaded:true, exports:{hasAdminSession:async () => signedIn}};
+const {GET} = require("../app/api/admin/writing-usage/route.ts");
+const {skillToken} = require("../lib/writing/tokens.ts");
+const {boardWritingSources} = require("../lib/writing/board-sources.ts");
+const {createBoard, updateBoard} = require("../lib/modules/canvas/store.ts");
+const prompt = skillToken({id:"prompt", name:"Prompt"});
+const copy = skillToken({id:"copy-prompt", name:"Copy prompt"});
+const ask = id => GET(new Request("http://localhost/api/admin/writing-usage?skill=" + id));
+const list = async id => (await (await ask(id)).json()).items;
+const base = {domain:"notes-docs", status:"active", createdAt:"2026-01-01T00:00:00Z", updatedAt:"2026-01-01T00:00:00Z"};
+const writeRecords = records => fs.writeFileSync(path.join(temp, "personal-records.json"), JSON.stringify(records));
+const node = {id:"card", kind:"sticky", x:10, y:10, width:250, height:200, title:"Card title", body:prompt + " On the board", color:"blue", used:false, group:""};
+async function main() {
+  const adText = "Line 1\r\n\r\nLine 2";
+  const ad = {...base, className:"file", id:"art", title:"Artwork", body:"", mediaNotes:adText + "\r\n\r\nSource: Zeely · https://zeely.ai/start/tools/static-ads-fw/#p42\r\nOther material"};
+  const note = {...base, className:"note", id:"note", title:"Brief", body:[prompt, "First paragraph", "", "Second paragraph", copy, prompt, "Separate prompt"].join("\n")};
+  writeRecords([ad, note, {...note, id:"archived", archivedAt:base.updatedAt}, {...note, id:"unavailable", domain:"unknown"}]);
+  const board = await createBoard({id:"sample", title:"Board"});
+  const linked = {...node, id:"linked", kind:"object", body:"", notes:prompt + " Obsolete cached notes", ref:{module:"media", objectType:"media_asset", objectId:"art", route:"/admin/media/art", label:"Artwork"}};
+  const saved = await updateBoard({...board, nodes:[node, linked]}, 1);
+  let rows = await list("prompt");
+  assert.deepEqual(rows.map(row => row.text.trim()).sort(), [adText, "First paragraph\n\nSecond paragraph", "Separate prompt", "On the board"].sort());
+  assert.equal(rows.find(row => row.area === "Canvas").href, "/admin/personal/canvas?board=sample&card=card");
+  assert.equal(rows.find(row => row.area === "Media").href, "/admin/media/art");
+  assert.equal((await list("copy-prompt")).length, 2);
+  if (process.argv.includes("--browser")) await require("./writing-usage-browser.cjs")({temp, adText, ad, note, writeRecords, copy});
+  const caption = {...linked, body:prompt + " Board caption"};
+  assert.ok(boardWritingSources({...board, nodes:[caption]}, new Map([["art", ad]])).some(s => s.field === "Board caption"));
+  assert.equal(boardWritingSources({...board, nodes:[caption]}, new Map([["art", {...ad, mediaCaptionEdited:true}]])).some(s => s.field === "Board caption"), false);
+  await updateBoard({...saved, nodes:[linked]}, saved.revision);
+  writeRecords([{...ad, mediaNotes:""}, {...note, body:"Saved replacement without markers"}]);
+  assert.deepEqual(await list("prompt"), []);
+  assert.equal((await ask("bad%2Fid")).status, 400);
+  assert.equal((await ask("prompt")).headers.get("cache-control"), "private, no-store");
+  signedIn = false;
+  assert.equal((await ask("prompt")).status, 401);
+  console.log("Writing library checks passed for authentication, source links, legacy prompts, multiple passages, canonical updates and removal.");
+}
+main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => fs.rmSync(temp, {recursive:true, force:true}));

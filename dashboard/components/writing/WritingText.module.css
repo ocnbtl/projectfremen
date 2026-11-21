@@ -1,0 +1,8 @@
+.object,.skill { font: inherit; font-weight: 680; color: var(--writing-accent,#225a92); text-underline-offset: .16em; text-decoration: underline; text-decoration-color: color-mix(in srgb,currentColor 35%,transparent); overflow-wrap:anywhere }
+.object:hover,.skill:hover { text-decoration-color:currentColor }
+.object img { display:inline-block; max-inline-size:min(10rem,100%); max-block-size:5rem; object-fit:contain; border-radius:.35rem; margin-inline-end:.35em; vertical-align:middle }
+.skill { color:inherit }
+.copyWrap { display:inline; }
+.copyWrap .copy { display:inline-flex; align-items:center; gap:.25em; min-height:1.55em; vertical-align:baseline; width:auto; padding:.05em .45em; border:1px solid #b8c9d9; border-radius:.4em; background:#eff4fa; color:#20496e; font:inherit; font-size:.94em; font-weight:650; cursor:pointer }
+.copyWrap .copy:hover { background:#e0ebf7 }
+.copyWrap textarea { display:block; width:100% }

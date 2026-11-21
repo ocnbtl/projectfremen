@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "./writing/WritingText";
 import { TransactionAccountProvider } from "./finance/FinanceTransactionAccount";
 import {FinanceMerchantsProvider} from "./finance/FinanceMerchants";
 import type {FinanceMerchantsData} from "../lib/modules/finance/merchants";
@@ -342,7 +343,7 @@ function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void 
       <section ref={modalRef} className="finance-modal" role="dialog" aria-modal="true" aria-label={item.title}>
         <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close modal" data-icon-button="standard"><Icon name="X" /></button>
         <h2>{item.title}</h2>
-        <p>{item.body}</p>
+        <p><WritingValue>{item.body}</WritingValue></p>
         <div>
           {item.fields.map((field) => <label key={field}>{field}<input placeholder={field} disabled aria-describedby="finance-preview-status" /></label>)}
         </div>

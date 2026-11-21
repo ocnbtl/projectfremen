@@ -1,5 +1,6 @@
 "use client";
 
+import { WritingValue } from "../writing/WritingText";
 import FinanceMerchantAvatar,{FinanceMerchantPanel} from "./FinanceMerchants";
 import detailStyles from "./FinanceDetails.module.css";
 import { TransactionAccount } from "./FinanceTransactionAccount";
@@ -352,7 +353,7 @@ export default function FinanceInspector({
             </div>
             <section className={styles.inspectorSection}>
               <h3>Notes</h3>
-              <p>{transaction.memo || "No memo is recorded."}</p>
+              <p><WritingValue>{transaction.memo || "No memo is recorded."}</WritingValue></p>
             </section>
             <section className={styles.inspectorSection}><h3>Recorded from</h3><p>{({ plaid: "Linked bank account", csv_import: "Imported statement", transfer: "Account transfer", manual: "Manual entry" })[financeState.transactions.find(t => t.id === transaction.id)?.source.kind || "manual"]}</p></section>
           </DetailTabPanel>

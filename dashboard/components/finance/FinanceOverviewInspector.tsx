@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import { useEffect, useRef, useState } from "react";
 import InspectorRail from "../admin-shell/InspectorRail";
 import { WorkspaceButton } from "../admin-shell/WorkspaceKit";
@@ -40,7 +41,7 @@ export default function FinanceOverviewInspector({ model, selection, mobileOpen,
       {transaction ? <>
         <div className={styles.amount}><span>{transaction.direction === "income" ? "Income" : "Spending"}</span><strong>{money(transaction.amount,{cents:true})}</strong><small>{transaction.status === "cleared" ? "Posted" : "Pending"} · {transaction.reviewed ? "Reviewed" : "Needs review"}</small></div>
         <dl className={styles.facts}>{[["Account",model.accountNames.get(transaction.accountId)||"Archived account"],["Category",transaction.category],["Date",overviewDate(transaction.occurredOn)],["Scope",transaction.entityScope]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{label==="Account" ? <TransactionAccount id={transaction.accountId} label={value}/> : value}</dd></div>)}</dl>
-        {transaction.memo && <section className={styles.notes}><h3>Notes</h3><p>{transaction.memo}</p></section>}
+        {transaction.memo && <section className={styles.notes}><h3>Notes</h3><p><WritingValue>{transaction.memo}</WritingValue></p></section>}
         <WorkspaceButton intent="primary" icon="edit" className={styles.open} onClick={()=>onOpenTransaction(transaction.id)}>Open transaction</WorkspaceButton>
       </> : <>
         <div className={styles.totals}>

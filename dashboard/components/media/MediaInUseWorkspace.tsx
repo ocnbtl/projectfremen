@@ -21,7 +21,7 @@ import {
 import { getModuleRoute, getModuleViewRoute } from "../../lib/native-objects/routes";
 import DirectoryPane from "../admin-shell/DirectoryPane";
 import InspectorRail from "../admin-shell/InspectorRail";
-import CopyAdPrompt from "./CopyAdPrompt";
+import LegacyPromptSkill from "./LegacyPromptSkill";
 import ModuleShell from "../admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleSidebar";
 import SharedAIDock from "../admin-shell/SharedAIDock";
@@ -619,7 +619,7 @@ export default function MediaInUseWorkspace({
           </>
         ) : <span className={baseStyles.stateChip}>AssetUsage disconnected</span>}
       />
-      <CopyAdPrompt notes={selectedRecord?.asset?.notes} />
+      <LegacyPromptSkill notes={selectedRecord?.asset?.notes} />
     </div>
   );
 

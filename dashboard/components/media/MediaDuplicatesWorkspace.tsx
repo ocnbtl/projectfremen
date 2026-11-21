@@ -8,7 +8,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import DirectoryPane from "../admin-shell/DirectoryPane";
 import InspectorRail from "../admin-shell/InspectorRail";
-import CopyAdPrompt from "./CopyAdPrompt";
+import LegacyPromptSkill from "./LegacyPromptSkill";
+import { WritingText } from "../writing/WritingText";
 import ModuleShell from "../admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleSidebar";
 import SharedAIDock from "../admin-shell/SharedAIDock";
@@ -355,8 +356,8 @@ export default function MediaDuplicatesWorkspace({
           <div><dt>Rights</dt><dd>Needs confirmation</dd></div>
           <div><dt>Source fields</dt><dd>{member.references.length}</dd></div>
         </dl>
-        <p>{summarizeBody(member.asset.body)}</p>
-        <CopyAdPrompt notes={member.asset.notes} />
+        <p><WritingText text={member.asset.body || summarizeBody(member.asset.body)} /></p>
+        <LegacyPromptSkill notes={member.asset.notes} />
         <Link className={baseStyles.linkButton} href={memberDetailRoute(member)}>
           Open canonical Media record
         </Link>

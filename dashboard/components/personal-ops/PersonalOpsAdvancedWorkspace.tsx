@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import PersonalRecordOverview from "./PersonalRecordOverview";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import ViewCycleButton from "../ui/ViewCycleButton";
@@ -1669,7 +1670,7 @@ export default function PersonalOpsAdvancedWorkspace({
                         ]} />
                         <div className={styles.panelGrid}>
                           <PersonalOpsPanel title={selectedItem.objectType === "capture_item" ? "Immutable raw source" : selectedItem.objectType === "routine" ? "Description" : "Operating summary"} wide>
-                            <p className={selectedItem.objectType === "capture_item" ? styles.rawSource : undefined}>{selectedItem.objectType === "capture_item" ? selectedItem.rawText : selectedItem.summary || (selectedItem.objectType === "routine" ? "No description recorded." : "No summary recorded.")}</p>
+                            <p className={selectedItem.objectType === "capture_item" ? styles.rawSource : undefined}><WritingValue>{selectedItem.objectType === "capture_item" ? selectedItem.rawText : selectedItem.summary || (selectedItem.objectType === "routine" ? "No description recorded." : "No summary recorded.")}</WritingValue></p>
                           </PersonalOpsPanel>
                           {selectedItem.objectType === "capture_item" && <PersonalOpsPanel title="Source provenance"><dl className={styles.metadataList}><div><dt>Source</dt><dd>{selectedItem.source.label}</dd></div><div><dt>Captured</dt><dd>{formatTimestamp(selectedItem.source.capturedAt)}</dd></div><div><dt>Raw edited</dt><dd>Never</dd></div></dl></PersonalOpsPanel>}
                           {selectedItem.objectType === "template" && <PersonalOpsPanel title="Creation contract"><p>{selectedItem.generatedDefinitions.length} destination definition{selectedItem.generatedDefinitions.length === 1 ? "" : "s"}; testing is non-writing and confirmed use creates one native object.</p></PersonalOpsPanel>}

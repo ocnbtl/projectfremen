@@ -1,0 +1,12 @@
+.usage { display: grid; gap: .8rem; min-width: 0; }
+.toolbar, .source { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .4rem .75rem; }
+.usage h3, .usage h4, .usage p { margin: 0; }
+.group ul { list-style: none; margin: .2rem 0 0; padding: 0; }
+.group li { display: grid; justify-items: start; gap: .5rem; padding: .85rem 0; border-bottom: 1px solid var(--border, #ccd2cd); }
+.source { width: 100%; }
+.source a { text-decoration: underline; text-underline-offset: .16em; overflow-wrap: anywhere; }
+.source span, .group h4 span { font-size: .85em; font-weight: 400; }
+.group details { width: 100%; overflow-wrap: anywhere; }
+.group summary { cursor: pointer; }
+.group details p { margin-top: .5rem; white-space: pre-wrap; }
+.passage { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "./writing/WritingText";
 import SelectField from "./ui/SelectField";
 
 import Link from "next/link";
@@ -850,7 +851,7 @@ export default function PersonalRecordsPanel({
                   </div>
                 </div>
 
-                {record.body && <p className="personal-record-body">{record.body}</p>}
+                {record.body && <p className="personal-record-body"><WritingValue>{record.body}</WritingValue></p>}
 
                 <div className="personal-record-meta">
                   <span>{record.createdMeta.created}</span>

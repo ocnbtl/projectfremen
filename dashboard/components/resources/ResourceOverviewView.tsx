@@ -1,5 +1,6 @@
 "use client";
 
+import { WritingValue } from "../writing/WritingText";
 import { useEffect, useState, type ReactNode } from "react";
 import { createResourcesRepository } from "../../lib/modules/resources/repository";
 import type { ResourceRecord } from "../../lib/modules/resources/types";
@@ -81,7 +82,7 @@ export default function ResourceOverviewView({ resource, followUpPanel, onSaved 
 
       <section className={styles.notesCard}>
         <header><h3>Notes <span>{notes.length}</span></h3><ResourceIconButton icon="plus" label="Add note" onClick={() => setAdding(true)} /></header>
-        {notes.length ? <ul className={styles.notesList}>{notes.map((note, index) => <li className={styles.noteRow} key={`${note}-${index}`}><i className={styles.noteDot} /><span>{note}</span><ResourceIconButton icon="delete" label="Delete note" destructive disabled={busy} onClick={() => void persistNotes(notes.filter((_, itemIndex) => itemIndex !== index))} /></li>)}</ul> : <p className={styles.empty}>No notes</p>}
+        {notes.length ? <ul className={styles.notesList}>{notes.map((note, index) => <li className={styles.noteRow} key={`${note}-${index}`}><i className={styles.noteDot} /><span><WritingValue>{note}</WritingValue></span><ResourceIconButton icon="delete" label="Delete note" destructive disabled={busy} onClick={() => void persistNotes(notes.filter((_, itemIndex) => itemIndex !== index))} /></li>)}</ul> : <p className={styles.empty}>No notes</p>}
         {adding ? <div className={styles.editBar}><label className={`${styles.field} ${styles.wide}`}><span className="sr-only">New note</span><input autoFocus value={draft} placeholder="Add a note" onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && draft.trim()) void persistNotes([...notes, draft.trim()]); if (event.key === "Escape") setAdding(false); }} /></label><div className={styles.editActions}><button type="button" className={styles.secondaryButton} onClick={() => { setDraft(""); setAdding(false); }}>Cancel</button><button type="button" className={styles.primaryButton} disabled={!draft.trim() || busy} onClick={() => void persistNotes([...notes, draft.trim()])}>Add</button></div></div> : null}
       </section>
       {followUpPanel}

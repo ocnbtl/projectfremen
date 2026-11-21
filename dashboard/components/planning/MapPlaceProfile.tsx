@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import PlaceImagePicker from "./PlaceImagePicker";
 import { placeDisplayName, formatPlaceCoordinates } from "../../lib/modules/planning/place-presentation";
 import { motion, useReducedMotion } from "motion/react";
@@ -24,7 +25,7 @@ export default function MapPlaceProfile({ place, picture, classification, onImag
       <p className={styles.address}><UnigentamosIcon role="location" size={16} /><span title={place.address}>{place.address || "No address added"}</span></p>
       <p className={styles.coordinates}><UnigentamosIcon role="location" candidate="current-location" size={16} /><span>{pinned ? formatPlaceCoordinates(place.latitude, place.longitude) : "No map pin yet"}</span></p>
       <div className={styles.tags}>{place.tags.filter(tag => !classification?.type || !["organization", "school"].includes(tag.toLowerCase())).map(tag => <PlaceTagLabel key={tag} tag={tag}/>)}{Object.values(classification || {}).filter(Boolean).map(value => <span key={value}>{value}</span>)}</div>
-      {place.notes && <p className={styles.notes}>{place.notes}</p>}
+      {place.notes && <p className={styles.notes}><WritingValue>{place.notes}</WritingValue></p>}
       <RelatedRecordsView {...related} compact hideEmpty />
     </div>
     <footer className={styles.actions}>

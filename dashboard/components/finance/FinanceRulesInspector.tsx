@@ -1,5 +1,6 @@
 "use client";
 
+import { WritingValue } from "../writing/WritingText";
 import Link from "next/link";
 import InspectorRail from "../admin-shell/InspectorRail";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "../operational/DetailTabs";
@@ -142,7 +143,7 @@ export default function FinanceRulesInspector({
           </div>
           <section className={styles.inspectorSection}>
             <h3>Rule summary</h3>
-            <p>{rule.description}</p>
+            <p><WritingValue>{rule.description}</WritingValue></p>
           </section>
           <section className={styles.inspectorSection}>
             <h3>Generated preview actions</h3>

@@ -1,0 +1,49 @@
+.menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 5px;
+  border: 1px solid var(--border, #d3dce1);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  color: var(--text, #203741);
+  box-shadow: 0 6px 28px #12303b26;
+  font: 13px/1.35 var(--font-body, system-ui);
+  pointer-events: auto;
+}
+.heading { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; font-weight: 650; }
+.heading kbd { color: var(--muted, #607379); font-family: inherit; font-size: 11px; font-weight: 400; }
+.scroller { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.group { margin: 6px 8px 2px; font-size: 11px; font-weight: 650; color: var(--muted, #596f78); }
+.menu [role="option"] {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  min-height: 39px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  font: inherit;
+  cursor: pointer;
+}
+.menu [role="option"][aria-selected="true"], .menu [role="option"]:hover { background: var(--accent-soft, #e6f0f1); }
+.menu [role="option"] > span { display: grid; min-width: 0; }
+.menu [role="option"] strong, .menu [role="option"] small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu [role="option"] strong { font-weight: 580; }
+.menu [role="option"] small { color: var(--muted, #596f78); }
+.menu p, .more { margin: 0; padding: 8px; }
+.more { border: 0; background: transparent; color: inherit; text-align: start; font: inherit; cursor: pointer; text-decoration: underline; }
+.preview { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; max-height: min(32dvh, 210px); overflow: auto; grid-column: 1 / -1; padding: 7px 10px; border-inline-start: 2px solid var(--border, #d3dce1); }
+@media (max-width: 640px) {
+  .menu [role="option"] { min-height: 44px; }
+  .heading kbd { display: none; }
+}

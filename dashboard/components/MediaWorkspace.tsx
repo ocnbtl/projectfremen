@@ -15,7 +15,8 @@ import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import MediaMetadataEditorSheet from "./media/MediaMetadataEditorSheet";
-import CopyAdPrompt from "./media/CopyAdPrompt";
+import LegacyPromptSkill from "./media/LegacyPromptSkill";
+import { WritingText } from "./writing/WritingText";
 import {watchMediaDetails} from "../lib/modules/media/detail-events";
 import {createMediaRepository} from "../lib/modules/media/repository";
 import MediaReviewScheduleEditorSheet from "./media/MediaReviewScheduleEditorSheet";
@@ -1241,8 +1242,8 @@ export default function MediaWorkspace({
                 <h2>Legacy description</h2>
                 <span className={styles.stateChip}>Authored context only</span>
               </div>
-              <p>{summarizeBody(asset.body)}</p>
-              {asset.notes && <p><strong>Notes</strong> {asset.notes}</p>}
+              <p><WritingText text={asset.body || summarizeBody(asset.body)} /></p>
+              {asset.notes && <p><strong>Notes</strong> <WritingText text={asset.notes}/></p>}
             </section>
 
             <section className={styles.panel} data-wide="true">
@@ -1905,7 +1906,7 @@ export default function MediaWorkspace({
             >
               Edit
             </button>
-            <CopyAdPrompt notes={asset.notes} />
+            <LegacyPromptSkill notes={asset.notes} />
           </>
         }
         metadata={

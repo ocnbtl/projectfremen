@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import { DirectoryLayout, MorphingLi, MorphingSpan } from "../ui/DirectoryLayout";
 import SearchField from "../ui/SearchField";
 import { WorkspaceNavSlot } from "../admin-shell/WorkspaceTopbar";
@@ -58,7 +59,7 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
             </span><UnigentamosIcon role="chevron-right" size={16} /></button>
             : <p key={id}>{person ? `${person.title} (archived)` : "Profile unavailable"}</p>;
         })}{!item.participantIds.length && <p>No participants recorded.</p>}</div></section>
-        <section className="people-interaction-detail-notes"><h3>Notes</h3><p>{item.summary || "No additional notes recorded."}</p></section>
+        <section className="people-interaction-detail-notes"><h3>Notes</h3><p><WritingValue>{item.summary || "No additional notes recorded."}</WritingValue></p></section>
         <dl className="people-interaction-detail-facts">
           {item.approach && <div><dt>Approach</dt><dd>{label(item.approach)}</dd></div>}
         </dl>

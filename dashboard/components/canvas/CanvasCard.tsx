@@ -4,6 +4,8 @@ import { Handle, NodeResizer, Position, useStore, type Node, type NodeProps } fr
 import { IconCheck, IconLock } from "@tabler/icons-react";
 import type { CanvasNode } from "../../lib/modules/canvas/model";
 import Icon from "../icons/UnigentamosIcon";
+import { WritingText } from "../writing/WritingText";
+import { writingPlainText } from "../../lib/writing/tokens";
 import { canvasModuleIcons } from "./CanvasIntake";
 import { PinImage, PinMarkers } from "./ImagePins";
 import { CanvasItemMenu } from "./CanvasItemMenu";
@@ -48,17 +50,17 @@ export const CanvasCard=memo(function CanvasCard({data,selected,id}:NodeProps<Fl
       {!focus && Boolean(item.imagePins?.length) && <PinMarkers pins={item.imagePins!} open={pinId=>actions.pins(id,pinId)}/>}
     </PinImage> : <div className={css.copy}>
       {target && <Icon role={canvasModuleIcons[target.module]} size={20}/>}
-      {body && <span>{body}</span>}
+      {body && <span><WritingText text={body}/></span>}
     </div>}
     {!focus && <div className={styles.footer}>
       <div className={styles.metadata}>
-        {title && (media || title!==body) && <strong title={title}>{title}</strong>}
+        {title && (media || title!==body) && <strong title={writingPlainText(title)}><WritingText text={title}/></strong>}
         {item.used && <IconCheck size={14} className={styles.used} aria-label="Used"/>}
         {item.locked && <IconLock size={14} aria-label="Position locked"/>}
       </div>
       <CanvasItemMenu item={item} label={label} edit={()=>actions.edit(id)} open={()=>actions.open(id)} style={()=>actions.style(id)} setAppearance={value=>actions.appearance(id,value)}
         pins={imageAvailable || item.imagePins?.length?()=>actions.pins(id):undefined}/>
-      {media && item.body && <span className={styles.caption} title={item.body}>{item.body}</span>}
+      {media && item.body && <span className={styles.caption} title={writingPlainText(item.body)}><WritingText text={item.body}/></span>}
     </div>}
   </div>;
 });

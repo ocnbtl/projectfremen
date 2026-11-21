@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { TravelEntry } from "../../lib/modules/planning/travel-sync";
@@ -52,7 +53,7 @@ export default function TravelVisitEditor({entry,busy,addRequest=0,onSave,onTrip
         </form>
       </motion.div>}
     </AnimatePresence>
-    {!!visits.length&&<div className={styles.visitHistory}><h5>Recorded visits <span>{visits.length}</span></h5>{[...visits].sort((a,b)=>b.startDate.localeCompare(a.startDate)).map(v=><div className={styles.visitRow} key={v.id}><UnigentamosIcon role="calendar" size={16}/><div><strong>{visitDates(v.startDate,v.endDate)}</strong>{v.note&&<small>{v.note}</small>}</div><button type="button" className={styles.textAction} onClick={()=>begin(v)} disabled={busy||!!draft} aria-label={`Edit visit ${visitDates(v.startDate,v.endDate)}`}>Edit</button><button type="button" className={styles.textAction} data-icon-button="compact" disabled={busy||!!draft} aria-label={`Remove visit ${visitDates(v.startDate,v.endDate)}`} onClick={()=>void onSave(visits.filter(x=>x.id!==v.id))}><UnigentamosIcon role="delete" size={16}/></button></div>)}</div>}
+    {!!visits.length&&<div className={styles.visitHistory}><h5>Recorded visits <span>{visits.length}</span></h5>{[...visits].sort((a,b)=>b.startDate.localeCompare(a.startDate)).map(v=><div className={styles.visitRow} key={v.id}><UnigentamosIcon role="calendar" size={16}/><div><strong>{visitDates(v.startDate,v.endDate)}</strong>{v.note&&<small><WritingValue>{v.note}</WritingValue></small>}</div><button type="button" className={styles.textAction} onClick={()=>begin(v)} disabled={busy||!!draft} aria-label={`Edit visit ${visitDates(v.startDate,v.endDate)}`}>Edit</button><button type="button" className={styles.textAction} data-icon-button="compact" disabled={busy||!!draft} aria-label={`Remove visit ${visitDates(v.startDate,v.endDate)}`} onClick={()=>void onSave(visits.filter(x=>x.id!==v.id))}><UnigentamosIcon role="delete" size={16}/></button></div>)}</div>}
     {!!entry.tripVisits.length&&<div className={styles.visitHistory}><h5>Linked trips</h5>{entry.tripVisits.map(v=><button type="button" className={styles.tripVisit} key={v.tripId} onClick={()=>onTrip(v.tripId)}><UnigentamosIcon role="travel" size={16}/><span><strong>{v.title}</strong><small>{visitDates(v.startDate,v.endDate)} · {travelStatusLabels[v.status]}</small></span><UnigentamosIcon role="chevron-right" size={16}/></button>)}</div>}
     {hasHistory&&!draft&&<Button intent="quiet" icon="travel" onClick={onPlan}>Plan a trip</Button>}
   </section>;

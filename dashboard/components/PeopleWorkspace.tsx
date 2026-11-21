@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "./writing/WritingText";
 import { DirectoryLayout, MorphingArticle, MorphingDiv, MorphingSpan } from "./ui/DirectoryLayout";
 import SearchField from "./ui/SearchField";
 import ViewCycleButton from "./ui/ViewCycleButton";
@@ -4775,7 +4776,7 @@ export default function PeopleWorkspace({
                             {item.interaction.approach && <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>}
                           </div>
                           <strong className="people-timeline-entry-title">{item.interaction.title}</strong>
-                          {item.interaction.summary && <p className="people-timeline-entry-body">{item.interaction.summary}</p>}
+                          {item.interaction.summary && <p className="people-timeline-entry-body"><WritingValue>{item.interaction.summary}</WritingValue></p>}
                           {item.participantIds.length > 1 && (
                             <div className="people-interaction-participants" aria-label="Tagged people">
                               {item.participantIds.map((participantId) => {
@@ -4830,7 +4831,7 @@ export default function PeopleWorkspace({
 
                 <div className="people-overview-story"><article className="people-overview-about" data-people-overview-card="about">
                   <h3><PeopleIcon name={selectedPerson.className === "org" ? "organization" : "person"}/>{selectedPerson.className === "org" ? "About this organization" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
-                  <p>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No description recorded yet." : "No relationship context recorded yet.")}</p>
+                  <p><WritingValue>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No description recorded yet." : "No relationship context recorded yet.")}</WritingValue></p>
                   {selectedPerson.className === "person" && selectedProfile.lifeDream&&<section className="people-overview-dream"><h4><PeopleIcon name="life-dream"/>Life dream</h4><p>{selectedProfile.lifeDream}</p></section>}
                   <div className="people-about-notes">
                     <header>
@@ -4855,7 +4856,7 @@ export default function PeopleWorkspace({
                     {selectedNotes.length > 0 && (
                       <ul>
                         {selectedNotes.map((note, index) => (
-                          <li key={`${note}-${index}`}>{note}</li>
+                          <li key={`${note}-${index}`}><WritingValue>{note}</WritingValue></li>
                         ))}
                       </ul>
                     )}

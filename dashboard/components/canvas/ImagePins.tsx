@@ -4,6 +4,8 @@ import { imagePinLimits, type CanvasNode, type ImagePin } from "../../lib/module
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import { CanvasMediaThumbnail } from "./CanvasIntake";
 import { Panel } from "./CanvasPanels";
+import { WritingText } from "../writing/WritingText";
+import { writingPlainText } from "../../lib/writing/tokens";
 import css from "./CanvasEditor.module.css";
 import styles from "./ImagePins.module.css";
 
@@ -36,7 +38,7 @@ export function PinImage({target,full,onOriginal,onAvailability,children}:{
 
 export function PinMarkers({pins,open}:{pins:ImagePin[];open:(pinId:string)=>void}) {
   return pins.map((pin,index)=><button key={pin.id} type="button" className={`nodrag nopan ${styles.marker}`}
-    style={location(pin)} title={pin.text} aria-label={`Pin ${index+1}: ${pin.text}`}
+    style={location(pin)} title={writingPlainText(pin.text)} aria-label={`Pin ${index+1}: ${writingPlainText(pin.text)}`}
     onPointerDown={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()}
     onClick={e=>{e.stopPropagation();open(pin.id);}}><span>{index+1}</span></button>);
 }
@@ -79,7 +81,7 @@ export function ImagePinsPanel({node,initialPinId,save,close}:{
     </div>
     {draft ? <form onSubmit={e=>{e.preventDefault();apply();}}>
       <small id="canvas-pin-instructions">Tap the image to place the pin. Use the arrow keys for fine adjustments.</small>
-      <label>Pin {number} note<textarea rows={3} maxLength={imagePinLimits.text} value={draft.text}
+      <label>Pin {number} note<textarea data-writing-field="on" rows={3} maxLength={imagePinLimits.text} value={draft.text}
         onChange={e=>setDraft({...draft,text:e.target.value})}/></label>
       <div className={styles.controls}>
         {draft.id && <button type="button" className={styles.remove} onClick={()=>{save(pins.filter(pin=>pin.id!==draft.id));setDraft(null);}}>Remove pin</button>}
@@ -88,7 +90,10 @@ export function ImagePinsPanel({node,initialPinId,save,close}:{
       </div>
     </form> : <>
       {pins.length>0 && <ol className={styles.list} aria-label="Pinned notes">{pins.map((pin,i)=>
-        <li key={pin.id}><button type="button" onClick={()=>setDraft(pin)}><b>{i+1}</b><span>{pin.text}</span></button></li>
+        <li key={pin.id}>{pin.text.includes("](/admin/") ? <div className={styles.markedPin}>
+          <button type="button" aria-label={"Edit pin " + (i+1)} onClick={()=>setDraft(pin)}><b>{i+1}</b></button>
+          <span><WritingText text={pin.text}/></span>
+        </div> : <button type="button" onClick={()=>setDraft(pin)}><b>{i+1}</b><span>{pin.text}</span></button>}</li>
       )}</ol>}
       <button type="button" className={css.primary} disabled={!available || pins.length>=imagePinLimits.count}
         onClick={()=>setDraft({...center,id:"",text:""})}>Add pin</button>

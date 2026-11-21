@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import { DirectoryLayout, MorphingArticle, MorphingDiv, MorphingButton, MorphingP, usePersonalDirectoryView } from "../ui/DirectoryLayout";
 import PersonalCardStatusControl, { personalCardStatusChoices } from "./PersonalCardStatusControl";
 import PersonalStatusRequirements, { type StatusDetails } from "./PersonalStatusRequirements";
@@ -205,7 +206,8 @@ const PERSONAL_SYSTEM_LINKS: ReadonlyArray<{ label: string; href: string; icon: 
   { label: "Personal Build", href: "/admin/personal/personal-build", icon: "build" },
   { label: "Car", href: "/admin/personal/car", icon: "car" },
   { label: "Style Guide", href: "/admin/personal/style-guide", icon: "style-guide" },
-  { label: "Pets", href: "/admin/personal/pets", icon: "dog" }
+  { label: "Pets", href: "/admin/personal/pets", icon: "dog" },
+  { label: "Settings", href: "/admin/personal/settings", icon: "sliders" }
 ];
 
 const PERSONAL_OPS_SORT_OPTIONS: ReadonlyArray<{ id: PersonalOpsSort; label: string }> = [
@@ -741,7 +743,7 @@ function DecisionPrompts({
     <span className={styles.decisionPrompts} data-compact={compact || undefined}>
       <span className={styles.decisionPrompt}>
         <small className={styles.decisionPromptIcon} aria-label="Question">?</small>
-        <span>{question || "No question recorded."}</span>
+        <span><WritingValue>{question || "No question recorded."}</WritingValue></span>
       </span>
       <span className={styles.decisionPrompt}>
         <small className={styles.decisionPromptIcon} aria-label="Decision">!</small>
@@ -1743,7 +1745,7 @@ export default function PersonalOpsWorkspace({
                         <PersonalOpsPanel title="Decision record" wide>
                           <dl><dt>Review state</dt><dd>{cleanLabel(decisionReviewState(selectedItem))}</dd><dt>Decision state</dt><dd>{cleanLabel(selectedItem.decisionState)}</dd><dt>Reversibility</dt><dd>{cleanLabel(selectedItem.reversibility)}</dd><dt>Due</dt><dd>{formatDate(selectedItem.dueAt)}</dd></dl>
                         </PersonalOpsPanel>
-                        {selectedItem.rationale && <PersonalOpsPanel title="Supporting rationale" wide><p>{selectedItem.rationale}</p></PersonalOpsPanel>}
+                        {selectedItem.rationale && <PersonalOpsPanel title="Supporting rationale" wide><p><WritingValue>{selectedItem.rationale}</WritingValue></p></PersonalOpsPanel>}
                       </>
                     )}
 
@@ -1760,7 +1762,7 @@ export default function PersonalOpsWorkspace({
 
                     {urlState.tab === "details" && selectedItem.objectType === "follow_up" && (
                       <>
-                        <PersonalOpsPanel title="Outcome" wide><p>{selectedItem.outcome || "No outcome recorded. This is optional."}</p></PersonalOpsPanel>
+                        <PersonalOpsPanel title="Outcome" wide><p><WritingValue>{selectedItem.outcome || "No outcome recorded. This is optional."}</WritingValue></p></PersonalOpsPanel>
                         <PersonalOpsPanel title="Completion criterion"><p>{selectedItem.completionCriteria || "No criterion recorded."}</p></PersonalOpsPanel>
                         <PersonalOpsPanel title="Follow-up type"><p>{cleanLabel(selectedItem.followUpType)}</p></PersonalOpsPanel>
                       </>

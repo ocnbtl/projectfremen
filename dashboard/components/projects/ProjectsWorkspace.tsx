@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import ProjectDirectoryCards from "./ProjectDirectoryCards";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "../people/PeopleProfilePhoto";
 import SelectField from "../ui/SelectField";
@@ -835,7 +836,7 @@ function EditorSurface({
         <header className={styles.formHeader}>
           <div>
             <h2 id="projects-editor-title">{title.toLowerCase().includes("milestone") && <UnigentamosIcon role="goal" size={20}/>} {title}</h2>
-            {description && <p id="projects-editor-description">{description}</p>}
+            {description && <p id="projects-editor-description"><WritingValue>{description}</WritingValue></p>}
           </div>
           <button type="button" className={styles.iconButton} onClick={onRequestClose} disabled={busy} aria-label={`Close ${title}`} data-icon-button="standard">
             <UnigentamosIcon role="close" size={18} />
@@ -2173,7 +2174,7 @@ export default function ProjectsWorkspace({
             <span className={styles.timelineDot} data-tone={event.tone} aria-hidden="true" />
             <span className={styles.itemBody}>
               <strong>{event.title}</strong>
-              <small>{event.summary}</small>
+              <small><WritingValue>{event.summary}</WritingValue></small>
             </span>
             <time className={styles.timelineMeta}>{formatTimestamp(event.occurredAt)}</time>
             <span className={styles.activityActions}><RowActionIcons inspectLabel={`Inspect ${event.title}`} onInspect={()=>selectChild(event.id,"timeline")} openHref={event.openHref||undefined} openLabel={`Open ${event.title}`}/></span>
@@ -2293,7 +2294,7 @@ export default function ProjectsWorkspace({
             <section className={styles.panel} aria-label="Project progress"><div className={styles.panelHeader}><h2>Progress</h2></div><span className={styles.targetLabel}>Completion target</span><p>{item.project.completionTarget || "No completion target set."}</p></section>
             <section className={styles.panel}>
               <div className={styles.panelHeader}><h2>About this project</h2></div>
-              <p>{item.project.description || "Add a description to explain what you’re working toward."}</p>
+              <p><WritingValue>{item.project.description || "Add a description to explain what you’re working toward."}</WritingValue></p>
             </section>
             <section className={styles.panel}>
               <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("milestone-create", item)}><UnigentamosIcon role="plus" size={16}/>Add milestone</button></div>
@@ -2519,9 +2520,9 @@ export default function ProjectsWorkspace({
                 setConfirmationReason("");setConfirmation({kind:"milestone-complete",projectId:item.project.id,objectId:milestone.id});
               }}>Mark reached</WorkspaceButton>}
             </div>
-            {milestone.description && <p>{milestone.description}</p>}
+            {milestone.description && <p><WritingValue>{milestone.description}</WritingValue></p>}
             {milestone.completionCriteria.length > 0 && <div className={inspectionStyles.contentSection}><h3>Success criteria</h3><ul className={styles.criteriaList}>{milestone.completionCriteria.map((criterion,index)=><li key={`${index}-${criterion}`}>{criterion}</li>)}</ul></div>}
-            {milestone.completionNote && <div className={inspectionStyles.contentSection}><h3>Reflection</h3><p>{milestone.completionNote}</p></div>}
+            {milestone.completionNote && <div className={inspectionStyles.contentSection}><h3>Reflection</h3><p><WritingValue>{milestone.completionNote}</WritingValue></p></div>}
             <ProjectDisclosure title="Linked work" icon="object">
               <div className={inspectionStyles.milestoneSupporting}>
                 <section>
@@ -2543,14 +2544,14 @@ export default function ProjectsWorkspace({
         )}
         {blocker && (
           <div className={inspectionStyles.body}>
-            <p>{blocker.condition}</p>
+            <p><WritingValue>{blocker.condition}</WritingValue></p>
             <div className={inspectionStyles.facts}>
               <div className={inspectionStyles.fact}><span>Status</span><strong>{displayLabel(blocker.state)}</strong></div>
               <div className={inspectionStyles.fact}><span>Severity</span><strong>{displayLabel(blocker.severity)}</strong></div>
               <div className={inspectionStyles.fact}><span>Owner</span><strong>{blocker.owner || "Unassigned"}</strong></div>
               <div className={inspectionStyles.fact}><span>Due</span><strong>{formatDate(blocker.dueAt, "No due date")}</strong></div>
             </div>
-            {blocker.resolution && <p><strong>Resolution:</strong> {blocker.resolution}</p>}
+            {blocker.resolution && <p><strong>Resolution:</strong> <WritingValue>{blocker.resolution}</WritingValue></p>}
             <div className={inspectionStyles.actions}>
               {blocker.state === "open" && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("blocker-resolve", item, blocker)}><UnigentamosIcon role="check" size={16} />Resolve blocker</button>}
               <Link className={styles.button} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}><UnigentamosIcon role="follow-up" size={16} />Create follow-up</Link>
@@ -2669,8 +2670,8 @@ export default function ProjectsWorkspace({
 
         {selectedDecision && (
           <div className={inspectionStyles.body}>
-            <div className={inspectionStyles.contentSection}><h3>Question</h3><p>{selectedDecision.question || "No question recorded."}</p></div>
-            <div className={inspectionStyles.contentSection}><h3>Decision</h3><p>{selectedDecision.finalDecision || "No decision recorded yet."}</p></div>
+            <div className={inspectionStyles.contentSection}><h3>Question</h3><p><WritingValue>{selectedDecision.question || "No question recorded."}</WritingValue></p></div>
+            <div className={inspectionStyles.contentSection}><h3>Decision</h3><p><WritingValue>{selectedDecision.finalDecision || "No decision recorded yet."}</WritingValue></p></div>
             <div className={inspectionStyles.actions}>
               <Link className={styles.button} href={decisionOwnerRoute(selectedDecision)}><UnigentamosIcon role="open" size={16} />Open decision</Link>
             </div>
@@ -2819,7 +2820,7 @@ export default function ProjectsWorkspace({
                   {initialPeople.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.profile?.fullName || candidate.title}</option>)}
                 </SelectField></label>
                 <label>Role<input value={person.role} onChange={(event) => updateEditorPerson(person.id, { role: event.target.value })} placeholder="e.g. Client, designer" /></label>
-                <label>Context<input value={person.context} onChange={(event) => updateEditorPerson(person.id, { context: event.target.value })} placeholder="Optional context" /></label>
+                <label>Context<input data-writing-field value={person.context} onChange={(event) => updateEditorPerson(person.id, { context: event.target.value })} placeholder="Optional context" /></label>
                 <button type="button" className={styles.iconButton} onClick={() => {
                   setEditor((current) => current ? { ...current, people: current.people?.filter((item) => item.id !== person.id) } : current);
                   setEditorDirty(true);

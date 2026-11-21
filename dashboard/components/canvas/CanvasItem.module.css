@@ -36,6 +36,7 @@
   margin-right:calc(44px * var(--canvas-inverse-zoom,1));
   font-size:clamp(11px,5cqw,calc(13px * var(--footer-scale,1)));
 }
+.footer :is(a,button) { pointer-events:auto; }
 :global([data-organized=true]) :global(.react-flow__node:not(.selected)) .footer {
   --canvas-inverse-zoom:var(--arranged-footer-scale);
   --footer-scale:var(--arranged-footer-scale);

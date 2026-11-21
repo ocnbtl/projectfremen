@@ -1,5 +1,6 @@
 "use client";
 
+import { WritingValue } from "../writing/WritingText";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -99,12 +100,12 @@ export default function PersonalWellnessWorkspace({ section, initialState, initi
           <div className={styles.cardTop}><span className={styles.entryKind}>{entry.kind === "recipe" ? <UnigentamosIcon role="meals" size={17} /> : <><UnigentamosIcon role="calendar" size={15} /><time dateTime={entry.date}>{dateLabel(entry.date)}</time></>}</span>{entry.kind !== "recipe" && section !== "health" && <PersonalOpsStatusChip tone={personalOpsToneForState(entry.schedule?.repeat ? "active" : entry.status)}>{entry.schedule?.repeat ? "Repeats" : entry.status === "completed" ? "Completed" : "Planned"}</PersonalOpsStatusChip>}</div>
           <button className={styles.title} type="button" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}><h2>{entry.title}</h2></button>
           <div className={styles.metrics}>{activeKind.fields.filter(field => field.type !== "textarea" && entry.fields[field.id] && field.id !== "recipeId").map(field => <span key={field.id} title={field.label}>{entry.fields[field.id]}{field.suffix ? ` ${field.suffix}` : ""}</span>)}</div>
-          {entry.kind === "recipe" && entry.fields.ingredients && <p className={styles.recipeIngredients}>{entry.fields.ingredients}</p>}
+          {entry.kind === "recipe" && entry.fields.ingredients && <p className={styles.recipeIngredients}><WritingValue>{entry.fields.ingredients}</WritingValue></p>}
           {entry.fields.recipeId && <button className={styles.recipeLink} type="button" onClick={() => { const recipe = entries.find(item => item.id === entry.fields.recipeId); if (recipe) setDraft({ ...recipe, fields: { ...recipe.fields } }); }}><UnigentamosIcon role="meals" size={15} />{entries.find(item => item.id === entry.fields.recipeId)?.title || "Recipe"}</button>}
           {entry.schedule && <Link prefetch={false} className={styles.scheduleLink} href={`/admin/calendar?date=${entry.date}`}><UnigentamosIcon role="clock" size={15} />{new Date(`${entry.schedule.start}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – {new Date(`${entry.schedule.end}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}<span>{entry.schedule.timeZone.replaceAll("_", " ")}</span><UnigentamosIcon role="calendar" size={15} /></Link>}
           {entry.schedule?.repeat && <p className={styles.repeatLabel}>{wellnessRepeatLabel(entry.schedule)}{entry.schedule.repeat.until ? ` · Until ${dateLabel(entry.schedule.repeat.until)}` : ""}</p>}
           {entry.schedule?.repeat && !archive && <WellnessOccurrences entry={entry} section={section} today={currentDay} onSaved={item=>setEntries(previous=>previous.map(existing=>existing.id===item.id?item:existing))} />}
-          {entry.notes && <p className={styles.notes}>{entry.notes}</p>}
+          {entry.notes && <p className={styles.notes}><WritingValue>{entry.notes}</WritingValue></p>}
           <footer><WorkspaceButton icon="edit" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>Edit</WorkspaceButton>{!archive && entry.kind === "recipe" && <WorkspaceButton icon="calendar" onClick={() => create("meal", entry)}>Plan meal</WorkspaceButton>}{!archive && section !== "health" && entry.kind !== "recipe" && <><WorkspaceButton icon="calendar" onClick={() => { setError(""); setDraft({ ...entry, fields: { ...entry.fields } }); }}>{entry.schedule ? "Reschedule" : "Schedule"}</WorkspaceButton>{!entry.schedule?.repeat && <WorkspaceButton icon={entry.status === "completed" ? "discard-changes" : "check"} busy={busy} onClick={() => void save({ ...entry, status: entry.status === "completed" ? "planned" : "completed" })}>{entry.status === "completed" ? "Reopen" : "Complete"}</WorkspaceButton>}</>}{archive && <WorkspaceButton icon="discard-changes" busy={busy} onClick={() => void save({ ...entry, archived: false })}>Restore</WorkspaceButton>}</footer>
         </article>)}</div>}
       </div>

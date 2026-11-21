@@ -1,4 +1,5 @@
 "use client";
+import { WritingValue } from "../writing/WritingText";
 import { DirectoryLayout, MorphingArticle, MorphingSpan } from "../ui/DirectoryLayout";
 import ViewCycleButton, { type DirectoryView } from "../ui/ViewCycleButton";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -1287,7 +1288,7 @@ export default function ReviewsWorkspace({
     <section id="review-item-summary" className={styles.summaryPanel} tabIndex={-1}>
       <div className={styles.panelHeader}><h2>Structured summary</h2></div>
       {SUMMARY_FIELDS.some(field => run.summary[field.id]?.trim()) ? <dl className={styles.readOnlySummary}>
-        {SUMMARY_FIELDS.filter(field => run.summary[field.id]?.trim()).map(field => <div key={field.id}><dt>{field.label}</dt><dd>{run.summary[field.id]}</dd></div>)}
+        {SUMMARY_FIELDS.filter(field => run.summary[field.id]?.trim()).map(field => <div key={field.id}><dt>{field.label}</dt><dd><WritingValue>{run.summary[field.id]}</WritingValue></dd></div>)}
       </dl> : <p>No summary was recorded.</p>}
     </section>
   ) : (
@@ -1337,7 +1338,7 @@ export default function ReviewsWorkspace({
               <div className={styles.checklistTop}>
                 <div>
                   <strong>{item.label}</strong>
-                  <p>{item.description}</p>
+                  <p><WritingValue>{item.description}</WritingValue></p>
                 </div>
                 <span className={styles.stateChip} data-tone={item.state === "complete" ? "positive" : item.state === "blocked" || item.state === "needs_evidence" ? "danger" : "attention"}>{displayLabel(item.state)}</span>
               </div>
@@ -1390,7 +1391,7 @@ export default function ReviewsWorkspace({
               <div className={styles.evidenceTop}>
                 <div>
                   <strong>{item.title}</strong>
-                  <p>{item.description}</p>
+                  <p><WritingValue>{item.description}</WritingValue></p>
                 </div>
                 <span className={styles.stateChip} data-tone={ready ? "positive" : item.required && item.blocksCompletion ? "danger" : "attention"}>{displayLabel(item.state)}</span>
               </div>
@@ -1464,7 +1465,7 @@ export default function ReviewsWorkspace({
               return (
                 <li id={`review-item-${item.id}`} className={styles.sourceRow} data-selected={urlState.item === item.id || undefined} tabIndex={-1} key={item.id}>
                   <div className={styles.sourceTop}>
-                    <div><strong>{item.title}</strong><p>{item.question}</p></div>
+                    <div><strong>{item.title}</strong><p><WritingValue>{item.question}</WritingValue></p></div>
                     <span className={styles.stateChip} data-tone={RESOLVED_DECISION_STATES.has(item.state) ? "positive" : "attention"}>{displayLabel(item.state)}</span>
                   </div>
                   <div className={styles.sourceLine}><span>Source</span><Link href={item.sourceRef.route}>{item.sourceRef.label}</Link></div>

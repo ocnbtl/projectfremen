@@ -1,5 +1,6 @@
 "use client";
 
+import { WritingValue } from "../writing/WritingText";
 import { createContext, useCallback, useContext, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
@@ -33,7 +34,7 @@ function ActivityDetails({ transaction, account }: { transaction: FinanceTransac
     <dl className={styles.facts}>{facts.map(([label, value]) =>
       <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
     )}</dl>
-    {transaction.memo && <section className={styles.memo}><h4>Notes</h4><p>{transaction.memo}</p></section>}
+    {transaction.memo && <section className={styles.memo}><h4>Notes</h4><p><WritingValue>{transaction.memo}</WritingValue></p></section>}
   </div>;
 }
 

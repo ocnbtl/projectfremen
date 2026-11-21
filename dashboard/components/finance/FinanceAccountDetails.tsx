@@ -1,5 +1,6 @@
 "use client";
 
+import { WritingValue } from "../writing/WritingText";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { FinanceAccountRowViewModel } from "../../lib/modules/finance/accounts-view-model";
@@ -126,7 +127,7 @@ export default function FinanceAccountDetails({row,state,tab,onOperation}:Props)
           const peer = state.accounts.find(a => a.id === (sent ? transfer.toAccountId : transfer.fromAccountId));
           return <article className={styles.transfer} key={transfer.id}><span className={styles.transferIcon}><UnigentamosIcon role="routine" candidate="arrows-exchange" size={20}/></span>
             <div className={styles.entryText}><strong>{sent ? "To" : "From"} {peer?.name || "Archived account"}</strong>
-              <small><time dateTime={transfer.occurredOn}>{accountDate(transfer.occurredOn)}</time></small>{transfer.memo && <small>{transfer.memo}</small>}</div>
+              <small><time dateTime={transfer.occurredOn}>{accountDate(transfer.occurredOn)}</time></small>{transfer.memo && <small><WritingValue>{transfer.memo}</WritingValue></small>}</div>
             <b className={sent ? "is-negative" : "is-positive"}>{amountLabel(sent ? -transfer.amount : transfer.amount)}</b>
           </article>;
         })}</div></section>}

@@ -1,5 +1,6 @@
 "use client";
 
+import { writingPlainText } from "../../lib/writing/tokens";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -51,7 +52,7 @@ export default function DenseObjectRow({
       {leading && <span className="dense-object-row__leading">{leading}</span>}
       <span className="dense-object-row__content">
         <strong id={titleId}>{title}</strong>
-        {description && <span id={descriptionId}>{description}</span>}
+        {description && <span id={descriptionId}>{typeof description === "string" ? writingPlainText(description) : description}</span>}
         {metadata && <span className="dense-object-row__metadata">{metadata}</span>}
       </span>
       {trailing && <span className="dense-object-row__trailing">{trailing}</span>}

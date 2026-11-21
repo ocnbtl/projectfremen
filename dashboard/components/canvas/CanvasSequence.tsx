@@ -11,6 +11,8 @@ import { defaultOrganizerOptions, organizerRows } from "./organizer-rows";
 import { resolveCanvasView } from "./board-organization";
 import { ArrangementDecorations } from "./ArrangementDecorations";
 import { arrangementViewport } from "./organization-viewport";
+import { writingPlainText } from "../../lib/writing/tokens";
+import { WritingText } from "../writing/WritingText";
 
 type Size = NonNullable<CanvasView["frameSize"]>;
 type SlideProps = {board: Board; nodes: CanvasNode[]; view: CanvasView; fallbackSize: Size};
@@ -66,14 +68,14 @@ function BoardItem({node,zoom,arranged}:{node:CanvasNode;zoom:number;arranged:bo
     <foreignObject width={node.width} height={node.height}>
       {media?<div className="cs-art"><Artwork node={node} eager full={Math.max(node.width,node.height)*zoom>400}
         loaded={node.imagePins?.length && !node.imageSize?setActual:undefined}/></div>:
-        <div className="cs-note">{label && <strong>{label}</strong>}{node.body && node.body!==label && <span>{node.body}</span>}{!label && !node.body && node.kind==="sticky" && "Sticky note"}</div>}
+        <div className="cs-note">{label && <strong><WritingText text={label}/></strong>}{node.body && node.body!==label && <span><WritingText text={node.body}/></span>}{!label && !node.body && node.kind==="sticky" && "Sticky note"}</div>}
     </foreignObject>
     {media && node.imagePins?.map((pin,index)=><g key={pin.id} transform={`translate(${(node.width-width)/2+pin.x*width} ${(node.height-height)/2+pin.y*height})`}>
-      <title>{(index+1)+". "+pin.text}</title><circle r={radius} fill="#18426b" stroke="white" strokeWidth={radius*.16}/>
+      <title>{(index+1)+". "+writingPlainText(pin.text)}</title><circle r={radius} fill="#18426b" stroke="white" strokeWidth={radius*.16}/>
       <text textAnchor="middle" dy=".34em" fontSize={radius*1.12} fontWeight="700" fill="white">{index+1}</text>
     </g>)}
     {media && (label||node.body) && <foreignObject y={node.height+3*captionScale} width={node.width} height={35*captionScale}>
-      <div className="cs-caption" style={{fontSize:Math.min(13*captionScale,node.width/8)}}>{label && <strong>{label}</strong>}{node.body && <span>{node.body}</span>}</div>
+      <div className="cs-caption" style={{fontSize:Math.min(13*captionScale,node.width/8)}}>{label && <strong><WritingText text={label}/></strong>}{node.body && <span><WritingText text={node.body}/></span>}</div>
     </foreignObject>}
   </g>;
 }
@@ -118,7 +120,7 @@ function BoardSlide({board,view,content}:{board:Board;view:CanvasView;content:Co
 
 function PinNotes({nodes}:{nodes:CanvasNode[]}) {
   return <div className="cs-pin-notes">{nodes.filter(n=>n.imagePins?.length).map(node=><section key={node.id}>
-    <h3>{node.title || node.ref?.label || "Image"}</h3><ol>{node.imagePins!.map(pin=><li key={pin.id}>{pin.text}</li>)}</ol>
+    <h3><WritingText text={node.title || node.ref?.label || "Image"}/></h3><ol>{node.imagePins!.map(pin=><li key={pin.id}><WritingText text={pin.text}/></li>)}</ol>
   </section>)}</div>;
 }
 
