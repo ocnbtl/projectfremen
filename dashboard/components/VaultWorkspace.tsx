@@ -1,4 +1,5 @@
 "use client";
+import { useDailyPreferences } from "../lib/settings/hooks";
 import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import { useWorkspaceReturn } from "./admin-shell/useWorkspaceReturn";
@@ -287,6 +288,10 @@ export default function VaultWorkspace({
   const [objectHistory, setObjectHistory] = useState<VaultObjectSnapshot[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [restoreArmed, setRestoreArmed] = useState(false);
+  const preferences = useDailyPreferences();
+  const [recentSearches,setRecentSearches] = useState<string[]>([]);
+  const [includeArchived,setIncludeArchived] = useState<boolean | null>(null);
+  useEffect(() => {if (!preferences.recentSearches) setRecentSearches([]);},[preferences.recentSearches]);
   const [recordQuery, setRecordQuery] = useState(initialSearch);
   const deferredRecordQuery = useDeferredValue(recordQuery);
   const [recordResultLimit, setRecordResultLimit] = useState(RECORD_PAGE_SIZE);
@@ -499,6 +504,7 @@ export default function VaultWorkspace({
       if (!response.ok || !payload.ok || !payload.objects) throw new Error(payload.error || "We could not refresh your workspace. Try again.");
       // Only use routes supplied by the authenticated owner. Local-only IDs stay on this device.
       const routes = new Map<string, string>();
+      const excluded=await browserVault.excludedOfflineModules();
       let changed = 0;
       for (const item of payload.objects) {
         const record = readCanonicalMetadata(item.fields);
@@ -510,12 +516,12 @@ export default function VaultWorkspace({
           || (record.module === "calendar" && record.collection === "events")
         )) routes.set(record.canonicalId, record.route);
         const objectId = await deterministicVaultObjectId(item.canonicalId);
-        const mirrored = await browserVault.mirrorCanonicalObject({
+        const changedHere = await browserVault.mirrorSelectedModule(item.canonicalId,{
           objectId,
           objectKind: item.objectKind,
           fields: item.fields
-        });
-        if (mirrored.changed) changed += 1;
+        },excluded);
+        if (changedHere) changed += 1;
         if (!quiet && changed > 0 && changed % 10 === 0) setMessage(`Adding ${changed} items to the Vault…`);
       }
       if (browserVault.isUnlocked()) setWorkspaceMentionRoutes(routes);
@@ -690,7 +696,7 @@ export default function VaultWorkspace({
     await run(async () => {
       const result = await browserVault.cleanupMediaCache();
       setMessage(result.deletedChunks
-        ? "Freed " + formatBytes(result.reclaimedBytes) + " from this device. Original encrypted files are still safe on Windows."
+        ? "Freed " + formatBytes(result.reclaimedBytes) + " from this device."
         : "Downloaded media is already tidy. Nothing was removed.");
     });
   }
@@ -949,8 +955,12 @@ export default function VaultWorkspace({
   const savedSearches = readSavedSearches(savedSearchObject);
   const recordSearchIndex = useMemo(() => buildVaultSearchIndex(objects), [objects]);
   const filteredObjects = useMemo(
-    () => searchVaultRecords(recordSearchIndex, deferredRecordQuery, activeKind),
-    [activeKind, deferredRecordQuery, recordSearchIndex]
+    () => searchVaultRecords(recordSearchIndex, deferredRecordQuery, activeKind).filter(record => {
+      if (!deferredRecordQuery.trim()) return true;
+      if (!(includeArchived ?? preferences.archived) && (record.fields.archivedAt || record.fields.lifecycle === "archived" || record.fields.state === "archived")) return false;
+      return activeKind !== "all" || !preferences.searchKinds.length || preferences.searchKinds.includes(record.objectKind);
+    }),
+    [activeKind, deferredRecordQuery, recordSearchIndex, includeArchived, preferences]
   );
   const visibleObjects = filteredObjects.slice(0, recordResultLimit);
   const selectedObject = objects.find((item) => item.objectId === selectedObjectId) || null;
@@ -1005,6 +1015,7 @@ export default function VaultWorkspace({
   const selectedMediaManifest = selectedObject?.objectKind === "media" && selectedObject.fields.mediaManifest && typeof selectedObject.fields.mediaManifest === "object" && !Array.isArray(selectedObject.fields.mediaManifest)
     ? selectedObject.fields.mediaManifest as Record<string, VaultFieldValue>
     : null;
+  const selectedMediaPinned = status?.metadata?.pinnedMediaIds?.includes(String(selectedMediaManifest?.mediaId)) ?? false;
   const changedFields = selectedVersion && selectedObject
     ? Array.from(new Set([...Object.keys(selectedObject.fields), ...Object.keys(selectedVersion.fields)]))
       .filter((field) => !field.startsWith("__unigentamos") && JSON.stringify(selectedObject.fields[field]) !== JSON.stringify(selectedVersion.fields[field]))
@@ -1216,10 +1227,12 @@ export default function VaultWorkspace({
           <section id="vault-records" tabIndex={-1} className={`${styles.panel} ${styles.objectWorkspace}`}>
             <div className={styles.searchRow}>
               {!recordPageOpen && hasUnsavedRecordChanges && <button type="button" onClick={() => setRecordPageOpen(true)}>Resume draft</button>}
-              <label className={styles.recordSearch}><span className={styles.searchLabel}>Search all records</span><SearchField ref={recordSearchRef} value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} aria-label="Search all records" /></label>
+              <label className={styles.recordSearch}><span className={styles.searchLabel}>Search all records</span><SearchField ref={recordSearchRef} value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} aria-label="Search all records" onKeyDown={event => {if(event.key === "Enter" && preferences.recentSearches && recordQuery.trim()) setRecentSearches(current => [recordQuery.trim(),...current.filter(query => query !== recordQuery.trim())].slice(0,8));}} /></label>
               {recordQuery.trim() && <button className={styles.quietButton} disabled={busy} onClick={() => void saveCurrentSearch()}>Save search</button>}
               {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={() => { void newObject(); }}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
             </div>
+            {recordQuery.trim() && <label><input type="checkbox" checked={includeArchived ?? preferences.archived} onChange={e=>setIncludeArchived(e.target.checked)}/> Include archived records</label>}
+            {preferences.recentSearches && recentSearches.length > 0 && <div className={styles.savedSearches}><span>Recent searches</span>{recentSearches.map(query => <button type="button" key={query} onClick={()=>setRecordQuery(query)}>{query}</button>)}<button type="button" onClick={()=>setRecentSearches([])}>Clear history</button></div>}
             {savedSearches.length > 0 && <div className={styles.savedSearches} aria-label="Saved Vault searches">
               <span>Saved searches</span>
               {savedSearches.map((search) => <span className={styles.savedSearch} key={search.id}>
@@ -1317,6 +1330,10 @@ export default function VaultWorkspace({
                   {selectedObject.objectKind === "media" && <div className={styles.mediaActions}>
                     {selectedMediaManifest && canPreviewMedia(String(selectedMediaManifest.mimeType || "")) && <button disabled={busy} onClick={() => void previewMedia(selectedObject)}>Preview here</button>}
                     <button className={styles.quietButton} disabled={busy} onClick={() => void openMedia(selectedObject)}>Open file</button>
+                    {selectedMediaManifest?.format === "unigentamos-vault-media-v1" && <button className={styles.quietButton} disabled={busy} aria-pressed={selectedMediaPinned} onClick={() => void run(async () => {
+                      await browserVault.setMediaPinned(selectedObject,!selectedMediaPinned);
+                      setMessage(selectedMediaPinned?"Offline pin removed.":"This encrypted file is pinned on this device.");
+                    })}>{selectedMediaPinned?"Remove offline pin":"Keep on this device"}</button>}
                   </div>}
                   {mediaPreview && selectedObject.objectKind === "media" && <div className={styles.mediaPreview}>
                     <div><strong>{mediaPreview.fileName}</strong><button className={styles.quietButton} type="button" onClick={() => setMediaPreview(null)}>Close</button></div>

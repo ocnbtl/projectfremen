@@ -17,8 +17,7 @@ export async function mirrorVaultRecord(
   if (!browserVault.isUnlocked()) return false;
   try {
     const objectId = await deterministicVaultObjectId(canonicalId);
-    const result = await browserVault.mirrorCanonicalObject({ objectId, objectKind, fields });
-    return result.changed;
+    return await browserVault.mirrorSelectedModule(canonicalId,{ objectId, objectKind, fields });
   } catch (error) {
     window.dispatchEvent(new CustomEvent("unigentamos-vault-mirror-error", {
       detail: { message: error instanceof Error ? error.message : "Encrypted history mirror failed" }

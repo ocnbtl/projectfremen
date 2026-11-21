@@ -423,9 +423,10 @@ try {
   await page.getByText("Saved. The full module will update automatically.").waitFor();
   await page.getByRole("tab", { name: "Notes" }).click();
   await page.getByText("Offline continuity note", { exact: true }).click();
-  await page.getByLabel("Find a record").fill("Continuity guide");
+  await page.getByLabel("Search notes, people, projects, resources...").fill("Continuity guide");
   await page.getByRole("option", { name: /Continuity guide/ }).click();
-  await page.getByLabel("How are they connected?").selectOption("source");
+  await page.getByLabel("How are they connected?").click();
+  await page.getByRole("option",{name:"Source",exact:true}).click();
   await page.getByRole("button", { name: "Connect records" }).click();
   await page.getByText("Connected to Continuity guide.").waitFor();
   const recordLayout = await page.locator("#vault-records").evaluate((section) => {
@@ -556,7 +557,8 @@ try {
     return rows.length;
   });
   assert.ok(agedDownloadedChunks > 0);
-  await applePage.getByLabel("Keep unused downloads").selectOption("7");
+  await applePage.getByLabel("Keep unused downloads").click();
+  await applePage.getByRole("option",{name:"7 days",exact:true}).click();
   await applePage.getByText("Downloaded files unused for 7 days", { exact: false }).waitFor();
   await applePage.getByRole("button", { name: "Clean up downloads" }).click();
   await applePage.getByText("Freed", { exact: false }).waitFor();

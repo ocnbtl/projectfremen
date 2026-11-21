@@ -28,6 +28,10 @@ export type VaultMetadata = {
   clockHealth: ClockHealth | null;
   acknowledgedCanonicalCommandIds?: string[];
   mediaCacheRetentionDays?: VaultMediaCacheRetentionDays;
+  mediaCacheLimitBytes?: number | null;
+  measuredMediaBytes?: number;
+  pinnedMediaIds?: string[];
+  excludedOfflineModules?: import("./offline-modules").OfflineModule[];
   lastMediaCleanupAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -200,11 +204,12 @@ export class BrowserVaultStore {
   }
 
   async updateMetadata(patch: Partial<Omit<VaultMetadata, "id" | "vaultId" | "deviceId" | "createdAt">>): Promise<VaultMetadata> {
-    const current = await this.metadata();
+    const transaction = this.database.transaction("metadata","readwrite");
+    const store = transaction.objectStore("metadata");
+    const current = await requestResult(store.get("vault")) as VaultMetadata | undefined;
     if (!current) throw new Error("Local vault is not configured");
     const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
-    const transaction = this.database.transaction("metadata", "readwrite");
-    transaction.objectStore("metadata").put(next);
+    store.put(next);
     await transactionDone(transaction);
     return next;
   }
@@ -346,20 +351,64 @@ export class BrowserVaultStore {
     await transactionDone(transaction);
   }
 
-  async putMediaChunk(packet: EncryptedVaultMediaChunk, uploaded = false): Promise<void> {
-    const digest = `${packet.mediaId}:${packet.chunkIndex}`;
-    const transaction = this.database.transaction("media", "readwrite");
-    transaction.objectStore("media").put({
-      digest,
-      mediaId: packet.mediaId,
-      chunkIndex: packet.chunkIndex,
-      packet,
-      uploaded,
-      cachedAt: new Date().toISOString()
-    } satisfies StoredMediaChunk);
+  async setDownloadLimit(limit: number | null) {
+    if (limit !== null && (!Number.isSafeInteger(limit) || limit < 0)) throw new Error("Choose a valid cache limit");
+    const transaction = this.database.transaction(["metadata","media"],"readwrite");
+    const metadata = transaction.objectStore("metadata");
+    const current = await requestResult(metadata.get("vault")) as VaultMetadata | undefined;
+    if (!current) throw new Error("Unlock this device to change its cache limit");
+    let bytes = 0;
+    if (limit !== null) {
+      // Count one encrypted packet at a time when enabling a cap on an older device.
+      await new Promise<void>((resolve,reject) => {
+        const cursor = transaction.objectStore("media").openCursor();
+        cursor.onerror = () => reject(cursor.error);
+        cursor.onsuccess = () => {
+          const row = cursor.result;
+          if (!row) { resolve(); return; }
+          bytes += (row.value as StoredMediaChunk).packet.byteLength;
+          row.continue();
+        };
+      });
+    }
+    metadata.put({...current,mediaCacheLimitBytes:limit,measuredMediaBytes:limit===null?undefined:bytes});
     await transactionDone(transaction);
   }
 
+  async setLocalMediaPin(mediaId: string, totalChunks: number, pinned: boolean) {
+    const transaction = this.database.transaction(["metadata","media"],"readwrite");
+    const metadata = transaction.objectStore("metadata");
+    const current = await requestResult(metadata.get("vault")) as VaultMetadata | undefined;
+    if (!current) throw new Error("Unlock this device to pin a file");
+    const pins = new Set(current.pinnedMediaIds);
+    if (pinned) {
+      for (let i=0;i<totalChunks;i++) {
+        if (!await requestResult(transaction.objectStore("media").getKey(mediaId+":"+i)))
+          throw new Error("The complete file must fit in this device’s offline cache");
+      }
+      pins.add(mediaId);
+    } else pins.delete(mediaId);
+    metadata.put({...current,pinnedMediaIds:[...pins]});
+    await transactionDone(transaction);
+  }
+
+  async putMediaChunk(packet: EncryptedVaultMediaChunk, uploaded = false): Promise<boolean> {
+    const digest = `${packet.mediaId}:${packet.chunkIndex}`;
+    const transaction = this.database.transaction(["metadata","media"], "readwrite");
+    const store = transaction.objectStore("media"), meta = transaction.objectStore("metadata");
+    const current = await requestResult(meta.get("vault")) as VaultMetadata | undefined;
+    if (!current) throw new Error("Local vault is not configured");
+    const previous = await requestResult(store.get(digest)) as StoredMediaChunk | undefined;
+    if (uploaded && previous) return true;
+    if (current.mediaCacheLimitBytes != null) {
+      const next = (current.measuredMediaBytes || 0) + packet.byteLength - (previous?.packet.byteLength || 0);
+      if (uploaded && next > current.mediaCacheLimitBytes) return false;
+      meta.put({...current,measuredMediaBytes:next});
+    }
+    store.put({digest,mediaId:packet.mediaId,chunkIndex:packet.chunkIndex,packet,uploaded,cachedAt:new Date().toISOString()} satisfies StoredMediaChunk);
+    await transactionDone(transaction);
+    return true;
+  }
   async mediaChunk(mediaId: string, chunkIndex: number): Promise<StoredMediaChunk | null> {
     const transaction = this.database.transaction("media", "readonly");
     return (await requestResult(transaction.objectStore("media").get(`${mediaId}:${chunkIndex}`))) || null;
@@ -385,15 +434,24 @@ export class BrowserVaultStore {
     await transactionDone(transaction);
   }
 
-  async deleteMediaChunks(digests: readonly string[]): Promise<void> {
-    if (!digests.length) return;
-    const transaction = this.database.transaction("media", "readwrite");
-    const store = transaction.objectStore("media");
-    for (const digest of digests) store.delete(digest);
+  async deleteMediaChunks(candidates: readonly StoredMediaChunk[]) {
+    const removed = {chunks:0,bytes:0};
+    if (!candidates.length) return removed;
+    const transaction = this.database.transaction(["media","metadata"],"readwrite");
+    const store = transaction.objectStore("media"), meta=transaction.objectStore("metadata");
+    const current = await requestResult(meta.get("vault")) as VaultMetadata | undefined;
+    if (!current) throw new Error("Local vault is not configured");
+    const pinned = new Set(current.pinnedMediaIds);
+    for (const candidate of candidates) {
+      const row = await requestResult(store.get(candidate.digest)) as StoredMediaChunk | undefined;
+      if (!row?.uploaded || pinned.has(row.mediaId) || row.cachedAt !== candidate.cachedAt || row.lastAccessedAt !== candidate.lastAccessedAt) continue;
+      store.delete(row.digest);removed.chunks++;removed.bytes+=row.packet.byteLength;
+    }
+    if (current.mediaCacheLimitBytes!=null) meta.put({...current,measuredMediaBytes:Math.max(0,(current.measuredMediaBytes||0)-removed.bytes)});
     await transactionDone(transaction);
-    notify("media-cache-changed", { deleted: digests.length });
+    notify("media-cache-changed", { deleted: removed.chunks });
+    return removed;
   }
-
   async markMediaChunkUploaded(mediaId: string, chunkIndex: number): Promise<void> {
     const transaction = this.database.transaction("media", "readwrite");
     const store = transaction.objectStore("media");

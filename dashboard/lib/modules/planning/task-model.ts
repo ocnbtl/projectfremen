@@ -14,7 +14,7 @@ export type TaskPlan = {
   id: string; source?: TaskSource; title?: string; description?: string; kind: TaskKind;
   start: string; end: string; allDay: boolean; timeZone: string; recurrence: string;
   calendarIds: string[]; peopleIds?: string[]; linkedRefs?: NativeObjectRef[]; exceptions: Record<string, EventOverride>; completed?: boolean;
-  targetDate?:string;
+  targetDate?:string; reminderMinutes?:number | null; followDeviceZone?:boolean;
   createdAt: string; updatedAt: string;
 };
 export type TaskDetails = {outcome?:string;finalDecision?:string;rationale?:string;completionNote?:string;completionCriteria?:import("../personal-ops/types").ObligationCompletionCriterion[];requiredEvidence?:import("../personal-ops/types").ObligationEvidenceRequirement[]};
@@ -79,13 +79,13 @@ export function taskCatalog(plans: TaskPlan[], ops: PersonalOpsState | null, pro
   return result;
 }
 
-export function taskEvents(items: TaskItem[], calendars: Calendar[], zone: string, _now = new Date()): CalendarEvent[] {
+export function taskEvents(items: TaskItem[], calendars: Calendar[], zone: string, _now = new Date(), deviceZone = typeof window === "undefined" ? zone : Intl.DateTimeFormat().resolvedOptions().timeZone): CalendarEvent[] {
   // General tasks stay in the catalogue, never projected onto a calendar day.
   return items.filter(item => item.source?.family !== "events" && !!item.start).map(item => {
     const start = item.start;
     const profiles = item.calendarIds.map(id=>calendars.find(c=>c.id===id && !c.archivedAt)).filter((c):c is Calendar=>!!c);
-    return { id:`task:${item.id}`,title:item.title,description:item.description,start,end:item.end || addDays(start,1),allDay:item.start ? item.allDay : true,timeZone:item.timeZone || zone,
-      calendarId:profiles[0]?.id || "personal-work",isTask:true,completed:item.completed,recurrence:item.start ? item.recurrence : "",exceptions:item.exceptions,createdAt:item.createdAt,updatedAt:item.updatedAt,location:"",linkedRefs:taskLinks(item),reminderMinutes:null,kind:"event" as const,
+    return { id:`task:${item.id}`,title:item.title,description:item.description,start,end:item.end || addDays(start,1),allDay:item.start ? item.allDay : true,timeZone:item.kind === "routine" && item.followDeviceZone ? deviceZone : item.timeZone || zone,
+      calendarId:profiles[0]?.id || "personal-work",isTask:true,completed:item.completed,recurrence:item.start ? item.recurrence : "",exceptions:item.exceptions,createdAt:item.createdAt,updatedAt:item.updatedAt,location:"",linkedRefs:taskLinks(item),reminderMinutes:item.reminderMinutes ?? null,kind:"event" as const,
       taskContext:{id:item.id,kind:item.kind,sourceUpdatedAt:item.sourceUpdatedAt,planUpdatedAt:item.updatedAt,floating:!item.start,colors:[...profiles.map(p=>p.color),...(item.peopleIds||[]).map(personTaskColor)],calendarIds:profiles.map(p=>p.id),dueAt:item.dueAt,peopleIds:item.peopleIds},ownerRef:item.ownerRef };
   });
 }

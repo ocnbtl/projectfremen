@@ -2,7 +2,7 @@ const fs=require('fs'),path=require('path'),os=require('os'),crypto=require('cry
 const {spawn}=require('child_process');
 const app=path.resolve(__dirname,'..'),{chromium}=require('@playwright/test');
 const data=fs.mkdtempSync(path.join(os.tmpdir(),'fremen-account-media-')),base='http://localhost:3227',secret='isolated-account-secret';
-const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3227'],{cwd:app,env:{...process.env,ADMIN_PASSWORD:'isolated-password',ADMIN_SESSION_SECRET:secret,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',VERCEL:''},stdio:'ignore'});
+const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3227'],{cwd:app,env:{...process.env,ADMIN_PASSWORD:'isolated-password',ADMIN_SESSION_SECRET:secret,FREMEN_ACCOUNT_MEDIA_BACKEND:'filesystem-test',FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',VERCEL:''},stdio:'ignore'});
 let browser;
 (async()=>{
  for(let i=0;i<100;i++){try{if((await fetch(base)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
@@ -37,7 +37,10 @@ let browser;
   const missing=await context.request.post(base+'/api/media/files',{headers,data:{action:'finish',name:'Incomplete',file:{id:crypto.randomUUID(),sha256:'a'.repeat(64),byteLength:1,chunkSize:1048576,totalChunks:1}}});assert.equal(missing.status(),400);
   await page.getByRole('button',{name:'Archive',exact:true}).click();await page.waitForTimeout(250);assert.equal(await page.getByRole('button',{name:new RegExp('Account '+name+'\\.svg')}).count(),0);
   await page.getByRole('button',{name:'Filter',exact:true}).click();await page.getByRole('button',{name:'Archive',exact:true}).click();await page.keyboard.press('Escape');
-  await page.getByRole('button',{name:new RegExp('Account '+name+'\\.svg')}).click();await page.getByRole('button',{name:'Restore',exact:true}).click();
+  await page.getByRole('button',{name:new RegExp('Account '+name+'\\.svg')}).click();
+  const restored=page.waitForResponse(r=>r.url().includes('/api/media/files')&&r.request().method()==='POST'&&r.request().postDataJSON()?.action==='edit');
+  await page.getByRole('button',{name:'Restore',exact:true}).click();
+  assert.equal((await restored).status(),200);
   assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   console.log('PASS '+name+' locked-Vault upload, preview, edit, reload, byte-identical download, archive/restore, authentication, CSRF, bounds and stale-write protection');
   if(name==='desktop') {

@@ -1,3 +1,7 @@
+.preferences { display: grid; gap: 16px; margin: 0; padding: 0; border: none; min-width: 0; }
+.preferenceRow { display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; padding:12px 0; border-bottom:1px solid var(--border); font-size:14px; }
+.preferenceRow:last-child { border:0; }
+.preferenceRow :is(select,input) { max-width:100%; min-height:36px; padding:6px 10px; font:inherit; color:var(--text-strong); background:var(--surface-panel); border:1px solid var(--border); border-radius:8px; }
 .content {
   display: grid;
   gap: 20px;

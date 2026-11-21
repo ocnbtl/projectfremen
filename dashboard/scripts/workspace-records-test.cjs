@@ -1,0 +1,96 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const {randomUUID} = require("node:crypto");
+const {PGlite} = require("@electric-sql/pglite");
+async function test() {
+  const db = new PGlite();
+  try {
+    const folder = path.resolve(__dirname,"../supabase/migrations");
+    await db.exec("create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key, email text, encrypted_password text, email_confirmed_at timestamptz, deleted_at timestamptz, banned_until timestamptz)");
+    for (const suffix of ["account_workspace_identity.sql","workspace_record_permissions.sql","workspace_media.sql","workspace_storage_ledger.sql"]) {
+      await db.exec(fs.readFileSync(path.join(folder,fs.readdirSync(folder).find(name=>name.endsWith(suffix))),"utf8"));
+    }
+    const owner=randomUUID(), viewer=randomUUID(), outsider=randomUUID(), a=randomUUID(), b=randomUUID();
+    for (const user of [owner,viewer,outsider]) await db.query("insert into auth.users(id) values($1)",[user]);
+    for (const [workspace,user] of [[a,owner],[b,outsider]]) {
+      await db.query("insert into account_workspaces(id,owner_id,name) values($1,$2,'Test')",[workspace,user]);
+      await db.query("insert into account_workspace_members(workspace_id,user_id,role) values($1,$2,'owner')",[workspace,user]);
+    }
+    await db.query("insert into account_workspace_members(workspace_id,user_id,role) values($1,$2,'viewer')",[a,viewer]);
+    const call=async (workspace,user,action,args={})=>(await db.query("select account_record_action($1,$2,$3,$4) as result",[workspace,user,action,JSON.stringify(args)])).rows[0].result;
+    await db.exec("set role service_role");
+    const {key:n}=await call(a,owner,"create",{kind:"note",title:"Campaign brief"});
+    const {key:p}=await call(a,owner,"create",{kind:"project",title:"Unannounced launch"});
+    const file=randomUUID();
+    const media=async(action,data={})=>db.query("select workspace_media_action($1,$2,$3,$4,$5)",[a,owner,file,action,JSON.stringify(data)]);
+    await media("start",{included:500,bytes:20,name:"Private file",mime:"text/plain",sha256:"0".repeat(64)});
+    await media("finish");await media("finish");
+    await call(a,owner,"attach",{key:n,mediaId:file}); await call(a,owner,"attach",{key:n,mediaId:file});
+    assert.equal((await call(a,owner,"get",{key:n})).files.length,1);
+    const ledger=(await db.query("select sum(used_delta) used,sum(reserved_delta) pending,sum(included_delta) allowance,count(*) events from account_storage_events where workspace_id=$1",[a])).rows[0];
+    assert.deepEqual(Object.values(ledger).map(Number),[20,0,500,3]);
+    await call(a,owner,"link",{key:n,target:p});
+    await call(a,owner,"link",{key:n,target:p});
+    assert.equal((await call(a,owner,"get",{key:n})).links.length,1);
+    const linkedKey=randomUUID();
+    await assert.rejects(call(a,owner,"create",{kind:"note",title:"Draft",createKey:linkedKey,newLinks:[p,randomUUID()]}),/Unavailable/);
+    await assert.rejects(call(a,owner,"get",{key:linkedKey}),/Unavailable/);
+    await call(a,owner,"create",{kind:"note",title:"Draft",createKey:linkedKey,newLinks:[p,p]});
+    assert.equal((await call(a,owner,"get",{key:linkedKey})).links.length,1);
+    await assert.rejects(call(a,owner,"edit",{key:linkedKey,title:"stale",body:"",revision:9,audience:"private",newLinks:[n]}),/Revision changed/);
+    assert.equal((await call(a,owner,"get",{key:linkedKey})).links.length,1);
+    assert.equal((await call(a,viewer,"list")).records.length,0);
+    await assert.rejects(call(b,outsider,"get",{key:n}),/Unavailable/);
+    await assert.rejects(call(a,outsider,"export"),/Unavailable/);
+    const share={key:n,recipient:viewer,expires:new Date(Date.now()+3600000).toISOString()};
+    const {grant}=await call(a,owner,"share",share);
+    assert.equal((await call(a,owner,"share",share)).grant,grant);
+    assert.deepEqual((await call(a,viewer,"get",{key:n})).links,[]);
+    const visible=await call(a,viewer,"export");
+    assert.deepEqual(visible.records[0].files,[]);
+    await media("share",{audience:"workspace"});
+    assert.equal((await call(a,viewer,"get",{key:n})).files[0].id,file);
+    assert.equal((await call(a,viewer,"workspaceShares"))[0].canRevoke,false);
+    await assert.rejects(call(a,viewer,"restrictAudience",{type:"media",key:file}),/Read only/);
+    await call(a,owner,"restrictAudience",{type:"media",key:file});
+    assert.deepEqual((await call(a,viewer,"get",{key:n})).files,[]);
+    assert.equal(visible.workspaceId,a);
+    assert.equal(visible.records.length,1);
+    assert.ok(!JSON.stringify(visible).includes(p));
+    await assert.rejects(call(a,viewer,"edit",{key:n,title:"x",body:"",revision:1,audience:"workspace"}),/Read only/);
+    await call(a,owner,"edit",{key:n,title:"Brief 2",body:"New",revision:1,audience:"private"});
+    await assert.rejects(call(a,owner,"edit",{key:n,title:"Stale",body:"",revision:1,audience:"private"}),/Revision changed/);
+    await call(a,owner,"revoke",{grant});
+    assert.equal((await call(a,viewer,"export")).records.length,0);
+    await call(a,owner,"policy",{defaultAudience:"workspace",allowSensitive:false});
+    const {key:s}=await call(a,owner,"create",{kind:"finance",title:"Private transaction",audience:"workspace"});
+    assert.equal((await call(a,owner,"get",{key:s})).audience,"private");
+    await assert.rejects(call(a,owner,"share",{...share,key:s}),/Sensitive sharing disabled/);
+    await call(a,owner,"policy",{defaultAudience:"workspace",allowSensitive:true});
+    await call(a,owner,"share",{...share,key:s});
+    assert.equal((await call(a,viewer,"get",{key:s})).title,"Private transaction");
+    await call(a,owner,"policy",{defaultAudience:"private",allowSensitive:false});
+    await call(a,owner,"policy",{defaultAudience:"private",allowSensitive:true});
+    await assert.rejects(call(a,viewer,"get",{key:s}),/Unavailable/);
+    const archive=await call(a,owner,"export");
+    const sample=archive.records.find(row=>row.key===n);
+    const restoredKey=randomUUID();
+    const recover={...archive,records:[{...sample,key:restoredKey},{...sample,key:randomUUID(),mine:false},sample]};
+    assert.deepEqual(await call(a,owner,"previewRestore",{archive:recover}),{newRecords:1,skipped:2});
+    await assert.rejects(call(a,owner,"get",{key:restoredKey}),/Unavailable/);
+    await assert.rejects(call(b,outsider,"restore",{archive:recover}),/Invalid archive/);
+    assert.deepEqual(await call(a,owner,"restore",{archive:recover}),{newRecords:1,skipped:2});
+    assert.deepEqual(await call(a,owner,"restore",{archive:recover}),{newRecords:0,skipped:3});
+    const restored=await call(a,owner,"get",{key:restoredKey});
+    assert.equal(restored.audience,"private");
+    assert.equal(restored.links[0].key,p);
+    const rollbackKey=randomUUID();
+    await assert.rejects(call(a,owner,"restore",{archive:{...archive,records:[{...sample,key:rollbackKey},{...sample,key:randomUUID(),title:""}]}}),/Invalid record/);
+    await assert.rejects(call(a,owner,"get",{key:rollbackKey}),/Unavailable/);
+    await db.exec("reset role; set role authenticated");
+    await assert.rejects(call(a,owner,"export"),/permission denied/);
+    console.log("Workspace record isolation, independent link visibility, sensitive policy, repeat grants, revocation, export and edit conflicts passed.");
+  } finally { await db.close(); }
+}
+test().catch(error=>{console.error(error);process.exitCode=1});

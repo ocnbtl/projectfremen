@@ -1,3 +1,4 @@
+import ReadingDisplay from "../../components/settings/ReadingDisplay";
 import type { Metadata } from "next";
 import ExperienceProvider from "../../components/admin-shell/ExperienceProvider";
 import AppTopNav from "../../components/admin-shell/AppTopNav";
@@ -25,7 +26,7 @@ export default async function VaultPage({
   const styleGuide = await readStyleGuideState().catch(() => defaultStyleGuideState());
   return (
     <IconSystemProvider selections={selectedIconMap(styleGuide.icons)}>
-      <ExperienceProvider><AppTopNav showCommandSearch={false} />
+      <ExperienceProvider><ReadingDisplay /><AppTopNav showCommandSearch={false} />
       <VaultWorkspace initialSearch={params.search?.slice(0, 500) || ""} initialKind={initialKind} focusSearch={params.focus === "search"} /><VaultAssistant /></ExperienceProvider>
     </IconSystemProvider>
   );

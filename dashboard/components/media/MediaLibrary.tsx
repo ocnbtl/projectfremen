@@ -1,4 +1,5 @@
 "use client";
+import {useUploadLocation} from "../../lib/modules/media/upload-privacy";
 import { DirectoryLayout } from "../ui/DirectoryLayout";
 import MediaUploadSheet, {type MediaUploadEntry} from "./MediaUploadSheet";
 import MediaReviewSheet from "./MediaReviewSheet";
@@ -162,7 +163,7 @@ export default function MediaLibrary({
   >([]);
   const [uploadOpen,setUploadOpen]=useState(false);
   const [bulkItems,setBulkItems]=useState<VaultObjectSnapshot[]>([]);
-  const [readLocation, setReadLocation] = useState(true);
+  const [readLocation, setReadLocation] = useUploadLocation();
   const [uploadedItems,setUploadedItems]=useState<VaultObjectSnapshot[]>([]);
   const [uploadedFiles,setUploadedFiles]=useState(new Map<string,File>());
   const [purposeFilter,setPurposeFilter]=useState("all"),[tagFilter,setTagFilter]=useState("all");

@@ -48,7 +48,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
         </div>
         <div className={styles.optionRow} data-enabled={fields.reminderMinutes !== null}>
           <EventCheckbox label="Reminder" checked={fields.reminderMinutes !== null} onChange={checked => { setReminderEmpty(false); update("reminderMinutes",checked ? reminderDraft : null); }} />
-          <input aria-label="Reminder amount" type="number" min={0} max={43200/reminderUnit} step="any" required={fields.reminderMinutes !== null} disabled={fields.reminderMinutes === null} value={reminderEmpty ? "" : Number((reminderDraft/reminderUnit).toFixed(5))} onChange={e => {
+          <input aria-label="Reminder amount" type="number" min={0} max={43200/reminderUnit} step="any" required={fields.reminderMinutes !== null} disabled={fields.reminderMinutes === null} value={reminderEmpty ? "" : Number(((fields.reminderMinutes ?? reminderDraft)/reminderUnit).toFixed(5))} onChange={e => {
             const empty = e.target.value === "";
             setReminderEmpty(empty);
             // Keep deletion editable; an empty enabled reminder must be filled before saving.

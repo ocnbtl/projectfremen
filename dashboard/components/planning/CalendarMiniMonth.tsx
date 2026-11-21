@@ -21,7 +21,7 @@ export default function CalendarMiniMonth({ month, value, today, showWeekends = 
     <div className={styles.miniDays} style={{ gridTemplateColumns: `repeat(${showWeekends ? 7 : 5}, minmax(0, 1fr))`, ...(fitWeeks ? { gridTemplateRows: `16px repeat(${weeks}, minmax(0, 1fr))` } : {}) }}>
       {visibleWeekdays(showWeekends).map(day => <span className={styles.miniWeekday} key={day} title={day}>{day.slice(0, 2)}</span>)}
       {Array.from({ length: weeks * 7 }, (_, index) => {
-        if (!showWeekends && [0, 6].includes(index % 7)) return null;
+        if (!showWeekends && [0, 6].includes(new Date(addDays(start,index)+"T12:00").getDay())) return null;
         const day = addDays(start, index), outside = day.slice(0, 7) !== month.slice(0, 7), count = counts?.get(day) || 0;
         if (outside) return <span key={day} aria-hidden="true" />;
         if (overview) return <span className={styles.overviewDate} key={day} data-morph-date={counts ? day : undefined} data-current={day === today} data-has-events={count > 0 || undefined}>{Number(day.slice(-2))}{renderMarks?.(day)}</span>;
@@ -30,7 +30,7 @@ export default function CalendarMiniMonth({ month, value, today, showWeekends = 
           aria-pressed={day === value} aria-current={day === today ? "date" : undefined}
           tabIndex={day === value || (value.slice(0, 7) !== month.slice(0, 7) && day.endsWith("-01")) ? 0 : -1}
           onClick={() => onSelect(day)} onKeyDown={event => {
-            const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7, Home: (showWeekends ? 0 : 1) - index % 7, End: (showWeekends ? 6 : 5) - index % 7 };
+            const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7, Home: (showWeekends ? 0 : visibleWeekdays().indexOf("Monday")) - index % 7, End: (showWeekends ? 6 : visibleWeekdays().indexOf("Friday")) - index % 7 };
             if (!(event.key in offsets)) return;
             event.preventDefault();
             let next = addDays(day, offsets[event.key]);

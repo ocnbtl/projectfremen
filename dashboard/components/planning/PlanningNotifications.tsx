@@ -1,4 +1,8 @@
 "use client";
+import { useDailyPreferences } from "../../lib/settings/hooks";
+import { readDeviceDaily } from "../../lib/settings/device";
+import { preferenceZone, silenced } from "../../lib/settings/preferences";
+import { eventTimeLabel } from "./calendar-presentation";
 import Link from "next/link";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import type { CSSProperties } from "react";
@@ -28,10 +32,13 @@ type Reminder = {
   allDay: boolean;
   isTask?: boolean;
   eventUpdatedAt?: string;
+  taskId?: string;
   receipt?: ReminderReceipt;
 };
 /** In-app delivery surface. Native notification delivery can consume the same bounded endpoint. */
 export default function PlanningNotifications() {
+  const prefs = useDailyPreferences();
+  const delivered = useRef(new Set<string>());
   const [items, setItems] = useState<Reminder[]>([]),
     [total, setTotal] = useState(0),
     [open, setOpen] = useState(false),
@@ -55,9 +62,10 @@ export default function PlanningNotifications() {
     running.current = true;
     const version=mutationVersion.current;
     try {
-      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const preferences = readDeviceDaily();
+      const zone = preferenceZone(preferences);
       const response = await fetch(
-        `/api/planning/notifications?zone=${encodeURIComponent(zone)}`,
+        `/api/planning/notifications?zone=${encodeURIComponent(zone)}&deviceZone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`,
         { cache: "no-store" },
       );
       if (response.status === 401)
@@ -68,7 +76,17 @@ export default function PlanningNotifications() {
         );
       const data = await response.json();
       if (mounted.current && version === mutationVersion.current) {
-        setItems(data.reminders);
+        const incoming = data.reminders as Reminder[];
+        if (preferences.desktopReminders && !silenced(preferences,Date.now(),zone) && "Notification" in window && Notification.permission === "granted") {
+          const due = incoming.filter(item => !delivered.current.has(item.id));
+          if (due.length) {
+            try {
+              new Notification(due.length === 1 ? "One calendar reminder" : due.length+" calendar reminders",{tag:"unigentamos-calendar"});
+              due.forEach(item => delivered.current.add(item.id));
+            } catch { /* The browser may require a service worker for notifications. */ }
+          }
+        }
+        setItems(incoming);
         setTotal(data.total);
         setLoaded(true);
         setError("");
@@ -116,10 +134,10 @@ export default function PlanningNotifications() {
     setBusy(item.id);
     setError("");
     try {
-      const response = await fetch("/api/planning", {
+      const response = await fetch(state === "completed" && item.taskId ? "/api/planning/tasks" : "/api/planning", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify(state === "completed" ? {operation:"complete-task",eventId:item.eventId,occurrenceKey:item.occurrenceKey,completed:true,expectedUpdatedAt:item.eventUpdatedAt} : {
+        body: JSON.stringify(state === "completed" && item.taskId ? {operation:"complete",id:item.taskId,expectedUpdatedAt:item.eventUpdatedAt,occurrenceKey:item.occurrenceKey,timeZone:item.timeZone,completed:true} : state === "completed" ? {operation:"complete-task",eventId:item.eventId,occurrenceKey:item.occurrenceKey,completed:true,expectedUpdatedAt:item.eventUpdatedAt} : {
           operation: "save",
           collection: "reminders",
           input: {
@@ -147,11 +165,12 @@ export default function PlanningNotifications() {
       setBusy("");
     }
   }
+  const badge = prefs.reminderBell && !silenced(prefs,Date.now()) ? total : 0;
   return <Popover.Root open={open} onOpenChange={next => {setOpen(next); if(next) void poll();}}>
-    <Popover.Trigger asChild><button type="button" className="work-button work-button--quiet work-reminder-trigger" data-icon-button="standard" aria-label={`Reminders${total ? `, ${total} due` : ""}`}>
-      <UnigentamosIcon role="reminder" size={20} />{total > 0 && <span aria-hidden="true">{total > 99 ? "99+" : total}</span>}
+    <Popover.Trigger asChild><button type="button" className="work-button work-button--quiet work-reminder-trigger" data-icon-button="standard" aria-label={`Reminders${badge ? `, ${badge} due` : ""}`}>
+      <UnigentamosIcon role="reminder" size={20} />{badge > 0 && <span aria-hidden="true">{badge > 99 ? "99+" : badge}</span>}
     </button></Popover.Trigger>
-    <span className="sr-only" role="status">{total ? `${total} calendar reminders need attention` : ""}</span>
+    <span className="sr-only" role="status">{badge ? `${badge} calendar reminders need attention` : ""}</span>
     <Popover.Portal><Popover.Content className={styles.panel} align="end" sideOffset={10} collisionPadding={12} aria-label="Reminders" onOpenAutoFocus={e => e.preventDefault()}>
       <header className={styles.header}><span><UnigentamosIcon role="reminder" size={20} /><strong>Reminders</strong>{total > 0 && <b>{total}</b>}</span><Popover.Close asChild><button type="button" aria-label="Close reminders" data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button></Popover.Close></header>
       {error && <div className={styles.error} role="alert"><p>{error}</p><WorkspaceButton onClick={() => void poll()}>Try again</WorkspaceButton></div>}
@@ -159,11 +178,11 @@ export default function PlanningNotifications() {
       {loaded && !error && !items.length && <div className={styles.empty}><span><UnigentamosIcon role="check" size={24} /></span><strong>You’re all caught up</strong><p>Your event reminders will appear here.</p></div>}
       {items.length > 0 && <div className={styles.items}>{error && <p className={styles.note}>Showing the last successful check.</p>}{<AnimatePresence initial={false}>{items.map(item => {
         const date=new Date(item.startMs);
-        const time=(ms:number) => new Date(ms).toLocaleTimeString("en-US",{timeZone:item.timeZone,hour:"numeric",minute:"2-digit",hour12:true}).toLowerCase().replace(/:00(?=\s)/, "").replace(/\s/g, "");
+        const time=(ms:number) => eventTimeLabel(ms,item.timeZone);
         const links=[...(item.linkedRefs || [])];
         if(item.place && !links.some(r => r.module === "map" && r.objectId === item.place!.id)) links.push({module:"map",objectType:"place",objectId:item.place.id,label:item.place.name,route:"/admin/map"});
         return <motion.article layout initial={reduced ? false : {opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:reduced ? 1 : .98}} transition={{duration:reduced ? 0 : .22}} key={item.id} className={styles.item} style={moduleThemeVariables("calendar") as CSSProperties} data-busy={busy === item.id || undefined}>
-          <div className={styles.summary}><Link className={styles.event} onClick={() => setOpen(false)} href={`/admin/calendar?selected=${encodeURIComponent(item.eventId)}&occurrence=${encodeURIComponent(item.occurrenceKey)}&date=${encodeURIComponent(item.date)}`}>
+          <div className={styles.summary}><Link className={styles.event} onClick={() => setOpen(false)} href={item.taskId ? "/admin/personal/tasks?task="+encodeURIComponent(item.taskId)+"&occurrence="+encodeURIComponent(item.occurrenceKey) : `/admin/calendar?selected=${encodeURIComponent(item.eventId)}&occurrence=${encodeURIComponent(item.occurrenceKey)}&date=${encodeURIComponent(item.date)}`}>
             <span className={styles.date}><small>{date.toLocaleDateString("en-US",{month:"short"})}</small><b>{date.getDate()}</b></span>
             <span className={styles.copy}><strong>{item.title}</strong><time dateTime={date.toISOString()}><UnigentamosIcon role="clock" size={13} />{item.allDay ? "All day" : `${time(item.startMs)} to ${time(item.endMs)}` }</time></span>
             <UnigentamosIcon role="chevron-right" size={15} />

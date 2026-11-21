@@ -12702,6 +12702,7 @@ async function main() {
     FREMEN_REQUIRE_SUPABASE: "false",
     SUPABASE_URL: "",
     SUPABASE_SERVICE_ROLE_KEY: "",
+    FREMEN_ACCOUNT_MEDIA_BACKEND: "filesystem-test",
     FREMEN_DATA_DIR: path.join(tempRoot, "data"),
     OBSIDIAN_EXPORT_DIR: path.join(tempRoot, "obsidian"),
     GITHUB_TOKEN: "",

@@ -1,6 +1,7 @@
 "use client";
 
 import { buildJsonHeadersWithCsrf } from "../client-csrf";
+import {offlineModuleFor,type OfflineModule} from "./offline-modules";
 import {
   createVaultKeyEnvelope,
   decryptVaultChange,
@@ -618,6 +619,22 @@ export class BrowserVaultEngine {
     await this.mirrorEnvelopes([envelope]);
     void this.syncOnce().catch(() => undefined);
     return snapshot;
+  }
+
+  async mirrorSelectedModule(canonicalId:string,input:{objectId:string;objectKind:VaultObjectKind;fields:Record<string,VaultFieldValue>},excluded?:readonly string[]):Promise<boolean>{
+    const module=offlineModuleFor(canonicalId);
+    const exclusions=excluded??await this.excludedOfflineModules();
+    // Continue updating an existing offline copy and keep its history intact.
+    if(module&&exclusions?.includes(module)&&!(await this.readObject(input.objectId)))return false;
+    return (await this.mirrorCanonicalObject(input)).changed;
+  }
+
+  async excludedOfflineModules(){
+    return (await this.requireSession().store.metadata())?.excludedOfflineModules??[];
+  }
+
+  async setOfflineModules(excluded:OfflineModule[]){
+    await this.requireSession().store.updateMetadata({excludedOfflineModules:[...new Set(excluded)]});
   }
 
   async mirrorCanonicalObject(input: {
@@ -1431,8 +1448,9 @@ export class BrowserVaultEngine {
       ? DEFAULT_MEDIA_CACHE_RETENTION_DAYS
       : metadata.mediaCacheRetentionDays;
     const cutoff = retentionDays === null ? Number.NEGATIVE_INFINITY : Date.now() - retentionDays * 86_400_000;
-    const orphaned = chunks.filter((row) => row.uploaded && !activeMediaIds.has(row.mediaId));
-    const reclaimable = chunks.filter((row) => row.uploaded && (
+    const pinned = new Set(metadata?.pinnedMediaIds);
+    const orphaned = chunks.filter((row) => row.uploaded && !pinned.has(row.mediaId) && !activeMediaIds.has(row.mediaId));
+    const reclaimable = chunks.filter((row) => row.uploaded && !pinned.has(row.mediaId) && (
       !activeMediaIds.has(row.mediaId)
       || retentionDays !== null && Date.parse(row.lastAccessedAt || row.cachedAt) < cutoff
     ));
@@ -1483,20 +1501,41 @@ export class BrowserVaultEngine {
       ? DEFAULT_MEDIA_CACHE_RETENTION_DAYS
       : metadata.mediaCacheRetentionDays;
     const cutoff = retentionDays === null ? Number.NEGATIVE_INFINITY : Date.now() - retentionDays * 86_400_000;
-    const removable = chunks.filter((row) => row.uploaded && (
+    const pinned = new Set(metadata?.pinnedMediaIds);
+    const removable = chunks.filter((row) => row.uploaded && !pinned.has(row.mediaId) && (
       !activeMediaIds.has(row.mediaId)
       || retentionDays !== null && Date.parse(row.lastAccessedAt || row.cachedAt) < cutoff
     ));
-    await session.store.deleteMediaChunks(removable.map((row) => row.digest));
+    // With an explicit device limit, release only copies still present in the
+    // authenticated relay. A failed check leaves the local packet untouched.
+    let verified = removable;
+    if (metadata?.mediaCacheLimitBytes != null) {
+      verified = [];
+      for (const row of removable) {
+        if (!navigator.onLine || session !== this.session) break;
+        try {
+          const params = new URLSearchParams({vaultId:session.vaultId,mediaId:row.mediaId,chunkIndex:String(row.chunkIndex)});
+          const response = await fetch("/api/vault/media?" + params,{cache:"no-store"});
+          if (!response.ok) continue;
+          const payload = await response.json() as {ok?:boolean;chunk?:EncryptedVaultMediaChunk};
+          const remote = payload.chunk;
+          if (payload.ok && remote?.ciphertext === row.packet.ciphertext && remote.iv === row.packet.iv &&
+              remote.aadHash === row.packet.aadHash && remote.contentRoot === row.packet.contentRoot &&
+              remote.vaultId === session.vaultId && remote.mediaId === row.mediaId && remote.chunkIndex === row.chunkIndex)
+            verified.push(row);
+        } catch { /* A remote copy must be verified before releasing local bytes. */ }
+      }
+    }
+    const removed = await session.store.deleteMediaChunks(verified);
     const completedAt = new Date().toISOString();
     await session.store.updateMetadata({ lastMediaCleanupAt: completedAt });
     this.mediaCacheHealthSnapshot = null;
     this.lastMediaCacheHealthAt = 0;
     return {
-      deletedChunks: removable.length,
-      reclaimedBytes: removable.reduce((total, row) => total + row.packet.byteLength, 0),
+      deletedChunks: removed.chunks,
+      reclaimedBytes: removed.bytes,
       protectedPendingChunks: chunks.filter((row) => !row.uploaded).length,
-      reason: removable.length ? "cleaned" : "nothing_to_clean",
+      reason: removed.chunks ? "cleaned" : "nothing_to_clean",
       completedAt
     };
   }
@@ -1504,6 +1543,7 @@ export class BrowserVaultEngine {
   private async maybeCleanMediaCache(): Promise<void> {
     const session = this.requireSession();
     const metadata = await session.store.metadata();
+    if (metadata?.mediaCacheLimitBytes != null) return;
     const last = metadata?.lastMediaCleanupAt ? Date.parse(metadata.lastMediaCleanupAt) : 0;
     if (Number.isFinite(last) && Date.now() - last < MEDIA_CACHE_AUTO_CLEANUP_MS) return;
     await this.cleanupMediaCache();
@@ -1632,13 +1672,25 @@ export class BrowserVaultEngine {
     return { snapshot, cloudCached, desktopStored };
   }
 
-  async openMedia(snapshotOrObjectId: VaultObjectSnapshot | string, onProgress?: (completed: number, total: number) => void): Promise<{ blob: Blob; fileName: string }> {
+  async setDownloadLimit(bytes: number | null) {
+    await this.requireSession().store.setDownloadLimit(bytes);
+  }
+
+  async setMediaPinned(snapshot: VaultObjectSnapshot, pinned: boolean) {
+    const session = this.requireSession(), manifest = mediaManifestFromSnapshot(snapshot);
+    if (!manifest) throw new Error("Only encrypted Vault files can be pinned here");
+    if (pinned) await this.openMedia(snapshot,undefined,true);
+    if (session !== this.requireSession()) throw new Error("Reopen Vault to continue");
+    await session.store.setLocalMediaPin(manifest.mediaId,manifest.totalChunks,pinned);
+    this.mediaCacheHealthSnapshot = null;
+  }
+  async openMedia(snapshotOrObjectId: VaultObjectSnapshot | string, onProgress?: (completed: number, total: number) => void, keepOffline = false): Promise<{ blob: Blob; fileName: string }> {
     const session = this.requireSession();
     const snapshot = typeof snapshotOrObjectId === "string" ? await this.readObject(snapshotOrObjectId) : snapshotOrObjectId;
     if (!snapshot || snapshot.objectKind !== "media") throw new Error("Media item was not found");
     const manifest = mediaManifestFromSnapshot(snapshot);
     if (!manifest) throw new Error("Encrypted media details are invalid");
-    if (this.companionCapability) {
+    if (this.companionCapability && !keepOffline) {
       const response = await fetch(`http://127.0.0.1:43127/v1/media/${manifest.contentRoot}`, {
         mode: "cors",
         headers: { Authorization: `Bearer ${this.companionCapability}` },
@@ -1648,27 +1700,31 @@ export class BrowserVaultEngine {
     }
     const plaintext: BlobPart[] = [];
     for (let index = 0; index < manifest.totalChunks; index += 1) {
-      let stored = await session.store.mediaChunk(manifest.mediaId, index);
+      const stored = await session.store.mediaChunk(manifest.mediaId, index);
       if (!stored) {
         if (!navigator.onLine) throw new Error("Connect to the internet once to download this file to this device");
         const response = await fetch(`/api/vault/media?vaultId=${encodeURIComponent(session.vaultId)}&mediaId=${encodeURIComponent(manifest.mediaId)}&chunkIndex=${index}`, { cache: "no-store" });
         const payload = await response.json() as { ok?: boolean; chunk?: EncryptedVaultMediaChunk; error?: string };
         if (!response.ok || !payload.ok || !payload.chunk) throw this.vaultRequestError(response, payload.error, "Encrypted media download failed");
         this.markVaultRequestAuthorized();
-        if (payload.chunk.contentRoot !== manifest.contentRoot || payload.chunk.totalChunks !== manifest.totalChunks) {
+        if (payload.chunk.mediaId !== manifest.mediaId || payload.chunk.chunkIndex !== index || payload.chunk.contentRoot !== manifest.contentRoot || payload.chunk.totalChunks !== manifest.totalChunks) {
           throw new Error("Encrypted media does not match its saved details");
         }
-        await session.store.putMediaChunk(payload.chunk, true);
+        const bytes = await decryptVaultMediaChunk(payload.chunk, session.key);
+        // The packet length includes the AES-GCM authentication tag.
+        if (bytes.byteLength + 16 !== payload.chunk.byteLength) throw new Error("Encrypted file size failed validation");
+        plaintext.push(bytes);
+        const saved = await session.store.putMediaChunk(payload.chunk, true);
+        if (!saved && keepOffline) throw new Error("Increase the download cache limit to pin this file.");
         this.mediaCacheHealthSnapshot = null;
-        stored = await session.store.mediaChunk(manifest.mediaId, index);
+      } else {
+        plaintext.push(await decryptVaultMediaChunk(stored.packet, session.key));
+        await session.store.touchMediaChunk(manifest.mediaId, index);
       }
-      if (!stored) throw new Error("Encrypted media cache failed");
-      plaintext.push(await decryptVaultMediaChunk(stored.packet, session.key));
-      await session.store.touchMediaChunk(manifest.mediaId, index);
       onProgress?.(index + 1, manifest.totalChunks);
     }
     const blob = new Blob(plaintext, { type: manifest.mimeType });
-    if (this.companionCapability) {
+    if (this.companionCapability && !keepOffline) {
       try {
         const response = await fetch(`http://127.0.0.1:43127/v1/media/${manifest.contentRoot}`, {
           method: "PUT",

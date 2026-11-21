@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { legacyAdminEnabled } from "../lib/account-mode";
 import PrivateRouteAnalytics from "../components/PrivateRouteAnalytics";
 import "@fontsource-variable/plus-jakarta-sans/wght.css";
 import "@fontsource-variable/inter/wght.css";
@@ -64,9 +65,11 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>
+        {legacyAdminEnabled() ? <>
         <LoadingHost><PersistentSharedAIDockProvider><NavigationHost>{children}</NavigationHost></PersistentSharedAIDockProvider></LoadingHost>
         <ServiceWorkerRegistration />
         {process.env.VERCEL === "1" ? <PrivateRouteAnalytics /> : null}
+        </> : children}
       </body>
     </html>
   );

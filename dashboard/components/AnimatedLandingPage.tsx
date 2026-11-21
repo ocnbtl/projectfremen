@@ -1,4 +1,5 @@
 "use client";
+import { useDailyPreferences } from "../lib/settings/hooks";
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
@@ -111,6 +112,7 @@ export default function AnimatedLandingPage({
   successPath = "/admin?welcome=1",
   showBackLink = false
 }: LandingProps) {
+  const dailyPrefs = useDailyPreferences();
   const reducedMotion = useReducedMotion();
   const showPortfolio = !showBackLink;
   const [animationComplete, setAnimationComplete] = useState(false);
@@ -148,7 +150,7 @@ export default function AnimatedLandingPage({
   const verticalVentures = viewport.w < 900 || viewport.w / viewport.h < 1.05;
   const loginForm = <form action="/api/admin/login" method="post" className="landing-login-form">
     <input type="hidden" name="errorPath" value={errorPath} />
-    <input type="hidden" name="successPath" value={successPath} />
+    <input type="hidden" name="successPath" value={successPath === "/admin?welcome=1" && dailyPrefs.landing !== "/admin" ? dailyPrefs.landing : successPath} />
     {hasError && <p className="landing-error" role="alert">Invalid password. Try again.</p>}
     <input id="password" name="password" type="password" aria-label="Password" placeholder="password"
       className="landing-input" autoComplete="current-password" required />

@@ -1,0 +1,22 @@
+.page {margin:auto; width:min(100%,880px); padding:clamp(16px,3vw,36px); color:var(--text-strong,#172e35); display:grid; gap:16px; box-sizing:border-box}
+.page nav,.actions,.title {display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.page nav a,.panel a,.page>a {color:var(--module-action,#265d81);font-weight:550;text-underline-offset:3px}
+.page h1 {font-size:1.55rem;margin:4px 0}
+.panel {min-width:0; padding:clamp(14px,2vw,22px); border:1px solid var(--border,#d5e2e7); border-radius:12px;background:var(--surface-panel,#fff);display:grid;gap:12px;align-content:start}
+.panel :is(h2,h3,p,ul) {margin:0}
+.panel h2 {font-size:1.12rem}.panel h3 {font-size:1rem}
+.panel label {display:grid;gap:5px;font-size:.88rem;font-weight:550}
+.panel :is(input:not([type=checkbox]),select,textarea) {width:100%;font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#c3d5db);background:var(--surface-panel,#fff);color:inherit;min-height:40px}
+.panel form,.stack {display:grid;gap:12px}
+.panel button,.action {border:1px solid var(--border,#c3d5db);border-radius:8px;background:var(--surface-panel,#fff);color:inherit;min-height:40px;padding:5px 12px;font:inherit;font-weight:550;cursor:pointer}
+.panel button:disabled {cursor:default;opacity:.6}
+.panel button[type=submit] {background:var(--module-action,#274f80);color:white}
+.panel ul {list-style:none;padding:0}.panel li {display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border,#d5e2e7);overflow-wrap:anywhere}
+.panel li:last-child {border:0}
+.panel small {display:block;color:var(--text-muted,#566972)}.panel .check {display:flex;align-items:center;gap:8px}
+.body {white-space:pre-wrap;overflow-wrap:anywhere}
+.usage {padding:10px 12px;border:1px solid var(--border,#d5e2e7);border-radius:10px}
+.usage summary {cursor:pointer;font-weight:550}
+.usage dl {display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:12px;margin:14px 0 4px}
+.usage dt {font-size:.84rem;color:var(--text-muted,#566972)}
+.usage dd {margin:2px 0;font-variant-numeric:tabular-nums}

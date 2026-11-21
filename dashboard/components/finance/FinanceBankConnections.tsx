@@ -8,6 +8,7 @@ import type { BankingView, BankConnectionView, BankingProduct } from "../../lib/
 import { matchingAccounts, suggestInvestmentMatches } from "../../lib/modules/finance/banking-matching";
 import FinanceInvestmentSnapshot from "./FinanceInvestmentSnapshot";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
+import { useDailyPreferences } from "../../lib/settings/hooks";
 import { Icon, money } from "./FinancePrimitives";
 
 type LinkSession = { sessionId: string; linkToken: string; expiresAt: string; update: boolean; product?: BankingProduct };
@@ -39,11 +40,16 @@ async function requestBank(body?: Record<string, unknown>) {
 const date = (value: string) => new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 function AccountMatching({ connection, state, busy, onSave }: { connection: BankConnectionView; state: FinanceState; busy: boolean; onSave: (choices: Record<string, string>) => void }) {
+  const {balanceCurrency,currencyDisplay} = useDailyPreferences();
+  const formatBalance=(value:number, currency:string) => /^[A-Z]{3}$/.test(currency) ? new Intl.NumberFormat("en-US",{style:"currency",currency,currencyDisplay}).format(value) : value.toLocaleString();
+  const subtotal = connection.accounts.filter(a=>a.balance !== null && a.currency === balanceCurrency)
+    .reduce((sums, account) => sums.set(account.kind,(sums.get(account.kind) ?? 0)+account.balance!),new Map<string,number>());
   const [choices, setChoices] = useState<Record<string, string>>(() => suggestInvestmentMatches(connection, state));
   return <form className="finance-bank-matching" onSubmit={event => { event.preventDefault(); onSave(choices); }}>
     <p>{connection.product === "investments" ? "Review the suggested matches, choose a new account, or skip an account. Connecting retrieves balances, holdings and up to 90 days of investment activity. Your first sync may take a couple of minutes." : "Match each account to a record you already keep, create a new one, or skip it. Connecting updates its balance and imports up to 90 days of available transactions."}</p>
+    {subtotal.size>0 && <p>{balanceCurrency} balances · {Array.from(subtotal,([kind,total])=>kind+" "+formatBalance(total,balanceCurrency)).join(" · ")}</p>}
     {connection.accounts.map(account => <label key={account.id}><span><strong>{account.name}</strong>{account.mask ? ` · ••${account.mask}` : ""}</span>
-      <small>{account.kind} · {account.currency}{account.balance !== null ? ` · ${money(account.balance, { cents: true })}` : " · Balance unavailable"}</small>
+      <small>{account.kind} · {account.currency}{account.balance !== null ? ` · ${formatBalance(account.balance,account.currency)}` : " · Balance unavailable"}</small>
       {account.supported ? <SelectField aria-label={`Match ${account.name}`} required disabled={busy} value={choices[account.id] || ""} onChange={event => setChoices({ ...choices, [account.id]: event.target.value })}>
         <option value="">Choose where this belongs</option><option value="skip">Skip this account</option><option value="new">Create a new Finance account</option>
         {matchingAccounts(connection, account, state).map(item => <option key={item.id} value={item.id}>{item.name}{item.mask ? ` · ••${item.mask}` : ""}</option>)}

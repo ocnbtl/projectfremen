@@ -11,7 +11,7 @@ const app=path.resolve(__dirname,"..");
 const data=fs.mkdtempSync(path.join(os.tmpdir(),"canvas-sequence-"));
 const port=25000+crypto.randomInt(10000),base="http://127.0.0.1:"+port,csrf=crypto.randomUUID(),secret=crypto.randomUUID();
 const server=spawn(process.execPath,[require.resolve("next/dist/bin/next"),"start","--hostname","127.0.0.1","--port",String(port)],{
-  cwd:app,env:{...process.env,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:"false",SUPABASE_URL:"",SUPABASE_SERVICE_ROLE_KEY:"",VERCEL:"",ADMIN_SESSION_SECRET:secret,ADMIN_PASSWORD:"fixture"},
+  cwd:app,env:{...process.env,FREMEN_ACCOUNT_MEDIA_BACKEND:'filesystem-test',FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:"false",SUPABASE_URL:"",SUPABASE_SERVICE_ROLE_KEY:"",VERCEL:"",ADMIN_SESSION_SECRET:secret,ADMIN_PASSWORD:"fixture"},
   stdio:["ignore","pipe","pipe"]
 });
 const ready=new Promise((resolve,reject)=>{server.stdout.on("data",b=>{if(String(b).includes("Ready in"))resolve();});server.once("error",reject);server.once("exit",code=>reject(Error("Local server exited "+code)));});

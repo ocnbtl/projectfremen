@@ -1,4 +1,5 @@
 import { safeLoginPath as sanitizePath } from "../../../../lib/login-redirect";
+import { legacyAdminEnabled } from "../../../../lib/account-mode";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { buildSignedAdminSessionToken, getAdminSessionSecret } from "../../../../lib/auth";
@@ -34,6 +35,7 @@ function isSameOriginRequest(request: Request): boolean {
 }
 
 export async function POST(request: Request) {
+  if (!legacyAdminEnabled()) return new Response(null, { status: 404 });
   const formData = await request.formData();
   const password = String(formData.get("password") ?? "");
   const errorPath = sanitizePath(String(formData.get("errorPath") ?? ""), "/");

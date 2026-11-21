@@ -138,6 +138,9 @@ export async function changeTask(body:Record<string,unknown>) {
   if(!input || typeof input!=="object")fail("Choose task details.");
   const start=text(input.start||"",40), end=text(input.end||"",40), recurrence=text(input.recurrence||"",500);
   const allDay=input.allDay===true;
+  const reminderMinutes=input.reminderMinutes === undefined ? current?.reminderMinutes ?? null : input.reminderMinutes;
+  if(reminderMinutes !== null && (typeof reminderMinutes !== "number" || !Number.isInteger(reminderMinutes) || reminderMinutes < 0 || reminderMinutes > 43200)) fail("Choose a valid reminder lead time.");
+  const followDeviceZone = input.followDeviceZone === undefined ? current?.followDeviceZone === true : input.followDeviceZone === true;
   const targetDate=text(input.dueAt!==undefined?input.dueAt:input.targetDate||"",40);
   if(targetDate!==current?.dueAt&&targetDate&&!/^\d{4}-\d{2}-\d{2}$/.test(targetDate))fail("Choose a due date.");
   if(recurrence&&!start)fail("Choose the first day for a repeating task.");
@@ -165,7 +168,7 @@ export async function changeTask(body:Record<string,unknown>) {
   if(current && Object.keys(current.exceptions).length && (start!==current.start||recurrence!==current.recurrence||allDay!==current.allDay))fail("This schedule has recorded occurrences. Keep its repeat rule and first date, or create a new task for the new schedule.");
   const now=new Date().toISOString();
   const base:TaskItem=current || {id,title,description,kind,start:"",end:"",allDay:true,timeZone:zone,recurrence:"",calendarIds:[],exceptions:{},createdAt:now,updatedAt:""};
-  return storePlan(base,{title,description,targetDate,kind,start,end,allDay,timeZone:zone,recurrence,calendarIds,peopleIds,linkedRefs});
+  return storePlan(base,{title,description,targetDate,kind,start,end,allDay,timeZone:zone,recurrence,calendarIds,peopleIds,linkedRefs,reminderMinutes,followDeviceZone});
 }
 async function storePlan(item:TaskItem, patch:Partial<TaskPlan>) {
   return mutatePlanningState(state=>{

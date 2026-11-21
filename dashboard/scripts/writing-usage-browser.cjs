@@ -38,7 +38,9 @@ module.exports = async function testLibrary({temp, adText, ad, note, writeRecord
     const settings = base + "/admin/personal/settings";
     await page.goto(settings);
     const sections = page.getByRole("navigation", {name:"Settings sections"});
-    await expect(sections.getByRole("link")).toHaveCount(3);
+    for (const name of ["Writing","Accessibility","Calendar and Map","Language and region","Calendar and tasks","Home and navigation","Search","Notifications"]) {
+      await expect(sections.getByRole("link",{name:new RegExp("^"+name)})).toBeVisible();
+    }
     await sections.getByRole("link", {name:/Writing/}).click();
     const object = page.getByRole("region", {name:"Object links"}), skills = page.getByRole("region", {name:"Skill shortcuts"});
     await expect(object).toContainText("@@Alex");
@@ -60,6 +62,24 @@ module.exports = async function testLibrary({temp, adText, ad, note, writeRecord
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-strong-focus", "");
     await expect(page.locator("html")).toHaveAttribute("data-product-motion", "reduce");
+    await page.getByLabel("Reading text size").selectOption("larger");
+    await expect(page.locator("html")).toHaveAttribute("data-reading-size","larger");
+    await page.goto(settings + "/regional");
+    await page.getByLabel("Clock",{exact:true}).selectOption("24");
+    await page.getByLabel("First day of the week",{exact:true}).selectOption("monday");
+    await page.goto(settings + "/navigation");
+    await page.getByLabel("After sign-in and from the home logo",{exact:true}).selectOption("/admin/notes");
+    await expect(page.getByRole("link",{name:"Unigentamos home"})).toHaveAttribute("href","/admin/notes");
+    await page.goto(settings + "/planning");
+    await page.getByLabel("Task kind",{exact:true}).selectOption("routine");
+    await page.getByRole("switch",{name:"Start new tasks on the selected day"}).check();
+    await page.getByLabel("Appointments",{exact:true}).selectOption("30");
+    await page.getByRole("link",{name:"Manage calendars and subscriptions"}).click();
+    await expect(page.getByRole("dialog").last()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button",{name:"Add event",exact:true}).click();
+    await expect(page.getByLabel("Reminder amount")).toHaveValue("30");
+    await page.keyboard.press("Escape");
     await page.goto(settings + "/calendar-map");
     const second = await context.newPage();
     await second.goto(settings + "/calendar-map");

@@ -498,7 +498,7 @@ try {
         ADMIN_PASSWORD: "isolated-browser-test-password",
         ADMIN_SESSION_SECRET:
           "isolated-browser-test-session-secret-0123456789abcdef",
-        FREMEN_DATA_DIR: dataRoot,
+        FREMEN_ACCOUNT_MEDIA_BACKEND:'filesystem-test',FREMEN_DATA_DIR: dataRoot,
         FREMEN_REQUIRE_SUPABASE: "false",
         SUPABASE_URL: "",
         SUPABASE_SERVICE_ROLE_KEY: "",

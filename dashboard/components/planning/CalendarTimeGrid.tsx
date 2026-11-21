@@ -1,5 +1,6 @@
 "use client";
 import { animate, motion } from "motion/react";
+import {useDailyPreferences} from "../../lib/settings/hooks";
 import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-presentation";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
@@ -88,7 +89,9 @@ export default function CalendarTimeGrid({
   const topAt = (minute: number) => `calc((${minute} - var(--calendar-start)) * 100% / var(--calendar-span))`;
   const heightFor = (duration: number) => `calc(${duration} * 100% / var(--calendar-span))`;
   const today = localDate(new Date(now), zone);
-  const currentTime = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", hour12: true }).format(now).toLowerCase().replace(/\s/g, "");
+  const preferences=useDailyPreferences();
+  const axisHour=(hour:number)=>preferences.clock==="24"?String(hour).padStart(2,"0")+":00":hourName(hour);
+  const currentTime = new Intl.DateTimeFormat(preferences.clock==="24"?"en-GB":"en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", hour12: preferences.clock==="12" }).format(now).toLowerCase().replace(/\s/g, "");
   useLayoutEffect(() => {
     const element = hours.current;
     if (!element) return;
@@ -176,7 +179,7 @@ export default function CalendarTimeGrid({
         <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} highlightDay={hoverDay} onOpen={onOpen} onComplete={onComplete} onDay={onDay} onTasks={onTasks} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
-            <span key={i} aria-label={hourName(i)} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span className={styles.hourFull}>{hourName(i)}</span><span className={styles.hourNumber} aria-hidden="true">{i % 12 || 12}{(i===0 || i===12) && <small className={styles.periodMarker}>{i===0?"am":"pm"}</small>}</span></span>
+            <span key={i} aria-label={axisHour(i)} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span className={styles.hourFull}>{axisHour(i)}</span><span className={styles.hourNumber} aria-hidden="true">{preferences.clock==="24"?String(i).padStart(2,"0"):i % 12 || 12}{preferences.clock==="12" && (i===0 || i===12) && <small className={styles.periodMarker}>{i===0?"am":"pm"}</small>}</span></span>
           ))}
         </div>
         {days.map((day) => {

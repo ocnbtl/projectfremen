@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const ts = require("typescript");
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "canvas-media-details-"));
-Object.assign(process.env, { FREMEN_DATA_DIR: temp, FREMEN_REQUIRE_SUPABASE:"false", SUPABASE_URL:"", SUPABASE_SERVICE_ROLE_KEY:"" });
+Object.assign(process.env, { FREMEN_ACCOUNT_MEDIA_BACKEND:'filesystem-test',FREMEN_DATA_DIR: temp, FREMEN_REQUIRE_SUPABASE:"false", SUPABASE_URL:"", SUPABASE_SERVICE_ROLE_KEY:"" });
 require.extensions[".ts"] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop:true },
 }).outputText, filename);

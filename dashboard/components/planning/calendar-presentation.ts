@@ -1,9 +1,11 @@
+import { readDeviceDaily } from "../../lib/settings/device";
 import type { Calendar, EventOccurrence } from "../../lib/modules/planning/types";
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 
 /** Keep event previews consistent across browser locales and calendar time zones. */
 export function eventTimeLabel(ms: number, zone: string) {
+  if (readDeviceDaily().clock === "24") return new Intl.DateTimeFormat("en-GB", {timeZone:zone,hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(ms);
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: zone, hour: "numeric", minute: "2-digit", hour12: true,
   }).formatToParts(ms);

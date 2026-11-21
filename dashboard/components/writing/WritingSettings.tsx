@@ -7,11 +7,12 @@ import { updateWritingPreferences, useWritingPreferences, type WritingPreference
 import { WorkspaceButton, WorkspaceSheet } from "../admin-shell/WorkspaceKit";
 import SettingsSwitch from "./SettingsSwitch";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import {AccountWritingUses} from "../settings/AccountWriting";
 import WritingSkillUsage from "./WritingSkillUsage";
 import styles from "./WritingSettings.module.css";
 
 const settingsPath = "/admin/personal/settings";
-const skillPath = (id: string) => settingsPath + "?skill=" + encodeURIComponent(id);
+
 const actions: Record<WritingSkill["behavior"], string> = {
   collection: "Collect passages",
   copy: "Copy a passage",
@@ -28,8 +29,11 @@ function suggestedAction(description: string): WritingSkill["behavior"] {
   return "collection";
 }
 
-export default function WritingSettings() {
-  const preferences = useWritingPreferences();
+export default function WritingSettings({account}:{account?:{preferences:WritingPreferences;save:(update:(current:WritingPreferences)=>WritingPreferences)=>Promise<void>;workspaceId:string}} = {}) {
+  const local = useWritingPreferences();
+  const preferences = account?.preferences ?? local;
+  const writingPath = account ? "/account/preferences/writing?workspace="+encodeURIComponent(account.workspaceId) : settingsPath+"/writing";
+  const skillPath = (id:string) => account ? writingPath+"&skill="+encodeURIComponent(id) : settingsPath+"?skill="+encodeURIComponent(id);
   const params = useSearchParams();
   const router = useRouter();
   const selectedId = params.get("skill");
@@ -59,7 +63,7 @@ export default function WritingSettings() {
     setNotice("");
     setBusy(true);
     try {
-      await updateWritingPreferences(update);
+      await (account ? account.save(update) : updateWritingPreferences(update));
       setNotice(message);
       return true;
     } catch (cause) {
@@ -124,10 +128,10 @@ export default function WritingSettings() {
       const existing = current.skills.find(item => item.id === remove.id);
       if (existing && JSON.stringify(existing) !== JSON.stringify(remove)) throw new Error("This skill changed in another tab. Close this dialog and review it before removing it.");
       return { ...current, skills: current.skills.filter(item => item.id !== remove.id) };
-    }, "Skill removed from this browser.");
+    }, "Skill removed.");
     if (saved) {
       setRemove(null);
-      if (selectedId === remove.id) router.replace(settingsPath + "/writing", { scroll: false });
+      if (selectedId === remove.id) router.replace(writingPath, { scroll: false });
     }
   }
 
@@ -144,10 +148,10 @@ export default function WritingSettings() {
       <form className={styles.shortcutPanels} onSubmit={saveShortcuts}>
         <section className={styles.panel} aria-labelledby="object-links">
           <header className={styles.shortcutHeading}><kbd>{preferences.objectTrigger}</kbd><h2 id="object-links">Object links</h2></header>
-          <p>Mention a person, project, place, or other saved item. Select a match to insert a link you can follow back to that item.</p>
-          <p className={styles.example}>In a meeting note, type <code>{preferences.objectTrigger}Alex</code> and choose Alex’s profile. The note will appear under <strong>Mentioned in</strong> on that profile.</p>
+          <p>{account ? "Type in a workspace record’s Notes field to find a record you can open. Choosing it adds a linked record when you save." : "Mention a person, project, place, or other saved item. Select a match to insert a link you can follow back to that item."}</p>
+          <p className={styles.example}>{account ? <>Type <code>{preferences.objectTrigger}Project</code>, choose its title, and save. Readers with access to that project can open it under <strong>Linked records</strong>.</> : <>In a meeting note, type <code>{preferences.objectTrigger}Alex</code> and choose Alex’s profile. The note will appear under <strong>Mentioned in</strong> on that profile.</>}</p>
           <SettingsSwitch label="Object suggestions" detail="Show matching workspace items as you type." checked={preferences.objectSuggestions} onChange={value => toggle("objectSuggestions", value)}/>
-          <SettingsSwitch label="Media previews" detail="Show previews for linked media in your writing." checked={preferences.mediaEmbeds} onChange={value => toggle("mediaEmbeds", value)}/>
+          {!account && <SettingsSwitch label="Media previews" detail="Show previews for linked media in your writing." checked={preferences.mediaEmbeds} onChange={value => toggle("mediaEmbeds", value)}/>}
           <label className={styles.triggerField}>Object shortcut<input value={shortcuts.objectTrigger?.value ?? preferences.objectTrigger} maxLength={4} required spellCheck={false} onChange={event => editShortcut("objectTrigger", event.target.value)}/></label>
         </section>
         <section className={styles.panel} aria-labelledby="skill-actions">
@@ -182,9 +186,9 @@ export default function WritingSettings() {
               <WorkspaceButton icon="edit" onClick={() => openSkill(selected)}>Edit skill</WorkspaceButton>
               <WorkspaceButton icon="delete" aria-label={"Remove " + selected.name} onClick={() => { setRemove(selected); setError(""); setNotice(""); }} />
             </div>}</header>
-            {!selected && <p>Only saved uses are available for this skill in this browser profile.</p>}
+            {!selected && <p>Showing saved uses of this skill.</p>}
             {selected?.behavior === "snippet" && <pre className={styles.snippet}>{selected.snippet}</pre>}
-            <WritingSkillUsage key={viewedSkill.id} skill={viewedSkill} />
+            {account ? viewedSkill.behavior !== "snippet" && <AccountWritingUses key={viewedSkill.id} workspace={account.workspaceId} skill={viewedSkill.id}/> : <WritingSkillUsage key={viewedSkill.id} skill={viewedSkill} />}
           </section>}
           {selectedId && !viewedSkill && <p role="status">This skill link is invalid.</p>}
 
@@ -202,7 +206,7 @@ export default function WritingSettings() {
         </form>}
       </WorkspaceSheet>
       <WorkspaceSheet open={Boolean(remove)} onClose={closeDialog} title="Remove writing skill" titleIcon="delete">
-        {remove && <div className={styles.editForm} data-writing-settings><p>Remove <strong>{remove.name}</strong> from this browser’s skill menu? Passages already saved in your writing will remain in their sources.</p>
+        {remove && <div className={styles.editForm} data-writing-settings><p>Remove <strong>{remove.name}</strong> from your skill menu? Passages already saved in your writing will remain in their sources.</p>
           {error && feedback}
           <div className={styles.buttons}><WorkspaceButton disabled={busy} onClick={closeDialog}>Cancel</WorkspaceButton><WorkspaceButton intent="danger" busy={busy} onClick={() => void removeSkill()}>Remove skill</WorkspaceButton></div>
         </div>}

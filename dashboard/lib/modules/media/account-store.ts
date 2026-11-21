@@ -23,7 +23,11 @@ export async function accountThumbnail(id: string, digest: string, bytes?: Buffe
 }
 
 async function accountObject(key: string, bytes?: Buffer): Promise<Buffer | null> {
-  if (process.env.FREMEN_DATA_DIR && !process.env.VERCEL) {
+  const backend = process.env.FREMEN_ACCOUNT_MEDIA_BACKEND || (process.env.VERCEL === "1" ? "supabase" : "");
+  if (backend === "filesystem-test") {
+    if (!process.env.FREMEN_DATA_DIR || process.env.VERCEL || process.env.FREMEN_REQUIRE_SUPABASE !== "false" ||
+        process.env.SUPABASE_URL || process.env.SUPABASE_SERVICE_ROLE_KEY)
+      throw new Error("Filesystem fixtures need an isolated local configuration");
     const file = path.join(process.env.FREMEN_DATA_DIR, "account-media", key);
     if (bytes) { await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, bytes, { flag: "wx" }); return bytes; }
     try { return await fs.readFile(file); } catch (error) {
@@ -31,6 +35,7 @@ async function accountObject(key: string, bytes?: Buffer): Promise<Buffer | null
       throw error;
     }
   }
+  if (backend !== "supabase") throw new Error("Set FREMEN_ACCOUNT_MEDIA_BACKEND to supabase");
   const url = process.env.SUPABASE_URL?.replace(/\/+$/, ""), secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !secret) throw new Error("Media storage unavailable");
   const response = await fetch(`${url}/storage/v1/object/${BUCKET}/${key}`, {

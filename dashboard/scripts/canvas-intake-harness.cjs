@@ -8,7 +8,7 @@ const Module = require("node:module");
 const sharp = require("sharp");
 const ts = require("typescript");
 const data = fs.mkdtempSync(path.join(os.tmpdir(), "fremen-canvas-intake-"));
-Object.assign(process.env,{FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:"false",SUPABASE_URL:"",SUPABASE_SERVICE_ROLE_KEY:"",VERCEL:""});
+Object.assign(process.env,{FREMEN_ACCOUNT_MEDIA_BACKEND:'filesystem-test',FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:"false",SUPABASE_URL:"",SUPABASE_SERVICE_ROLE_KEY:"",VERCEL:""});
 require.extensions[".ts"] = (mod, filename) => mod._compile(ts.transpileModule(fs.readFileSync(filename,"utf8"),{
   compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}
 }).outputText,filename);

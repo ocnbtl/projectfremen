@@ -1,3 +1,4 @@
+import { taskEvents, type TaskItem } from "../../../../lib/modules/planning/task-model";
 import { readProjectsState } from "../../../../lib/modules/projects/store";
 import { projectLinkPreview } from "../../../../lib/modules/projects/link-preview";
 import { reminderIsDue } from "../../../../lib/modules/planning/calendar-tasks";
@@ -23,16 +24,21 @@ export async function GET(request: Request) {
       now = Date.now();
     const today = localDate(new Date(now), zone),
       state = await readPlanningState();
+    const deviceZone = new URL(request.url).searchParams.get("deviceZone") || zone;
+    new Intl.DateTimeFormat("en",{timeZone:deviceZone});
+    const taskItems: TaskItem[] = (state.taskPlans || []).flatMap(plan => !plan.source && plan.title && plan.reminderMinutes != null ? [{...plan,title:plan.title,description:plan.description || ""}] : []);
+    const projected = taskEvents(taskItems,state.calendars,zone,new Date(now),deviceZone);
+    const eventsWithTasks = [...state.events,...projected];
     const birthdays = await repeatBirthdays(state.events);
     const recent = eventOccurrences(
-      state.events,
+      eventsWithTasks,
       addDays(today, -30),
       addDays(today, 31),
       zone,
       birthdays,
     );
     // An unfinished task does not expire when it leaves the ordinary reminder window.
-    const taskRecords = state.events.filter(event => event.isTask || event.overrides?.isTask || Object.values(event.exceptions || {}).some(value => value.isTask) || Object.values(event.sourceExceptions || {}).some(value => value.isTask));
+    const taskRecords = eventsWithTasks.filter(event => event.isTask || event.overrides?.isTask || Object.values(event.exceptions || {}).some(value => value.isTask) || Object.values(event.sourceExceptions || {}).some(value => value.isTask));
     const firstTaskDate = taskRecords.flatMap(event => [event.start, event.overrides?.start, ...Object.values(event.exceptions || {}).map(value => value.start)]).filter((value): value is string => Boolean(value)).map(value => value.slice(0,10)).sort()[0];
     const olderTasks = firstTaskDate && firstTaskDate < addDays(today,-30) ? eventOccurrences(taskRecords,firstTaskDate,addDays(today,-30),zone,birthdays).filter(event => event.isTask) : [];
     const events = [...new Map([...olderTasks,...recent].map(event => [event.id,event])).values()]
@@ -60,7 +66,8 @@ export async function GET(request: Request) {
                 location: e.location,
                 allDay: e.allDay,
                 isTask: Boolean(e.isTask),
-                eventUpdatedAt: state.events.find(event => event.id === e.eventId)?.updatedAt,
+                taskId: e.taskContext?.id,
+                eventUpdatedAt: e.taskContext?.planUpdatedAt || state.events.find(event => event.id === e.eventId)?.updatedAt,
                 receipt,
               },
             ];

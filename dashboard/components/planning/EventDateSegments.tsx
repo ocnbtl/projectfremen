@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import {useDailyPreferences} from "../../lib/settings/hooks";
+import { Fragment, useEffect, useRef, useState } from "react";
 import EventDateTimePicker from "./EventDateTimePicker";
 import styles from "./EventEditorFields.module.css";
 
@@ -10,13 +11,15 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export default function EventDateSegments({ label, value, allDay, timeZone, onChange, hideLabel = false }: {
   label: string; value: string; allDay: boolean; timeZone: string; onChange: (value: string) => void; hideLabel?: boolean;
 }) {
+  const prefs=useDailyPreferences();
+  const fullClock=prefs.clock === "24";
   const [editing, setEditing] = useState<Segment>();
   const [draft, setDraft] = useState("");
   const skipBlur = useRef<Segment | undefined>(undefined);
   const inputs = useRef<Partial<Record<Segment, HTMLInputElement | null>>>({});
   const year = Number(value.slice(0,4)), month = Number(value.slice(5,7)), day = Number(value.slice(8,10));
   const hour = Number(value.slice(11,13) || 9), minute = Number(value.slice(14,16) || 0);
-  const values = { month:pad(month), day:pad(day), year:String(year).padStart(4,"0"), hour:String(hour % 12 || 12), minute:pad(minute), period:hour >= 12 ? "pm" : "am" };
+  const values = { month:pad(month), day:pad(day), year:String(year).padStart(4,"0"), hour:fullClock ? pad(hour) : String(hour % 12 || 12), minute:pad(minute), period:hour >= 12 ? "pm" : "am" };
   useEffect(() => { if (allDay && editing && ["hour","minute","period"].includes(editing)) setEditing(undefined); }, [allDay, editing]);
   function commit(segment: Segment, raw: string) {
     if (!raw.trim()) return;
@@ -30,16 +33,18 @@ export default function EventDateSegments({ label, value, allDay, timeZone, onCh
       if (segment === "year") y=Math.max(1,Math.min(9999,number));
       if (segment === "month") m=Math.max(1,Math.min(12,number));
       if (segment === "day") d=Math.max(1,number);
-      if (segment === "hour") h=Math.max(1,Math.min(12,number)) % 12 + (hour >= 12 ? 12 : 0);
+      if (segment === "hour") h=fullClock ? Math.max(0,Math.min(23,number)) : Math.max(1,Math.min(12,number)) % 12 + (hour >= 12 ? 12 : 0);
       if (segment === "minute") min=Math.max(0,Math.min(59,number));
     }
     const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
     d=Math.min(d,[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][m-1]);
-    const normalized = {month:pad(m),day:pad(d),year:String(y).padStart(4,"0"),hour:String(h % 12 || 12),minute:pad(min),period:h >= 12 ? "pm" : "am"};
+    const normalized = {month:pad(m),day:pad(d),year:String(y).padStart(4,"0"),hour:fullClock ? pad(h) : String(h % 12 || 12),minute:pad(min),period:h >= 12 ? "pm" : "am"};
     onChange(`${String(y).padStart(4,"0")}-${pad(m)}-${pad(d)}${allDay ? "" : `T${pad(h)}:${pad(min)}`}`);
     return normalized[segment];
   }
-  const order: Segment[] = allDay ? ["month","day","year"] : ["month","day","year","hour","minute","period"];
+  const dateOrder:Segment[] = prefs.dateOrder==="mdy" ? ["month","day","year"] : prefs.dateOrder==="dmy" ? ["day","month","year"] : ["year","month","day"];
+  const order:Segment[] = [...dateOrder];
+  if(!allDay){order.push("hour","minute");if(!fullClock)order.push("period");}
   function field(segment: Segment) {
     return <input ref={node => { inputs.current[segment]=node; }} className={styles.segment} data-segment={segment} aria-label={`${label} ${segment}`} autoComplete="off" inputMode={segment === "period" ? "text" : "numeric"} spellCheck={false}
       value={editing === segment ? draft : values[segment]} maxLength={segment === "year" ? 4 : 2}
@@ -57,8 +62,8 @@ export default function EventDateSegments({ label, value, allDay, timeZone, onCh
   return <div className={styles.dateRow} role="group" aria-label={label}>
     <EventDateTimePicker iconOnly dateOnly label={label.replace(/\s+date$/i, "")} value={value.slice(0,10)} allDay timeZone={timeZone} onChange={next => onChange(allDay ? next : `${next}T${pad(hour)}:${pad(minute)}`)} />
     {!hideLabel && <span className={styles.dateLabel}>{label}</span>}
-    <div className={styles.segments}>{field("month")}<span>/</span>{field("day")}<span>/</span>{field("year")}
-      {!allDay && <><span className={styles.comma}>,</span>{field("hour")}<span>:</span>{field("minute")}{field("period")}</>}
+    <div className={styles.segments}>{dateOrder.map((segment,index)=><Fragment key={segment}>{index>0 && <span>{prefs.dateOrder==="ymd"?"-":"/"}</span>}{field(segment)}</Fragment>)}
+      {!allDay && <><span className={styles.comma}>,</span>{field("hour")}<span>:</span>{field("minute")}{!fullClock && field("period")}</>}
     </div>
   </div>;
 }

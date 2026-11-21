@@ -1,0 +1,19 @@
+html[data-reading-size="large"] {
+  --preferred-reading-size: 18px;
+}
+html[data-reading-size="larger"] {
+  --preferred-reading-size: 21px;
+}
+html:is([data-reading-size="large"], [data-reading-size="larger"])
+  :is(main, [role="dialog"])
+  :is(p, li, textarea, [contenteditable="true"], article > div > small) {
+  font-size: var(--preferred-reading-size);
+  line-height: 1.6;
+}
+html[data-reading-contrast="high"] :is(main, nav, header, [role="dialog"]) {
+  --text-muted: var(--text-strong, #17202b);
+  --text-secondary: var(--text-strong, #17202b);
+}
+html[data-reading-contrast="high"] :is(main, [role="dialog"]) :is(label, small, [role="status"]) {
+  color: var(--text-strong, #17202b);
+}

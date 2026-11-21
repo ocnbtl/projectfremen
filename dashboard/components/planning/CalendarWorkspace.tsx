@@ -1,6 +1,9 @@
 "use client";
 import MentionBacklinks from "../writing/MentionBacklinks";
 import { getNativeObjectRoute } from "../../lib/native-objects/routes";
+import { useDailyPreferences } from "../../lib/settings/hooks";
+import { readDeviceDaily } from "../../lib/settings/device";
+import { leadMinutes, preferenceZone } from "../../lib/settings/preferences";
 import { subscribeTaskChanges } from "../../lib/modules/planning/task-changes";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import dynamic from "next/dynamic";
@@ -143,6 +146,7 @@ const labelDate = (
 const subscribeCompact = (notify: () => void) => { const query = matchMedia("(max-width: 760px)"); query.addEventListener("change", notify); return () => query.removeEventListener("change", notify); };
 const readCompact = () => matchMedia("(max-width: 760px)").matches;
 export default function CalendarWorkspace() {
+  const preferences = useDailyPreferences();
   const compact = useSyncExternalStore(subscribeCompact, readCompact, () => false);
   const params = useSearchParams();
   const { layoutTransition } = useCalendarMotion();
@@ -180,7 +184,7 @@ export default function CalendarWorkspace() {
       occurrence?: EventOccurrence;
       scope: "series" | "occurrence";
     }>(),
-    [connections, setConnections] = useState(false),
+    [connections, setConnections] = useState(params.get("panel") === "connections"),
     [sharing, setSharing] = useState(false),
     [filters, setFilters] = useState(false),
     [ai, setAi] = useState(false),
@@ -277,7 +281,7 @@ export default function CalendarWorkspace() {
     }
   }, []);
   useEffect(() => {
-    const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const z = preferenceZone(readDeviceDaily());
     setZone(z);
     const linkedDate = params.get("date");
     setDate(
@@ -374,7 +378,7 @@ export default function CalendarWorkspace() {
       setError("This event link has an invalid date.");
     }
   }, [params, snapshot, zone, openEvent]);
-  const range = useMemo(() => calendarRange(date, view, agendaDays), [date, view, agendaDays]);
+  const range = useMemo(() => calendarRange(date, view, agendaDays), [date, view, agendaDays, preferences.weekStart]);
   const holidayCountries = observanceSettings.countries.join(",");
   const holidayYears = [...new Set([range.start.slice(0, 4), addDays(range.end, -1).slice(0, 4), date.slice(0, 4)])].join(",");
   useEffect(() => {
@@ -465,7 +469,7 @@ export default function CalendarWorkspace() {
         timeZone: zone,
         allDay: false,
         calendarId:
-          snapshot?.state.calendars.find(
+          snapshot?.state.calendars.find(x => x.id === preferences.calendarId && !x.connectionId && !x.archivedAt)?.id || snapshot?.state.calendars.find(
             (x) => !x.connectionId && !x.archivedAt,
           )?.id || "native",
         placeId: params.get("place") || undefined,
@@ -474,7 +478,7 @@ export default function CalendarWorkspace() {
             ?.name || "",
         linkedRefs: [],
         recurrence: "",
-        reminderMinutes: 15,
+        reminderMinutes: leadMinutes(preferences.eventLead),
         kind: "event",
       },
     });
@@ -484,6 +488,10 @@ export default function CalendarWorkspace() {
     setEditor((current) => {
       if (!current) return current;
       const fields = { ...current.fields, [key]: value };
+      if (!current.original && (key === "allDay" || key === "isTask")) {
+        const lead = (fields: EventFields) => leadMinutes(fields.isTask ? preferences.taskLead : fields.allDay ? preferences.deadlineLead : preferences.eventLead);
+        if (current.fields.reminderMinutes === lead(current.fields)) fields.reminderMinutes = lead(fields);
+      }
       if (key === "start" && value !== current.fields.start && !fields.allDay && typeof value === "string" && value.includes("T")) {
         // Start changes suggest a one-hour end in wall-clock time. End edits are
         // independent so choosing a longer event never moves its start.

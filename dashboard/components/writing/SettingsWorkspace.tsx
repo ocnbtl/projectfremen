@@ -11,11 +11,9 @@ import SettingsSwitch from "./SettingsSwitch";
 import styles from "./WritingSettings.module.css";
 
 const base = "/admin/personal/settings";
-const pages = {
-  writing: {title:"Writing", icon:"edit", description:"Link objects, use shortcuts, and manage your writing skills."},
-  appearance: {title:"Accessibility", icon:"sliders", description:"Adjust motion and keyboard focus across the workspace."},
-  "calendar-map": {title:"Calendar and Map", icon:"calendar", description:"Choose which event details and map pins you see."}
-} as const;
+import { settingsPages as pages } from "../../lib/settings/sections";
+import DailySettings, { ReadingSettings } from "../settings/DailySettings";
+import DeviceDataSettings from "../settings/DeviceDataSettings";
 
 function Accessibility() {
   const motion = useMotionPreference();
@@ -41,7 +39,7 @@ function CalendarAndMap() {
   </>;
 }
 
-export default function SettingsWorkspace({section}: {section: "home" | keyof typeof pages}) {
+export default function SettingsWorkspace({section,accountUrl}: {section: "home" | keyof typeof pages;accountUrl?:string}) {
   const current = section === "home" ? null : pages[section];
   return <div className={layout.shell} data-personal-pages>
     <PersonalOpsSidebar activeView="settings" filter="" pathname={base} mobileOpen={false} onClose={() => {}}/>
@@ -50,17 +48,21 @@ export default function SettingsWorkspace({section}: {section: "home" | keyof ty
         <header className={styles.heading}>
           {current && <Link prefetch={false} className={styles.back} href={base}><UnigentamosIcon role="chevron-left" size={16}/>Settings</Link>}
           <h1><UnigentamosIcon role={current?.icon ?? "sliders"} size={24}/>{current?.title ?? "Settings"}</h1>
-          <p>{current?.description ?? "These preferences apply to this browser profile."}</p>
+          <p>{current?.description ?? "Manage preferences for this browser and your connected services."}</p>
         </header>
         {section === "home" && <nav className={styles.directoryList} aria-label="Settings sections">
-          {Object.entries(pages).map(([key, page]) => <Link key={key} href={base + "/" + key} prefetch={false}>
+          {Object.entries(pages).filter(([key])=>accountUrl||!["account","sharing"].includes(key)).map(([key, page]) => <Link key={key} href={base + "/" + key} prefetch={false}>
             <span className={styles.skillIcon}><UnigentamosIcon role={page.icon} size={18}/></span>
             <span><strong>{page.title}</strong><small>{page.description}</small></span>
             <UnigentamosIcon role="chevron-right" size={16}/>
           </Link>)}
         </nav>}
         {section === "writing" && <WritingSettings/>}
-        {section === "appearance" && <Accessibility/>}
+        {section === "appearance" && <><ReadingSettings/><Accessibility/></>}
+        {(section === "account" || section === "sharing") && <section className={styles.panel}><h2>Individual accounts</h2>{accountUrl?<a href={accountUrl}>Open your account and workspaces</a>:<p>Individual accounts are available on the workspace host when your administrator connects it.</p>}</section>}
+        {section === "backup" && <section className={styles.panel}><h2>Device Vault</h2><p>Unlock Vault on this device to export an encrypted backup or check a recovery file.</p><Link href="/vault" prefetch={false}>Open Vault</Link>{accountUrl&&<a href={accountUrl}>Open workspace record exports</a>}</section>}
+        {section === "device-data" && <DeviceDataSettings/>}
+        {(["regional","notifications","planning","navigation","search"] as const).map(group=>section === group && <DailySettings key={group} section={group}/>)}
         {section === "calendar-map" && <CalendarAndMap/>}
       </div></div>
     </main>

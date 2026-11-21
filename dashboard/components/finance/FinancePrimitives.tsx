@@ -46,6 +46,8 @@ export function hueStyle(hue: FinanceHue): FinanceHueStyle {
   };
 }
 
+import { readDeviceDaily } from "../../lib/settings/device";
+
 export interface MoneyOptions {
   readonly cents?: boolean;
   readonly sign?: boolean;
@@ -66,7 +68,8 @@ const CENTS_DOLLARS = new Intl.NumberFormat("en-US", {
 });
 
 export function money(value: number, options: MoneyOptions = {}): string {
-  const formatted = (options.cents ? CENTS_DOLLARS : WHOLE_DOLLARS).format(Math.abs(value));
+  const formatter = options.cents ? CENTS_DOLLARS : WHOLE_DOLLARS;
+  const formatted = readDeviceDaily().currencyDisplay === "code" ? formatter.formatToParts(Math.abs(value)).map(part => part.type === "currency" ? "USD " : part.value).join("") : formatter.format(Math.abs(value));
   if (options.sign) return `${value >= 0 ? "+" : "-"}${formatted}`;
   return `${value < 0 ? "-" : ""}${formatted}`;
 }

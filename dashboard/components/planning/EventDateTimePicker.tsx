@@ -5,7 +5,7 @@ import { AnimatePresence, LayoutGroup, motion, useIsPresent } from "motion/react
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import { addDays, localDate, monthStart, shiftMonth, weekStart } from "../../lib/modules/planning/calendar-model";
-import { calendarWeekdays as weekdays } from "../../lib/calendar-week";
+import { visibleWeekdays } from "../../lib/calendar-week";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
 import styles from "./EventDateTimePicker.module.css";
@@ -141,7 +141,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
                   }}>{dateLabel(month, { month: "short" })}</button>;
                 })}
               </div> : <div ref={grid} role="grid" aria-label={`${label} calendar`} className={styles.days}>
-                <div role="row" className={styles.weekdays}>{weekdays.map(weekday => <span role="columnheader" aria-label={weekday} key={weekday}>{weekday.slice(0, 2)}</span>)}</div>
+                <div role="row" className={styles.weekdays}>{visibleWeekdays().map(weekday => <span role="columnheader" aria-label={weekday} key={weekday}>{weekday.slice(0, 2)}</span>)}</div>
                 {Array.from({ length: 6 }, (_, row) => <div role="row" key={row}>
                   {Array.from({ length: 7 }, (_, column) => {
                     const date = addDays(first, row * 7 + column), selected = date === day;

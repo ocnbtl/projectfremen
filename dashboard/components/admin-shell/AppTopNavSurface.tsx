@@ -1,5 +1,7 @@
 "use client";
 
+import { useDailyPreferences } from "../../lib/settings/hooks";
+import { pinOrder } from "../../lib/settings/preferences";
 import SearchField from "../ui/SearchField";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -13,6 +15,9 @@ import PlanningNotifications from "../planning/PlanningNotifications";
 import type { AppTopNavProps } from "./AppTopNav";
 
 export default function AppTopNavSurface({ showCommandSearch = true, onCommandSearch, rightSlot, className, reduceMotion: preference = false }: AppTopNavProps & { reduceMotion?: boolean }) {
+  const preferences = useDailyPreferences();
+  const [mobile,setMobile] = useState(false);
+  const pins = mobile ? preferences.mobilePins : preferences.desktopPins;
   const pathname = usePathname();
   const router = useRouter();
   const [systemReduceMotion, setSystemReduceMotion] = useState(false);
@@ -25,11 +30,15 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
   const [indicator, setIndicator] = useState<{ x: number; y: number; width: number; height: number; color: string; border: string } | null>(null);
 
   useEffect(() => {
+    const compact = window.matchMedia("(max-width: 760px)");
+    const reflectSize = () => setMobile(compact.matches);
+    reflectSize();
+    compact.addEventListener("change", reflectSize);
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setSystemReduceMotion(media.matches);
     update();
     media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
+    return () => {media.removeEventListener("change", update); compact.removeEventListener("change",reflectSize);};
   }, []);
 
   useEffect(() => {
@@ -79,7 +88,7 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
     const active = links.querySelector<HTMLAnchorElement>('[aria-current="page"]');
     active?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reduceMotion ? "instant" : "smooth" });
     return () => observer.disconnect();
-  }, [activeHref, reduceMotion]);
+  }, [activeHref, reduceMotion, pins]);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,7 +100,7 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
 
   return (
     <header className={`admin-global-topnav app-top-nav ${className || ""}`} data-active-module={moduleColorIdForPathname(pathname) || "home"}>
-      <Link href="/admin" prefetch={false} className="admin-global-brand app-top-nav__brand" aria-label="Unigentamos home" onClick={() => setLogoRotation(value => value + 360)}>
+      <Link href={preferences.landing} prefetch={false} className="admin-global-brand app-top-nav__brand" aria-label="Unigentamos home" onClick={() => setLogoRotation(value => value + 360)}>
         <motion.img src="/unigentamos-logo.svg" alt="" width="32" height="32" initial={false}
           animate={{ rotate: reduceMotion ? 0 : logoRotation }}
           transition={reduceMotion ? { duration: 0 } : { type: "spring", duration: 1.85, bounce: 0.24, delay: 0.22 }} />
@@ -106,7 +115,7 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
               backgroundColor: { duration: 0.4, ease: "easeInOut" },
               borderColor: { duration: 0.4, ease: "easeInOut" },
             }} />}
-          {ADMIN_NAV_ITEMS.map(item => {
+          {pinOrder(ADMIN_NAV_ITEMS,pins).map(item => {
             const href = item.href || "/admin";
             const moduleId = moduleColorIdForPathname(href);
             const palette = moduleId ? MODULE_COLOR_SYSTEM[moduleId] : null;

@@ -2,7 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cryp
 const app=path.resolve(__dirname,'..'),out=process.env.CONTROL_QA_OUTPUT||fs.mkdtempSync(path.join(os.tmpdir(),'module-cards-'));
 const {chromium}=require(path.join(app,'node_modules/@playwright/test'));
 const data=fs.mkdtempSync(path.join(os.tmpdir(),'module-cards-data-')),base='http://localhost:3235',secret='isolated-module-cards';
-const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3235'],{cwd:app,env:{...process.env,ADMIN_PASSWORD:'fixture',ADMIN_SESSION_SECRET:secret,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',RESEND_API_KEY:'',VERCEL:''},stdio:'ignore'});
+const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3235'],{cwd:app,env:{...process.env,ADMIN_PASSWORD:'fixture',ADMIN_SESSION_SECRET:secret,FREMEN_ACCOUNT_MEDIA_BACKEND:'filesystem-test',FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',RESEND_API_KEY:'',VERCEL:''},stdio:'ignore'});
 let browser;
 (async()=>{
  for(let i=0;i<100;i++){try{if((await fetch(base)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}

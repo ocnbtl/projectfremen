@@ -4,7 +4,7 @@ const {spawn}=require("node:child_process"),{webkit,expect}=require("@playwright
 const app=path.resolve(__dirname,".."), data=fs.mkdtempSync(path.join(os.tmpdir(),"canvas-browser-"));
 const port=24000+crypto.randomInt(10000),base="http://localhost:"+port,secret=crypto.randomUUID(),csrf=crypto.randomUUID();
 const server=spawn(process.execPath,[path.join(app,"node_modules/next/dist/bin/next"),"start","--hostname","127.0.0.1","--port",String(port)],{
-  cwd:app,env:{...process.env,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:"false",SUPABASE_URL:"",SUPABASE_SERVICE_ROLE_KEY:"",VERCEL:"",ADMIN_PASSWORD:"fixture",ADMIN_SESSION_SECRET:secret},stdio:["ignore","pipe","pipe"]});
+  cwd:app,env:{...process.env,FREMEN_ACCOUNT_MEDIA_BACKEND:'filesystem-test',FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:"false",SUPABASE_URL:"",SUPABASE_SERVICE_ROLE_KEY:"",VERCEL:"",ADMIN_PASSWORD:"fixture",ADMIN_SESSION_SECRET:secret},stdio:["ignore","pipe","pipe"]});
 const ready=new Promise((res,rej)=>{server.stdout.on("data",b=>{if(String(b).includes("Ready in"))res()});server.once("error",rej);server.once("exit",c=>rej(Error("Local server exited "+c)));});
 const output=path.join(app,"output/canvas");fs.mkdirSync(output,{recursive:true});
 let browser,page;

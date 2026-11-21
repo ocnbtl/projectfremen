@@ -21,6 +21,9 @@ import { EventObjectIdentity } from "./EventObjects";
 import { EventObjectPreview } from "./EventLinksPreview";
 import TaskCalendarPicker from "./TaskCalendarPicker";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
+import { useDailyPreferences } from "../../lib/settings/hooks";
+import { readDeviceDaily } from "../../lib/settings/device";
+import { formattedDay, preferenceZone, leadMinutes } from "../../lib/settings/preferences";
 import { writeTask } from "./task-client";
 export { writeTask } from "./task-client";
 import { TASK_KINDS, taskEvents, calendarTaskRecords, personTaskColor, taskLinks, taskRefKey, taskMatchesPerson, type TaskItem } from "../../lib/modules/planning/task-model";
@@ -30,15 +33,18 @@ import styles from "./TaskWorkspace.module.css";
 
 export const taskIcon=(kind:string)=>({task:"check",goal:"goal",routine:"routine",obligation:"check",decision:"decision",follow_up:"follow-up",objective:"goal"}[kind]||"check");
 function taskDateLabel(value:string){
- const day=new Date(value.slice(0,10)+"T12:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+ const prefs = readDeviceDaily();
+ const day=formattedDay(value,prefs.dateOrder);
  if(!value.includes("T"))return day;
  const hour=Number(value.slice(11,13)),minute=value.slice(14,16);
+ if(prefs.clock === "24") return day+" · "+value.slice(11,16);
  return day+" · "+(hour%12||12)+":"+minute+" "+(hour>=12?"PM":"AM");
 }
 type Props={snapshot:PlanningSnapshot;zone:string;onSaved:()=>Promise<void>;initialId?:string;initialOccurrence?:string;day?:string;onlyAllDay?:boolean;surface?:"page"|"sheet";beforeList?:ReactNode;initialPersonId?:string;initialKind?:string;projectRef?:PlanningSnapshot["refs"][number]};
 // Focus changes presentation only; keep pickers and occurrence expansion out of that work.
 const TaskCardControls=memo(function TaskCardControls({item,calendars,busy,onSaved}:{item:TaskItem;calendars:PlanningSnapshot["state"]["calendars"];busy:boolean;onSaved:()=>Promise<void>}){return <><TaskKindPicker item={item} disabled={busy} onSaved={onSaved}/><TaskCalendarPicker item={item} calendars={calendars} disabled={busy} onSaved={onSaved}/></>;});
 export default function TaskWorkspace({snapshot,zone,onSaved,initialId,initialOccurrence,day,onlyAllDay=false,surface="sheet",beforeList,initialPersonId,initialKind,projectRef}:Props){
+ const preferences = useDailyPreferences();
  const [selectedDay,setSelectedDay]=useState(day||localDate(new Date(),zone));
  const [focus,setFocus]=useState(false),[burst,setBurst]=useState<{x:number;y:number;id:number}|null>(null);
  const items=useMemo(()=>(snapshot.taskItems||[]).filter(item=>!projectRef||taskLinks(item).some(ref=>ref.module==="projects"&&ref.objectType==="project"&&ref.objectId===projectRef.objectId)),[snapshot.taskItems,projectRef?.objectId]),today=day?selectedDay:localDate(new Date(),zone),reduced=useReducedMotion(),bar=useContext(WorkspaceTopbarContext);
@@ -73,7 +79,12 @@ export default function TaskWorkspace({snapshot,zone,onSaved,initialId,initialOc
    await onSaved();setEditing(undefined);
   }catch(e){setError((detailsSaved?"Task details saved. Remaining changes need attention: ":"")+(e as Error).message);}finally{setBusy(false);}
  }
- function create(){setOccurrence("");setEditing({id:"task-"+crypto.randomUUID(),kind:kind!=="all"?kind as TaskItem["kind"]:"task",title:"",description:"",start:"",end:"",allDay:true,timeZone:zone,recurrence:"",calendarIds:[],peopleIds:initialPersonId?[initialPersonId]:[],linkedRefs:projectRef?[projectRef]:[],exceptions:{},createdAt:new Date().toISOString(),updatedAt:""});}
+ function create(){
+   const taskKind = kind !== "all" ? kind as TaskItem["kind"] : preferences.taskKind;
+   const taskZone = taskKind === "routine" && preferences.routineZone === "device" ? Intl.DateTimeFormat().resolvedOptions().timeZone : preferenceZone(preferences,zone);
+   const start = preferences.scheduleTask ? day || localDate(new Date(),taskZone) : "";
+   const calendarIds = calendars.some(calendar => calendar.id === preferences.calendarId) ? [preferences.calendarId] : [];
+   setOccurrence("");setEditing({id:"task-"+crypto.randomUUID(),kind:taskKind,title:"",description:"",reminderMinutes:leadMinutes(preferences.taskLead),followDeviceZone:taskKind === "routine" && preferences.routineZone === "device",start,end:start ? addDays(start,1) : "",allDay:true,timeZone:taskZone,recurrence:"",calendarIds,peopleIds:initialPersonId?[initialPersonId]:[],linkedRefs:projectRef?[projectRef]:[],exceptions:{},createdAt:new Date().toISOString(),updatedAt:""});}
  const filters=<div className={styles.filterPanel}><section><h3>Task type</h3><div className={styles.choices}>{[["all","All types"],...Object.entries(TASK_KINDS)].map(([value,label])=><button key={value} type="button" aria-pressed={kind===value} onClick={()=>setKind(value)}><UnigentamosIcon role={value==="all"?"object":taskIcon(value)} size={16}/>{label}</button>)}</div></section><label>Assigned to<SelectField searchable aria-label="Assigned to" value={assignee} onChange={e=>setAssignee(e.target.value)}><option value="all">Everyone</option>{[...calendars.map(c=>({id:c.id,name:c.name})),...people.map(p=>({id:p.objectId,name:p.label}))].map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</SelectField></label><Button aria-pressed={showCompleted} onClick={()=>setShowCompleted(!showCompleted)} icon="check">Completed</Button></div>;
  async function completeCard(item:TaskItem,key:string,completed:boolean|undefined,button:HTMLButtonElement){const box=button.getBoundingClientRect();if(await run({operation:"complete",id:item.id,timeZone:zone,expectedUpdatedAt:item.updatedAt,sourceUpdatedAt:item.sourceUpdatedAt,occurrenceKey:key,completed:!completed})&&!completed&&!reduced)setBurst({x:box.x+box.width/2,y:box.y+box.height/2,id:Date.now()});}
  const focusControl=<Button icon="focus-mode" aria-label="Focus mode" title="Focus mode: keep linked objects, hide task type and calendars" aria-pressed={focus} onClick={()=>setFocus(!focus)}/>;
