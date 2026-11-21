@@ -1,16 +1,18 @@
 "use client";
 
 import { motionTokens } from "../../lib/design-system/motion";
+import { browserPreference } from "../../lib/design-system/browser-preference";
 import { MotionConfig } from "motion/react";
 import {
   createContext,
   useContext,
   useEffect,
-  useState,
   type ReactNode,
 } from "react";
 
 type Preference = "system" | "reduce";
+const useBrowserMotion = browserPreference<Preference>("unigentamos:motion", "system", raw => raw === "reduce" ? "reduce" : "system", value => value);
+export const useStrongFocus = browserPreference("unigentamos:strong-focus", false, raw => raw === "true", String);
 const Context = createContext({
   preference: "system" as Preference,
   setPreference: (_value: Preference) => {},
@@ -22,31 +24,20 @@ export default function ExperienceProvider({
 }: {
   children: ReactNode;
 }) {
-  const [preference, setPreference] = useState<Preference>("system");
+  const [preference, setPreference] = useBrowserMotion();
+  const [strongFocus] = useStrongFocus();
   useEffect(() => {
-    try {
-      if (localStorage.getItem("unigentamos:motion") === "reduce")
-        setPreference("reduce");
-    } catch {
-      /* Storage is optional. */
-    }
-  }, []);
+    document.documentElement.toggleAttribute("data-strong-focus", strongFocus);
+    return () => document.documentElement.removeAttribute("data-strong-focus");
+  }, [strongFocus]);
   useEffect(() => {
     document.documentElement.dataset.productMotion = preference;
     return () => {
       delete document.documentElement.dataset.productMotion;
     };
   }, [preference]);
-  function update(value: Preference) {
-    setPreference(value);
-    try {
-      localStorage.setItem("unigentamos:motion", value);
-    } catch {
-      /* Session preference still works. */
-    }
-  }
   return (
-    <Context.Provider value={{ preference, setPreference: update }}>
+    <Context.Provider value={{ preference, setPreference }}>
       <MotionConfig
         transition={{
           duration: motionTokens.standard,

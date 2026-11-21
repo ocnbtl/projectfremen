@@ -33,9 +33,8 @@
 .switchRow input:checked { background: var(--module-action, #274f80); border-color: var(--module-action, #274f80); }
 .switchRow input:checked::before { transform: translateX(15px); background: white; }
 .switchRow input:focus-visible, .skills a:focus-visible { outline: 2px solid var(--module-focus); outline-offset: 3px; }
-.panel .shortcutForm { display: flex; flex-flow: row wrap; align-items: flex-end; gap: 14px 20px; padding-top: 18px; }
-.shortcutForm label, .editForm label { display: grid; gap: 6px; color: var(--text-strong); font-size: 13px; font-weight: 550; }
-.shortcutForm input, .editForm input, .editForm select, .editForm textarea {
+.triggerField, .editForm label { display: grid; gap: 6px; color: var(--text-strong); font-size: 13px; font-weight: 550; }
+.triggerField input, .editForm input, .editForm select, .editForm textarea {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--border);
@@ -46,7 +45,27 @@
   font: inherit;
   font-weight: 400;
 }
-.shortcutForm input { width: 86px; font-family: monospace; }
+.triggerField { display:flex; gap:12px; align-items:center; justify-content:space-between; padding-top:12px; margin-top:auto; }
+.triggerField input { width:76px; text-align:center; font-family:monospace; font-size:16px; }
+.back { display:inline-flex; align-items:center; gap:4px; margin-bottom:10px; min-height:32px; color:var(--module-action); font-size:14px; text-decoration:none; }
+.back:hover { text-decoration:underline; }
+.directoryList { display:grid; border:1px solid var(--border); background:var(--surface-panel); border-radius:14px; padding:4px 10px; }
+.directoryList a { display:flex; align-items:center; gap:14px; padding:16px 10px; border-radius:8px; text-decoration:none; color:var(--text-strong); }
+.directoryList a + a { border-top:1px solid var(--border); }
+.directoryList a:hover,.directoryList a:focus-visible { background:var(--module-primary-50); }
+.directoryList a > span:nth-child(2) { flex:1; min-width:0; }
+.directoryList strong { font-size:15px; }
+.shortcutPanels { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.shortcutPanels section { display:flex; flex-direction:column; }
+.shortcutHeading { display:flex; gap:10px; align-items:center; }
+.shortcutHeading kbd { padding:5px 8px; border-radius:6px; background:var(--module-primary-50); color:var(--module-action); font-weight:600; }
+.panel .example { padding:10px 12px; margin:0 0 5px; border-inline-start:2px solid var(--module-focus); background:var(--module-primary-50); border-radius:4px; color:var(--text-strong); overflow-wrap:anywhere; }
+.shortcutFooter { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.shortcutFooter small { margin:0; }
+.switchRow input::before { transition:transform .16s ease; }
+@media (max-width:680px) { .shortcutPanels { grid-template-columns:1fr; } .content { gap:14px; } }
+@media (prefers-reduced-motion:reduce) { .switchRow input::before { transition:none; } }
+:global([data-product-motion="reduce"]) .switchRow input::before { transition:none; }
 .editForm { display: grid; gap: 16px; padding: 16px 20px 20px; }
 .editForm textarea { resize: vertical; }
 .buttons { gap: 6px; flex-wrap: wrap; }

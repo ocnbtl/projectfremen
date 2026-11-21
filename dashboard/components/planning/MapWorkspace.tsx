@@ -1,4 +1,5 @@
 "use client";
+import { useMapPinPreference } from "./CalendarDisplayPreferences";
 import Link from "next/link";
 import SearchField from "../ui/SearchField";
 import PlaceSync from "./PlaceSync";
@@ -71,9 +72,7 @@ type SearchPlace = PlaceSearchResult;
 export default function MapWorkspace() {
   const params = useSearchParams();
   const [travelOpen,setTravelOpen]=useState(false), [directoryQuery,setDirectoryQuery]=useState(""), [directoryPage,setDirectoryPage]=useState(0);
-  const [pinDisplay, setPinDisplay] = useState<"icons" | "images">("icons");
-  useEffect(() => { try { if (localStorage.getItem("map:pin-display") === "images") setPinDisplay("images"); } catch {} }, []);
-  function changePinDisplay(next: "icons" | "images") { setPinDisplay(next); try { localStorage.setItem("map:pin-display", next); } catch {} }
+  const [pinDisplay, changePinDisplay] = useMapPinPreference();
   const [showPhotos, setShowPhotos] = useState(false),
     [photos, setPhotos] = useState<
       Array<{

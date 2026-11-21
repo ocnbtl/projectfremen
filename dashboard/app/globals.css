@@ -94,6 +94,11 @@ html {
   }
 }
 
+html[data-strong-focus] :focus-visible {
+  outline: 3px solid var(--module-focus, #174f90) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 2px var(--surface-panel, white);
+}
 :focus-visible {
   outline: 3px solid var(--module-focus);
   outline-offset: 2px;
