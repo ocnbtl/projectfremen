@@ -77,7 +77,7 @@ async function dimensions(file:File):Promise<ImageSize|undefined> {
   finally { URL.revokeObjectURL(url); }
 }
 
-export function CanvasMediaThumbnail({target,full,onOriginal}:{target:NativeObjectRef;full:boolean;onOriginal:(width:number,height:number)=>void}) {
+export function CanvasMediaThumbnail({target,full=false,thumbnailOnly=false,onOriginal}:{target:NativeObjectRef;full?:boolean;thumbnailOnly?:boolean;onOriginal?:(width:number,height:number)=>void}) {
   const [failed,setFailed]=useState<Record<string,boolean>>({});
   const container=useRef<HTMLDivElement>(null);
   const [visible,setVisible]=useState(false);
@@ -93,9 +93,9 @@ export function CanvasMediaThumbnail({target,full,onOriginal}:{target:NativeObje
   },[target.module]);
   const base="/api/personal/canvas/thumbnail?"+new URLSearchParams({id:target.objectId,v:target.versionId||""});
   const original=base+"&original=1";
-  const src=(full || failed[base]) && !failed[original] ? original : base;
+  const src=!thumbnailOnly && (full || failed[base]) && !failed[original] ? original : base;
   if(target.module!=="media") return null;
-  return <div ref={container} className={styles.thumb}>{!visible||failed[src]||target.objectType==="workspace_link"?<UnigentamosIcon role="module-media" size={25}/>:<img src={src} alt="" draggable={false} decoding="async" onLoad={e=>{if(src===original)onOriginal(e.currentTarget.naturalWidth,e.currentTarget.naturalHeight);}} onError={()=>setFailed(old=>({...old,[src]:true}))}/>}</div>;
+  return <div ref={container} className={styles.thumb}>{!visible||failed[src]||target.objectType==="workspace_link"?<UnigentamosIcon role="module-media" size={25}/>:<img src={src} alt="" draggable={false} decoding="async" onLoad={e=>{if(src===original)onOriginal?.(e.currentTarget.naturalWidth,e.currentTarget.naturalHeight);}} onError={()=>setFailed(old=>({...old,[src]:true}))}/>}</div>;
 }
 
 type FileMatch={hash:string;archived:boolean;ref:NativeObjectRef};

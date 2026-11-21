@@ -11,7 +11,7 @@ require.extensions[".ts"] = (module, filename) => module._compile(ts.transpileMo
 }).outputText, filename);
 
 const {createBoard,getBoard,listBoardSummaries,updateBoard} = require("../lib/modules/canvas/store.ts");
-const {boardSummary,boardContents} = require("../lib/modules/canvas/model.ts");
+const {boardSummary,boardContents,canvasViewLimits,canvasTagLimits} = require("../lib/modules/canvas/model.ts");
 const groups = [
   ["Static ad inspiration", "media", "asset", "/admin/media/"],
   ["Project handoff", "projects", "project", "/admin/projects/"],
@@ -50,6 +50,39 @@ async function checkSummaryPagination(summaries){
     assert.deepEqual(rows.map(r=>r.id),keys);
     assert.equal(queries,2);
   } finally {global.fetch=original;}
+}
+
+async function checkSavedViewSettings(board) {
+  const legacy = board.views[0];
+  assert(!("organizer" in legacy) && !("mode" in legacy));
+  const categories = [{id:"brand",name:"Brand",tags:[{id:"nike",name:"Nike"}]}];
+  const organizer = {groupBy:"brand",sortBy:"category/brand",filters:["nike"],search:"portraits"};
+  const gallery = {...legacy,id:"nike-portraits",name:"Nike portraits",mode:"gallery",organizer};
+  const filteredBoard = {...gallery,id:"board-detail",mode:"board"};
+  const views = [gallery, legacy, filteredBoard];
+  const saved = await updateBoard({...board,categories,views},board.revision);
+  assert.deepEqual((await getBoard(board.id)).views, views);
+  assert.deepEqual(boardSummary(saved).viewNames, views.map(({id,name}) => ({id,name})));
+  const withOptions = (options, mode="gallery") => ({...saved,views:[{...gallery,organizer:options,mode}]});
+
+  const normalized = boardContents(withOptions({...organizer,filters:["nike","removed","nike"],search:"  portraits  "}));
+  assert.deepEqual(normalized.views[0], gallery);
+  const cleared = boardContents({...saved,categories:[]}).views[0].organizer;
+  assert.deepEqual(cleared, {groupBy:"",sortBy:"board",filters:[],search:"portraits"});
+  for (const groupBy of ["kind","item/type"]) {
+    assert.equal(boardContents(withOptions({groupBy})).views[0].organizer.groupBy, groupBy);
+  }
+  const maxFilters = canvasTagLimits.categories * canvasTagLimits.tags;
+  for (const draft of [
+    withOptions(organizer,"invalid"), withOptions(null),
+    withOptions({...organizer,search:"x".repeat(canvasViewLimits.search+1)}),
+    withOptions({...organizer,sortBy:"unsupported"}), withOptions({...organizer,groupBy:"bad/id"}),
+    withOptions({...organizer,filters:["bad/id"]}), withOptions({...organizer,filters:"nike"}),
+    withOptions({...organizer,filters:Array(maxFilters+1).fill("nike")})
+  ]) {
+    await assert.rejects(updateBoard(draft,saved.revision),e=>e.status===400);
+  }
+  assert.deepEqual(await getBoard(board.id), saved);
 }
 
 async function main(){
@@ -112,9 +145,10 @@ async function main(){
   ];
   for(const draft of invalid) await assert.rejects(updateBoard(draft,current.revision), e=>e.status===400);
   assert.deepEqual(await getBoard(base.id),current,"invalid saves are atomic");
+  await checkSavedViewSettings(current);
   await assert.rejects(getBoard("../not-a-board"), e=>e.status===400);
   await assert.rejects(getBoard("nonexistent"), e=>e.status===404);
   await checkSummaryPagination(summaries);
-  console.log("PASS",interactions,"model interactions across 5 board scenarios; durable round trips, lightweight previews, stable source links, conflicts, retries, invalid inputs and paginated cloud summary queries against a local stub.");
+  console.log("PASS",interactions,"model interactions across 5 board scenarios; saved gallery and board organization, legacy views, durable round trips, lightweight previews, stable source links, conflicts, retries, invalid inputs and paginated cloud summary queries against a local stub.");
 }
 main().catch(error=>{console.error(error);process.exitCode=1});

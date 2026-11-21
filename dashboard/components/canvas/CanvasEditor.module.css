@@ -20,6 +20,7 @@
 .editor input,.editor textarea{margin:0}
 .bar{flex:none}
 .editor .stage{flex:1 1 auto}
+.boardSurface{position:absolute;inset:0}
 .history{display:flex;align-items:center}
 .stage{position:relative;isolation:isolate;height:calc(100dvh - 185px);min-height:400px;overflow:hidden;background:#f5f7f9;border-top:1px solid var(--board-border)}
 .stage[data-drop=true]{outline:3px solid #5991c5;outline-offset:-4px}

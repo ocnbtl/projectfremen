@@ -18,9 +18,12 @@ import { snapResize,snapTranslation,spaceEvenly,type AlignmentGuide } from "./al
 import { BoardActions, CanvasCard, type FlowCard } from "./CanvasCard";
 import { CanvasObjectPicker, useCanvasMediaImport } from "./CanvasIntake";
 import { CardFields, EdgeFields, Panel } from "./CanvasPanels";
+import { SavedViews } from "./SavedViews";
 import { FrameFields,withFrame,type FrameStyle } from "./FrameFields";
 import { CanvasSaveStatus } from "./CanvasSaveStatus";
 import { ItemTags, BoardOrganizer } from "./CanvasTaxonomy";
+import { defaultOrganizerOptions, organizerRows, type OrganizerOptions } from "./organizer-rows";
+import { OrganizedGallery } from "./OrganizedGallery";
 import { useCanvasMediaDetails, displayMediaDetails, linkedMediaId } from "./useCanvasMediaDetails";
 import css from "./CanvasEditor.module.css";
 
@@ -55,7 +58,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const previous=useRef<Board[]>([]), next=useRef<Board[]>([]);
   const frame=useRef<HTMLDivElement>(null), uploadInput=useRef<HTMLInputElement>(null);
   const flow=useRef<ReactFlowInstance<FlowCard,Edge>|null>(null);
-  const [initialView]=useState(()=>board.views.find(v=>v.id===entryView) || lastViewport(board.id));
+  const [entryBookmark]=useState(()=>board.views.find(v=>v.id===entryView));
+  const [initialView]=useState(()=>entryBookmark || lastViewport(board.id));
   const [zoom,setZoom]=useState(initialView?.zoom||1);
   const viewTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const rememberView=useCallback((view:Viewport)=>{
@@ -81,14 +85,21 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const [tagDraft,setTagDraft]=useState<string[]>();
   const [categoryDraft,setCategoryDraft]=useState<CanvasCategory[]>();
   const [fromOrganizer,setFromOrganizer]=useState(false);
-  const [tagFilter,setTagFilter]=useState<string[]>([]);
-  const visibleBoardNodes=useMemo(()=>tagFilter.length?board.nodes.filter(n=>tagFilter.every(id=>n.tagIds?.includes(id))):board.nodes,[board.nodes,tagFilter]);
-  const visibleIds=useMemo(()=>tagFilter.length?new Set(visibleBoardNodes.map(n=>n.id)):null,[tagFilter,visibleBoardNodes]);
+  const [organization,setOrganization]=useState<OrganizerOptions>(entryBookmark?.organizer??defaultOrganizerOptions);
+  const [gallery,setGallery]=useState(entryBookmark?.mode==="gallery");
+  const unfilteredCamera=useRef<Viewport|undefined>(undefined);
   const sharedMedia=useCanvasMediaDetails(board.nodes);
   const displayNodes=useMemo(()=>board.nodes.map(n=>{
     const id=linkedMediaId(n);
     return id?displayMediaDetails(n,sharedMedia.get(id)):n;
   }),[board.nodes,sharedMedia]);
+  const isFiltered=Boolean(organization.filters.length || organization.search);
+  const hasGallery=Boolean(organization.groupBy || organization.sortBy!=="board");
+  const organized=useMemo(()=>isFiltered||hasGallery||gallery
+    ? organizerRows(displayNodes,board.categories??[],organization.filters,organization.groupBy,organization.sortBy,organization.search)
+    : null,[displayNodes,board.categories,organization,isFiltered,hasGallery,gallery]);
+  const visibleIds=useMemo(()=>isFiltered && organized ? new Set(organized.orderedIds) : null,[isFiltered,organized]);
+  const visibleBoardNodes=useMemo(()=>visibleIds ? board.nodes.filter(n=>visibleIds.has(n.id)) : board.nodes,[board.nodes,visibleIds]);
   const [notice,setNotice]=useState(""),[drop,setDrop]=useState(false);
   const [live,setLive]=useState<Record<string,Partial<Layout>>>({});
   const resizing=useRef<{item:CanvasNode;start:Layout}|null>(null);
@@ -130,7 +141,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     });
   },[]);
   const insertObjects=useCallback((refs:NativeObjectRef[],sizes?:Map<string,{width:number;height:number}>)=>{
-    setTagFilter([]);
+    setOrganization(defaultOrganizerOptions);setGallery(false);unfilteredCamera.current=undefined;
     const current=latest.current,added=addObjects(current,refs,dropPoint.current||place(),sizes);
     dropPoint.current=null;
     if(!added.length){
@@ -143,7 +154,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const media=useCanvasMediaImport(insertObjects);
   function insert(kind:CanvasNode["kind"],point=place(),body=""){
     if(latest.current.nodes.length>=1000){setNotice("This board is full.");return;}
-    setTagFilter([]);setCategoryDraft(undefined);setTagDraft(undefined);setFromOrganizer(false);
+    setOrganization(defaultOrganizerOptions);setGallery(false);unfilteredCamera.current=undefined;
+    setCategoryDraft(undefined);setTagDraft(undefined);setFromOrganizer(false);
     const node={...makeNode(kind,point),body:body.slice(0,32000)};
     // Keep newly inserted notes reachable when several are added from the toolbar.
     for(let step=0;step<18 && latest.current.nodes.some(n=>Math.abs(node.x-n.x)<30 && Math.abs(node.y-n.y)<30);step++){
@@ -332,9 +344,23 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
     return new Map(start.items.map(n=>[n.id,{x:n.x+result.delta.x,y:n.y+result.delta.y}]));
   }
   function show(p:string){setPanel(old=>old===p?"":p);setName("");setConnectFrom("");}
+  function applyOrganization(options:OrganizerOptions){
+    setOrganization(options);choose([]);setConnectFrom("");setPanel("");
+    if(!isFiltered && !hasGallery)unfilteredCamera.current=flow.current?.getViewport();
+    const openGallery=Boolean(options.groupBy || options.sortBy!=="board");
+    setGallery(openGallery);
+    if(openGallery)return;
+    if(options.filters.length || options.search){
+      const matches=organizerRows(displayNodes,latest.current.categories??[],options.filters,"","board",options.search);
+      reframe(matches.orderedIds);
+    }else if(unfilteredCamera.current){
+      void flow.current?.setViewport(unfilteredCamera.current,{duration:duration()});
+      unfilteredCamera.current=undefined;
+    }
+  }
   const paste=useRef((_:ClipboardEvent)=>{});
   paste.current=(e)=>{
-    if(e.defaultPrevented||isField(e.target)||panel||media.busy)return;
+    if(e.defaultPrevented||isField(e.target)||panel||gallery||media.busy)return;
     const files=Array.from(e.clipboardData?.files||[]);
     if(files.length){e.preventDefault();void media.importFiles(files);return;}
     const value=e.clipboardData?.getData("text/plain").trim();if(value){e.preventDefault();insert("text",place(),value);}
@@ -343,7 +369,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(""),4500);return()=>clearTimeout(t);},[notice]);
   const shortcut=useRef((_:KeyboardEvent)=>{});
   shortcut.current=e=>{
-    if(!(e.metaKey||e.ctrlKey)||e.altKey||e.isComposing||e.defaultPrevented||panel||isField(e.target))return;
+    if(!(e.metaKey||e.ctrlKey)||e.altKey||e.isComposing||e.defaultPrevented||panel||gallery||isField(e.target))return;
     const editor=frame.current?.parentElement;
     if(e.target!==document.body && (!(e.target instanceof Element)||!editor?.contains(e.target)||e.target.closest("[role=menu]")))return;
     const key=e.key.toLowerCase();
@@ -356,7 +382,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   useEffect(()=>{const handle=(e:KeyboardEvent)=>shortcut.current(e);document.addEventListener("keydown",handle,true);return()=>document.removeEventListener("keydown",handle,true);},[]);
   const selectionCount=selected.length+edgeIds.length;
   return <div className={css.editor} style={{"--canvas-inverse-zoom":1/zoom,"--footer-scale":Math.min(3,1/zoom)} as React.CSSProperties} data-arranging={arranging||undefined} data-multi={ids.length>1||undefined} aria-label="Canvas editor" onKeyDown={e=>{
-    if(e.defaultPrevented || isField(e.target) || (e.target instanceof HTMLElement && e.target.closest("button,a,[role=menu]")))return;
+    if(gallery || e.defaultPrevented || isField(e.target) || (e.target instanceof HTMLElement && e.target.closest("button,a,[role=menu]")))return;
     if(multiPick && (e.key==="Enter" || e.key===" ")){
       const id=(e.target as HTMLElement).closest<HTMLElement>(".react-flow__node")?.dataset.id;
       if(id){e.preventDefault();togglePicked(id);return;}
@@ -369,10 +395,11 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       <Action name="Back to boards" icon={<IconArrowLeft/>} run={onBack} disabled={media.busy}/>
       <div className={css.heading}><h2>{board.title}</h2></div>
       <CanvasSaveStatus status={saveStatus} updatedAt={board.updatedAt}/>
-      {visibleIds && <Action name="Clear board filter" label="Clear filter" icon={<IconX/>} run={()=>setTagFilter([])}/>}
+      {hasGallery && !gallery && <Action name="Open organized gallery" icon={<IconLayoutGrid/>} run={()=>{setGallery(true);setPanel("");}}/>}
+      {visibleIds && <Action name="Clear board filter" label="Clear filter" icon={<IconX/>} run={()=>applyOrganization(defaultOrganizerOptions)}/>}
       <Action name="Organize board" label="Organize" icon={<IconTags/>} active={panel==="organizer"} run={()=>show("organizer")}/>
       <div className={css.history}><Action name="Undo" icon={<IconArrowBackUp/>} disabled={!previous.current.length} run={()=>restore()}/><Action name="Redo" icon={<IconArrowForwardUp/>} disabled={!next.current.length} run={()=>restore(true)}/></div>
-      <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
+      <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setGallery(false);setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
       <Action name="Saved views" icon={<IconBookmark/>} label="Views" active={panel==="views"} run={()=>show("views")}/>
     </header>
     <div ref={frame} className={css.stage} data-box-select={multiPick||undefined} data-drop={drop||undefined}
@@ -382,6 +409,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         dropPoint.current=flow.current?.screenToFlowPosition({x:e.clientX,y:e.clientY})||place();
         void media.importFiles(Array.from(e.dataTransfer.files)).finally(()=>{dropPoint.current=null;});
       }}}>
+      <div className={css.boardSurface} inert={gallery} style={gallery?{visibility:"hidden"}:undefined}>
       <BoardActions.Provider value={actions}><ReactFlow<FlowCard,Edge> nodes={flowNodes} edges={flowEdges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
         onEdgesChange={changes=>setEdgeIds(old=>{const s=new Set(old);for(const c of changes)if(c.type==="select"){if(c.selected)s.add(c.id);else s.delete(c.id);}return [...s];})}
         onInit={instance=>{flow.current=instance;}}
@@ -435,15 +463,19 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         <Action name="Upload media" icon={<IconUpload/>} disabled={media.busy} run={()=>uploadInput.current?.click()}/>
         <input ref={uploadInput} type="file" multiple hidden onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value="";void media.importFiles(files);}}/>
       </div>
+      </div>
+      {gallery && organized && <OrganizedGallery results={organized} boardTitle={board.title}
+        onBoard={()=>{setGallery(false);setPanel("");}} onOrganize={()=>setPanel("organizer")}
+        onLocate={id=>{choose([id]);setGallery(false);setPanel("");reframe([id]);}}/>}
       {panel==="card"&&edited && <CardFields key={edited.id} node={edited} close={()=>setPanel(fromOrganizer?"organizer":"")} restoreSize={edited.imageSize&&!edited.locked?()=>{patchNodes([edited.id],{...edited.imageSize});reframe([edited.id]);}:undefined} save={patch=>{
         change(b=>({...b,...(categoryDraft?{categories:categoryDraft}:{}),nodes:b.nodes.map(n=>n.id===edited.id?{...n,...patch,...(tagDraft?{tagIds:tagDraft}:{})}:n)}));
-        if(tagFilter.some(id=>!(tagDraft??edited.tagIds)?.includes(id)))choose([]);
+        if(organization.filters.some(id=>!(tagDraft??edited.tagIds)?.includes(id)))choose([]);
       }}>
         <ItemTags categories={categoryDraft??board.categories??[]} tagIds={tagDraft??edited.tagIds??[]} onChange={setTagDraft} onCategoriesChange={setCategoryDraft}/>
       </CardFields>}
-      {panel==="organizer" && <BoardOrganizer boardId={board.id} categories={board.categories??[]} nodes={displayNodes}
+      {(panel==="organizer" || (panel==="card" && fromOrganizer)) && <BoardOrganizer hidden={panel!=="organizer"} boardId={board.id} categories={board.categories??[]} nodes={displayNodes}
         close={()=>setPanel("")} onEdit={id=>{edit(id);setFromOrganizer(true);}}
-        onShowOnCanvas={tags=>{setTagFilter(tags);choose([]);setPanel("");reframe(board.nodes.filter(n=>tags.every(id=>n.tagIds?.includes(id))).map(n=>n.id));}}
+        applied={organization} onApply={applyOrganization} onClear={()=>applyOrganization(defaultOrganizerOptions)}
         onCategoriesChange={categories=>change(b=>({...b,categories}))}/>}
       {panel==="read" && <Panel title={board.nodes.find(n=>n.id===reading)?.title || "Canvas item"} close={()=>setPanel("")}><p className={css.readBody}>{board.nodes.find(n=>n.id===reading)?.body || "No additional text."}</p></Panel>}
       {panel==="edge"&&edge && <EdgeFields key={edge.id} edge={edge} close={()=>setPanel("")} save={patch=>change(b=>({...b,edges:b.edges.map(e=>e.id===edge.id?{...e,...patch}:e)}))}/>}
@@ -477,16 +509,16 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         <button className={css.primary}>Group cards</button>
         {selected.some(n=>n.group)&&<button type="button" onClick={()=>{patchNodes(ids,{group:""});setPanel("");}}>Ungroup selection</button>}
       </form></Panel>}
-      {panel==="views" && <Panel title="Saved views" close={()=>setPanel("")}>
-        <div className={css.bookmarks}>{board.views.map(v=><div key={v.id}><button type="button" onClick={()=>{void flow.current?.setViewport(v,{duration:duration()});setPanel("");}}><IconBookmark size={16}/>{v.name}</button>
-          <Action name={"Remove view "+v.name} icon={<IconX/>} run={()=>change(b=>({...b,views:b.views.filter(i=>i.id!==v.id)}))}/></div>)}</div>
-        <form onSubmit={e=>{e.preventDefault();const viewport=flow.current?.getViewport();if(!viewport||!name.trim())return;
-          if(board.views.length>=100){setNotice("This board already has 100 saved views.");return;}
-          change(b=>({...b,views:[...b.views,{id:crypto.randomUUID(),name:name.trim(),...viewport}]}));setName("");}}>
-          <label>View name<input autoFocus maxLength={160} required value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Shortlisted ads"/></label>
-          <button className={css.primary}>Save current view</button>
-        </form></Panel>}
-      {!focus && selectionCount>0 && !panel && !connectFrom && <div className={css.selection} role="toolbar" aria-label="Selection actions">
+      {panel==="views" && <SavedViews views={board.views} organizer={organization} mode={gallery?"gallery":"board"} close={()=>setPanel("")}
+        currentViewport={()=>flow.current?.getViewport()}
+        changeViews={update=>change(current=>{
+          const views=update(current.views);
+          return views===current.views?current:{...current,views};
+        })}
+        open={view=>{setOrganization(view.organizer??defaultOrganizerOptions);setGallery(view.mode==="gallery");
+          choose([]);setConnectFrom("");unfilteredCamera.current=undefined;
+          void flow.current?.setViewport(view,{duration:duration()});setPanel("");}}/>}
+      {!gallery && !focus && selectionCount>0 && !panel && !connectFrom && <div className={css.selection} role="toolbar" aria-label="Selection actions">
         {selected.length>1 && <><span className={css.pickCount} aria-live="polite">{selected.length} selected</span>
           <Action name="Arrange selection" label="Arrange" icon={<IconArrowsMove/>} disabled={movable.length<2} run={()=>show("arrange")}/></>}
         {one && <Action name="Connect to another card" icon={<IconLine/>} run={()=>{setConnectFrom(one.id);setMultiPick(false);setHand(false);}}/>}
@@ -497,7 +529,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         <Action name={selected.every(n=>n.used)?"Mark unused":"Mark used"} icon={<IconCheck/>} active={selected.every(n=>n.used)} run={()=>patchNodes(ids,{used:!selected.every(n=>n.used)})}/></>}
         <Action name="Remove selection from board" disabled={selected.length>0&&!movable.length} icon={<IconTrash/>} run={removeSelected}/>
       </div>}
-      <div className={css.navigation} role="toolbar" aria-label="Board navigation">
+      <div className={css.navigation} hidden={gallery} role="toolbar" aria-label="Board navigation">
         <Action name="Snap to align" icon={<IconMagnet/>} active={snap} run={()=>{setSnap(v=>!v);setGuides([]);}}/>
         <Action name="Select all cards" icon={<IconSelectAll/>} disabled={!visibleBoardNodes.length} run={()=>{choose(visibleBoardNodes.map(n=>n.id));setPanel("");}}/>
         <Action name="Arrange cards in a grid" icon={<IconLayoutGrid/>} disabled={board.nodes.length<2} run={arrange}/>
@@ -506,6 +538,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
         <Action name="Zoom in" icon={<IconPlus/>} run={()=>void flow.current?.zoomIn({duration:duration()})}/>
         <Action name="Fit board" icon={<IconMaximize/>} run={()=>void flow.current?.fitView({padding:.2,maxZoom:1.3,duration:duration()})}/>
       </div>
+      {!gallery && panel==="" && board.nodes.length>0 && visibleIds?.size===0 && <div className={css.empty}><IconTags size={28}/><h3>No matching items</h3></div>}
       {(connectFrom||media.message||notice||drop) && <div className={css.message} role="status">{drop?"Drop to add to Media and this board":connectFrom?"Choose the card to connect to":notice||media.message}{connectFrom&&<Action name="Cancel connection" run={()=>setConnectFrom("")} icon={<IconX/>}/>}</div>}
     </div>
   </div>;

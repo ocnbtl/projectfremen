@@ -1,85 +1,172 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { IconChevronRight, IconFilter, IconX } from "@tabler/icons-react";
-import type { CanvasNode } from "../../lib/modules/canvas/model";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { IconCheck, IconChevronDown, IconChevronRight, IconFilter, IconRotateClockwise2, IconX } from "@tabler/icons-react";
+import { canvasViewLimits, type CanvasCategory, type CanvasNode } from "../../lib/modules/canvas/model";
+import SearchField from "../ui/SearchField";
 import SelectField from "../ui/SelectField";
 import { Panel } from "./CanvasPanels";
 import { TagPicker, type CategoryProps } from "./CanvasTagPicker";
-import { organizerRows, type OrganizerGroup } from "./organizer-rows";
+import { OrganizerPreview } from "./OrganizerPreview";
+import { defaultOrganizerOptions, organizerRows, organizerTagTone, type OrganizerGroup, type OrganizerOptions } from "./organizer-rows";
 import styles from "./CanvasTaxonomy.module.css";
 
 export {ItemTags} from "./CanvasTagPicker";
 
-type OrganizerOptions = {groupBy: string; sortBy: string; filters: string[]};
-const boardOptions = new Map<string, OrganizerOptions>();
-
-function GroupRows({group, onEdit}: {group: OrganizerGroup; onEdit: (id: string) => void}) {
-  const [limit, setLimit] = useState(40);
-  return <div className={styles.group}>
-    {group.name && <h4>{group.name} <span>{group.rows.length}</span></h4>}
-    <ul>
+function GroupRows({group, onEdit}: {group: OrganizerGroup; onEdit: (id: string, button: HTMLButtonElement) => void}) {
+  const [limit, setLimit] = useState(32);
+  const [expanded, setExpanded] = useState(true);
+  const showRows = !group.name || expanded;
+  return <section className={styles.group} data-grouped={Boolean(group.name)}>
+    {group.name && <h4><button type="button" className={styles.groupHead} data-tone={group.tone} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+      <i className={styles.dot} aria-hidden/>
+      <span>{group.name}</span><small>{group.rows.length}</small><IconChevronDown aria-hidden size={14}/>
+    </button></h4>}
+    {showRows && <ul>
       {group.rows.slice(0, limit).map(row => <li key={row.id}>
-        <button type="button" className={styles.row} onClick={() => onEdit(row.id)} aria-label={"Edit " + row.title}>
+        <button type="button" className={styles.row} onClick={event => onEdit(row.id, event.currentTarget)} aria-label={"Edit " + row.title}>
+          <span className={styles.thumbnail}><OrganizerPreview row={row}/></span>
           <span className={styles.copy}>
             <strong>{row.title}</strong>
-            {row.tags.length > 0 && <small>{row.tags.join("  /  ")}</small>}
+            <span className={styles.meta}>
+              <small>{row.kindLabel}</small>
+              {row.tags.slice(0, 2).map(tag => <span className={styles.badge} key={tag.id} data-tone={tag.tone} title={tag.category + " · " + tag.name}>{tag.name}</span>)}
+              {row.tags.length > 2 && <small title={row.tags.slice(2).map(tag => tag.category + " · " + tag.name).join(", ")}>+{row.tags.length - 2}</small>}
+            </span>
           </span>
-          <IconChevronRight aria-hidden size={16}/>
+          <IconChevronRight aria-hidden size={15}/>
         </button>
       </li>)}
-    </ul>
-    {group.rows.length > limit && <button type="button" className={styles.more} onClick={() => setLimit(limit + 40)}>Show more items</button>}
-  </div>;
+    </ul>}
+    {showRows && group.rows.length > limit && <button type="button" className={styles.more} onClick={() => setLimit(limit + 32)}>
+      Show {Math.min(32, group.rows.length - limit)} more
+    </button>}
+  </section>;
 }
 
-export function BoardOrganizer({boardId, categories, nodes, onEdit, close, onCategoriesChange, onShowOnCanvas}: CategoryProps & {
+// Only additions are staged. An item edited from the organizer can add its own tags before returning.
+function mergeAdditions(categories: CanvasCategory[], additions: CanvasCategory[]) {
+  const categoryAliases = new Map<string, string>(), tagAliases = new Map<string, string>();
+  const merged = [...categories];
+  for (const extra of additions) {
+    const index = merged.findIndex(category => category.id === extra.id || category.name.toLowerCase() === extra.name.toLowerCase());
+    if (index === -1) { merged.push(extra); continue; }
+    const category = merged[index], tags = [...category.tags];
+    categoryAliases.set(extra.id, category.id);
+    for (const added of extra.tags) {
+      const saved = tags.find(tag => tag.id === added.id || tag.name.toLowerCase() === added.name.toLowerCase());
+      if (saved) tagAliases.set(added.id, saved.id);
+      else tags.push(added);
+    }
+    merged[index] = {...category, tags};
+  }
+  return {draftCategories: merged, categoryAliases, tagAliases};
+}
+
+export function BoardOrganizer({categories, nodes, applied, hidden = false, onApply, onClear, onEdit, close, onCategoriesChange}: CategoryProps & {
   boardId?: string;
   nodes: CanvasNode[];
+  applied: OrganizerOptions;
+  hidden?: boolean;
+  onApply: (options: OrganizerOptions) => void;
+  onClear: () => void;
   onEdit: (id: string) => void;
-  onShowOnCanvas?: (tagIds: string[]) => void;
   close: () => void;
 }) {
-  const [options, setOptions] = useState<OrganizerOptions>(() => (boardId && boardOptions.get(boardId)) || {groupBy: "", sortBy: "board", filters: []});
-  const {filters} = options;
-  const groupBy = categories.some(category => category.id === options.groupBy) ? options.groupBy : "";
-  const sortBy = options.sortBy.startsWith("category/") && !categories.some(category => "category/" + category.id === options.sortBy) ? "board" : options.sortBy;
-  useEffect(() => {if (boardId) boardOptions.set(boardId, options);}, [boardId, options]);
-  const setFilters = (next: string[]) => setOptions(previous => ({...previous, filters: next}));
-  const selected = categories.flatMap(category => category.tags.filter(tag => filters.includes(tag.id)).map(tag => ({...tag, category: category.name})));
-  const results = useMemo(() => organizerRows(nodes, categories, filters, groupBy, sortBy), [nodes, categories, filters, groupBy, sortBy]);
-  return <Panel title="Board organizer" close={close}>
+  const [options, setOptions] = useState<OrganizerOptions>(applied);
+  const [additions, setAdditions] = useState<CanvasCategory[]>([]);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const lastRow = useRef<HTMLButtonElement | null>(null);
+  const searchField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (hidden || !lastRow.current) return;
+    const focus = lastRow.current.isConnected ? lastRow.current : searchField.current;
+    focus?.focus({preventScroll: true});
+    lastRow.current = null;
+  }, [hidden]);
+
+  const {draftCategories, categoryAliases, tagAliases} = useMemo(() => mergeAdditions(categories, additions), [categories, additions]);
+  const filters = useMemo(() => options.filters.map(id => tagAliases.get(id) ?? id), [options.filters, tagAliases]);
+  const search = options.search;
+  const typeGroup = draftCategories.some(category => category.id === "kind") ? "item/type" : "kind";
+  const groupId = categoryAliases.get(options.groupBy) ?? options.groupBy;
+  const groupBy = groupId === "item/type" || groupId === typeGroup ? typeGroup
+    : draftCategories.some(category => category.id === groupId) ? groupId : "";
+  const sortCategory = options.sortBy.slice("category/".length);
+  const sortId = categoryAliases.get(sortCategory) ?? sortCategory;
+  const sortBy = !options.sortBy.startsWith("category/") ? options.sortBy
+    : draftCategories.some(category => category.id === sortId) ? "category/" + sortId : "board";
+  const selected = draftCategories.flatMap((category, index) => category.tags.flatMap((tag, i) =>
+    filters.includes(tag.id) ? [{...tag, category: category.name, tone: organizerTagTone(index, i)}] : []));
+  const results = useMemo(() => organizerRows(nodes, draftCategories, filters, groupBy, sortBy, search),
+    [nodes, draftCategories, filters, groupBy, sortBy, search]);
+  const changed = Boolean(groupBy || sortBy !== "board" || filters.length || search || additions.length);
+  const active = Boolean(applied.groupBy || applied.sortBy !== "board" || applied.filters.length || applied.search);
+
+  function stageCategories(next: CanvasCategory[]) {
+    setOptions({...options, filters, groupBy, sortBy});
+    setAdditions(next.flatMap(category => {
+      const saved = categories.find(existing => existing.id === category.id);
+      if (!saved) return [category];
+      const tags = category.tags.filter(tag => !saved.tags.some(existing => existing.id === tag.id));
+      return tags.length ? [{...category, tags}] : [];
+    }));
+  }
+  function apply() {
+    if (additions.length) onCategoriesChange(draftCategories);
+    onApply({groupBy, sortBy, search: search.trim(), filters: selected.map(tag => tag.id)});
+  }
+  function clear() {
+    setOptions(defaultOrganizerOptions);
+    setAdditions([]);
+    setTagsOpen(false);
+    onClear();
+  }
+
+  return <div hidden={hidden}><Panel title="Board organizer" close={close}>
     <div className={styles.organizer} onKeyDown={event => {if (event.key === "Delete" || event.key === "Backspace") event.stopPropagation();}}>
-      <div className={styles.controls}>
-        <label>Group by<SelectField portalToBody value={groupBy} onChange={event => setOptions({...options, groupBy: event.target.value})}>
-          <option value="">No grouping</option>
-          {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
-        </SelectField></label>
-        <label>Sort by<SelectField portalToBody value={sortBy} onChange={event => setOptions({...options, sortBy: event.target.value})}>
-          <option value="board">Board order</option>
-          <option value="title">Title A–Z</option>
-          <option value="tags">Tag A–Z</option>
-          {categories.map(category => <option key={category.id} value={"category/" + category.id}>{category.name} A–Z</option>)}
-        </SelectField></label>
+      <div className={styles.scroller}>
+        <div className={styles.controls}>
+          <SearchField ref={searchField} className={styles.search} aria-label="Search board items" placeholder="Search board items" maxLength={canvasViewLimits.search} value={search}
+            onChange={event => setOptions({...options, search: event.target.value})}>
+            {search && <button type="button" aria-label="Clear search" onClick={() => {setOptions({...options, search: ""}); searchField.current?.focus();}}><IconX size={15} aria-hidden/></button>}
+          </SearchField>
+          <label>Group by<SelectField portalToBody value={groupBy} onChange={event => setOptions({...options, groupBy: event.target.value})}>
+            <option value="">No grouping</option>
+            <option value={typeGroup}>Item type</option>
+            {draftCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </SelectField></label>
+          <label>Sort by<SelectField portalToBody value={sortBy} onChange={event => setOptions({...options, sortBy: event.target.value})}>
+            <option value="board">Board order</option>
+            <option value="title">Title A–Z</option>
+            <option value="tags">Tag A–Z</option>
+            {draftCategories.map(category => <option key={category.id} value={"category/" + category.id}>{category.name} A–Z</option>)}
+          </SelectField></label>
+        </div>
+        <details className={styles.filter} open={tagsOpen} onToggle={e => setTagsOpen(e.currentTarget.open)}>
+          <summary><IconFilter aria-hidden size={16}/>Filter &amp; manage tags{selected.length > 0 && <small>{selected.length}</small>}<IconChevronRight aria-hidden size={15}/></summary>
+          <TagPicker categories={draftCategories} tagIds={filters} onChange={next => setOptions({...options, filters: next})} onCategoriesChange={stageCategories}/>
+        </details>
+        {selected.length > 0 && <div className={styles.chips} role="group" aria-label="Selected tag filters">
+          {selected.map(tag => <button key={tag.id} type="button" className={styles.filterTag} data-tone={tag.tone}
+            aria-label={"Remove filter " + tag.category + " " + tag.name} onClick={() => setOptions({...options, filters: filters.filter(id => id !== tag.id)})}>
+            {tag.category} · {tag.name}<IconX aria-hidden size={12}/>
+          </button>)}
+        </div>}
+        <div className={styles.results}>
+          <p className={styles.count} role="status">
+            <strong>{results.count}</strong>{selected.length || search.trim() ? " of " + nodes.length : ""} {nodes.length === 1 ? "item" : "items"}
+            {groupBy && results.groups.length > 0 && <span> · {results.groups.length} {results.groups.length === 1 ? "group" : "groups"}</span>}
+          </p>
+          {results.groups.map(group => <GroupRows key={groupBy + "/" + group.id} group={group}
+            onEdit={(id, button) => {lastRow.current = button; onEdit(id);}}/>)}
+          {!results.count && <p className={styles.empty}>{nodes.length ? "No items match this search or the selected tags." : "Items added to this board will appear here."}</p>}
+        </div>
       </div>
-      <details className={styles.filter}>
-        <summary><IconFilter aria-hidden size={16}/>Filter &amp; manage tags<IconChevronRight aria-hidden size={15}/></summary>
-        <TagPicker categories={categories} tagIds={filters} onChange={setFilters} onCategoriesChange={onCategoriesChange}/>
-      </details>
-      {selected.length > 0 && <div className={styles.chips} role="group" aria-label="Active tag filters">
-        {selected.map(tag => <button key={tag.id} type="button" className={styles.filterTag}
-          aria-label={"Remove filter " + tag.category + " " + tag.name} onClick={() => setFilters(filters.filter(id => id !== tag.id))}>
-          {tag.category} · {tag.name}<IconX aria-hidden size={12}/>
-        </button>)}
-        {selected.length > 1 && <button type="button" className={styles.clear} onClick={() => setFilters([])}>Clear filters</button>}
-      </div>}
-      {selected.length > 0 && onShowOnCanvas && <button type="button" className={styles.applyFilter}
-        onClick={() => onShowOnCanvas(selected.map(tag => tag.id))}>Show matches on canvas</button>}
-      <div className={styles.results}>
-        <p className={styles.count} role="status">{results.count} {selected.length ? "of " + nodes.length + " " : ""}{(selected.length ? nodes.length : results.count) === 1 ? "item" : "items"}</p>
-        {results.groups.map(group => <GroupRows key={groupBy + "/" + group.id} group={group} onEdit={onEdit}/>)}
-        {!results.count && <p className={styles.note}>{nodes.length ? "No items match all selected tags." : "Items added to this board will appear here."}</p>}
-      </div>
+      <footer className={styles.footer}>
+        <button type="button" className={styles.clear} disabled={!active && !changed} onClick={clear}><IconRotateClockwise2 aria-hidden size={15}/>Clear</button>
+        <button type="button" className={styles.applyFilter} onClick={apply}><IconCheck aria-hidden size={16}/>Apply to canvas</button>
+      </footer>
     </div>
-  </Panel>;
+  </Panel></div>;
 }

@@ -37,7 +37,13 @@ export type CanvasEdge = {
   symbol: "arrow" | "circle" | "none";
   label: string;
 };
-export type CanvasView = { id: string; name: string; x: number; y: number; zoom: number };
+export type CanvasViewOrganizer = {groupBy: string; sortBy: string; filters: string[]; search: string};
+export type CanvasView = {
+  id: string; name: string; x: number; y: number; zoom: number;
+  mode?: "board" | "gallery";
+  organizer?: CanvasViewOrganizer;
+};
+export const canvasViewLimits = {count: 100, name: 160, search: 240, position: 1e8, minZoom: .002, maxZoom: 8} as const;
 export const canvasTagLimits = {categories:64,tags:128,name:80} as const;
 export type CanvasCategory = {id:string;name:string;tags:{id:string;name:string}[]};
 export type Board = {
@@ -107,6 +113,34 @@ function namedTag(input:Record<string,unknown>){
 function checkNames(items:{name:string}[]){
   if(new Set(items.map(item=>item.name.toLowerCase())).size!==items.length)throw new CanvasError("That name is already in use.");
 }
+function viewOrganizer(value: unknown, categoryIds: Set<string>, tagIds: Set<string>): CanvasViewOrganizer {
+  const input = record(value);
+  let groupBy = "";
+  if (input.groupBy === "item/type" || input.groupBy === "kind") {
+    groupBy = input.groupBy;
+  } else if (input.groupBy !== undefined && input.groupBy !== "") {
+    const categoryId = canvasId(input.groupBy);
+    if (categoryIds.has(categoryId)) groupBy = categoryId;
+  }
+
+  let sortBy: string = "board";
+  if (typeof input.sortBy === "string" && input.sortBy.startsWith("category/")) {
+    const categoryId = canvasId(input.sortBy.slice("category/".length));
+    if (categoryIds.has(categoryId)) sortBy = input.sortBy;
+  } else if (input.sortBy !== undefined) {
+    sortBy = option(input.sortBy, ["board", "title", "tags"] as const);
+  }
+
+  const filters = input.filters === undefined ? [] : input.filters;
+  if (!Array.isArray(filters) || filters.length > canvasTagLimits.categories * canvasTagLimits.tags) {
+    throw new CanvasError("Choose filters from this board.");
+  }
+  return {
+    groupBy, sortBy,
+    filters: [...new Set(filters.map(canvasId).filter(id => tagIds.has(id)))],
+    search: string(input.search === undefined ? "" : input.search, canvasViewLimits.search, "view search").trim()
+  };
+}
 export function boardContents(value: unknown): Pick<Board, "title" | "folder" | "nodes" | "edges" | "views" | "categories"> {
   const item = record(value);
   const tags=new Set<string>();
@@ -158,9 +192,13 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
     return {id: canvasId(edge.id), source, target, label: string(edge.label, 250, "connector label"),
       style: option(edge.style, ["solid","dashed","dotted"] as const), symbol: option(edge.symbol, ["arrow","circle","none"] as const)};
   });
-  const views = entries<CanvasView>(item.views, 100, view => ({
-    id: canvasId(view.id), name: string(view.name, 160, "view name", true).trim(),
-    x: number(view.x, -1e8, 1e8), y: number(view.y, -1e8, 1e8), zoom: number(view.zoom, 0.002, 8)
+  const categoryIds = new Set(categories?.map(category => category.id));
+  const views = entries<CanvasView>(item.views, canvasViewLimits.count, view => ({
+    id: canvasId(view.id), name: string(view.name, canvasViewLimits.name, "view name", true).trim(),
+    x: number(view.x, -canvasViewLimits.position, canvasViewLimits.position), y: number(view.y, -canvasViewLimits.position, canvasViewLimits.position),
+    zoom: number(view.zoom, canvasViewLimits.minZoom, canvasViewLimits.maxZoom),
+    ...(view.mode === undefined ? {} : {mode: option(view.mode, ["board", "gallery"] as const)}),
+    ...(view.organizer === undefined ? {} : {organizer: viewOrganizer(view.organizer, categoryIds, tags)})
   }));
   return {...boardNames(item), nodes, edges, views,...(categories?{categories}:{})};
 }
