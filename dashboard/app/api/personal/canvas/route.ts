@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { isCsrfRequestValid } from "../../../../lib/csrf";
-import { CanvasError } from "../../../../lib/modules/canvas/model";
+import { CanvasError, canvasMaxRequestBytes } from "../../../../lib/modules/canvas/model";
 import { createBoard, getBoard, listBoardSummaries, updateBoard } from "../../../../lib/modules/canvas/store";
 
 export const runtime = "nodejs";
@@ -9,10 +9,9 @@ const json = (body: unknown, status = 200) => NextResponse.json(body, {status, h
 const failure = (error: unknown) => error instanceof CanvasError
   ? json({ok:false, error:error.message}, error.status)
   : json({ok:false, error:"Canvas is temporarily unavailable. Please try again."}, 503);
-const MAX_BYTES = 3_000_000;
 
 async function readInput(request: Request) {
-  if (Number(request.headers.get("Content-Length")) > MAX_BYTES) throw new CanvasError("This board is too large to save.",413);
+  if (Number(request.headers.get("Content-Length")) > canvasMaxRequestBytes) throw new CanvasError("This board is too large to save.",413);
   if (!request.body) throw new CanvasError("A canvas document is required.");
   const reader = request.body.getReader();
   const decoder = new TextDecoder();
@@ -23,7 +22,7 @@ async function readInput(request: Request) {
       const {value, done} = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > MAX_BYTES) {
+      if (size > canvasMaxRequestBytes) {
         await reader.cancel();
         throw new CanvasError("This board is too large to save.",413);
       }

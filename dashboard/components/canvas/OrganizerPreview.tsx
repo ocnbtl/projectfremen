@@ -3,7 +3,7 @@ import { IconHighlight, IconNote, IconTypography } from "@tabler/icons-react";
 import Icon from "../icons/UnigentamosIcon";
 import { canvasModuleIcons, CanvasMediaThumbnail } from "./CanvasIntake";
 import type { OrganizerRow } from "./organizer-rows";
-import css from "./OrganizedGallery.module.css";
+import css from "./CanvasTaxonomy.module.css";
 
 export function OrganizerPreview({row}:{row:OrganizerRow}){
   const LocalIcon=row.kind==="sticky"?IconNote:row.kind==="highlight"?IconHighlight:IconTypography;

@@ -40,7 +40,8 @@ export async function updateBoard(input: Record<string, unknown>, expectedRevisi
       }
       throw new CanvasError("This board was updated in another window. Load the latest version to continue.", 409);
     }
-    const board = { ...previous, ...contents, revision: previous.revision + 1, updatedAt: new Date().toISOString() };
+    const {arrangement: _oldArrangement, legacyPositions: _oldPositions, ...base} = previous;
+    const board = { ...base, ...contents, revision: previous.revision + 1, updatedAt: new Date().toISOString() };
     return { value: document(board), result: board };
   });
 }

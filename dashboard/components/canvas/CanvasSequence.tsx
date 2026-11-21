@@ -7,23 +7,34 @@ import { getBezierPath, Position } from "@xyflow/react";
 import { IconArrowLeft, IconArrowRight, IconFileExport, IconMapPin, IconX } from "@tabler/icons-react";
 import { defaultCanvasAppearance, sequenceViews, type Board, type CanvasNode, type CanvasView } from "../../lib/modules/canvas/model";
 import { bounds, colors } from "./board-layout";
-import { defaultOrganizerOptions, organizerRows, type OrganizerRow } from "./organizer-rows";
+import { defaultOrganizerOptions, organizerRows } from "./organizer-rows";
+import { resolveCanvasView } from "./board-organization";
+import { ArrangementDecorations } from "./ArrangementDecorations";
+import { arrangementViewport } from "./organization-viewport";
 
 type Size = NonNullable<CanvasView["frameSize"]>;
 type SlideProps = {board: Board; nodes: CanvasNode[]; view: CanvasView; fallbackSize: Size};
 const sheetPath="/canvas-sequence.css";
+// Older galleries have no board camera. Their printed arrangement fits the landscape sheet.
+const legacyPrintFrame={width:1085,height:610};
 
 function slideContent({board,nodes,view,fallbackSize}:SlideProps) {
-  const options=view.organizer??defaultOrganizerOptions;
-  const size=view.frameSize??fallbackSize;
-  const organized=organizerRows(nodes,board.categories??[],options.filters,options.groupBy,options.sortBy,options.search);
-  const visibleIds=new Set(organized.orderedIds);
-  const included=nodes.filter(node=>visibleIds.has(node.id));
+  const legacyGallery=view.mode==="gallery" && !view.positions && !view.arrangement;
+  const size=legacyGallery ? fallbackSize : view.frameSize??fallbackSize;
+  const resolved=resolveCanvasView({...board,nodes},view,false);
+  const options=view.organizer??resolved.arrangement?.organizer??defaultOrganizerOptions;
+  let included=resolved.nodes;
+  if(options.filters.length || options.search.trim()) {
+    const matches=organizerRows(included,board.categories??[],options.filters,"","board",options.search);
+    const visibleIds=new Set(matches.orderedIds);
+    included=included.filter(node=>visibleIds.has(node.id));
+  }
+  const camera=(legacyGallery ? arrangementViewport({...resolved,nodes:included},size) : undefined) ?? view;
   const framed=included.filter(node=>{
-    const x=node.x*view.zoom+view.x, y=node.y*view.zoom+view.y;
-    return x < size.width && y < size.height && x+node.width*view.zoom>0 && y+node.height*view.zoom>0;
+    const x=node.x*camera.zoom+camera.x, y=node.y*camera.zoom+camera.y;
+    return x < size.width && y < size.height && x+node.width*camera.zoom>0 && y+node.height*camera.zoom>0;
   });
-  return {size,organized,included,framed};
+  return {size,camera,arrangement:resolved.arrangement,included,framed};
 }
 type Content=ReturnType<typeof slideContent>;
 
@@ -38,7 +49,7 @@ function Artwork({node,eager=false,full=false,loaded}:{node: Pick<CanvasNode,"re
     onLoad={e=>loaded?.({width:e.currentTarget.naturalWidth,height:e.currentTarget.naturalHeight})} onError={()=>setAttempt(i=>Math.min(2,i+1))}/>;
 }
 
-function BoardItem({node,zoom}:{node:CanvasNode;zoom:number}) {
+function BoardItem({node,zoom,arranged}:{node:CanvasNode;zoom:number;arranged:boolean}) {
   const [actual,setActual]=useState<Size>();
   const media=node.ref?.module==="media";
   const label=node.title || node.ref?.label;
@@ -48,6 +59,7 @@ function BoardItem({node,zoom}:{node:CanvasNode;zoom:number}) {
   const tint=node.fillColor??colors[node.color as keyof typeof colors]??colors.paper;
   const appearance=node.appearance??defaultCanvasAppearance(node);
   const radius=Math.min(node.width*.13,node.height*.13,10/zoom);
+  const captionScale=Math.min(arranged?1:3,1/zoom);
   return <g transform={`translate(${node.x} ${node.y})`} data-slide-node={node.id}>
     {appearance!=="plain" && <rect width={node.width} height={node.height} rx={media?0:8}
       fill={appearance==="card"?tint:"none"} stroke={node.strokeColor??"#8796a1"} strokeWidth={node.strokeWidth??1}/>}
@@ -60,15 +72,15 @@ function BoardItem({node,zoom}:{node:CanvasNode;zoom:number}) {
       <title>{(index+1)+". "+pin.text}</title><circle r={radius} fill="#18426b" stroke="white" strokeWidth={radius*.16}/>
       <text textAnchor="middle" dy=".34em" fontSize={radius*1.12} fontWeight="700" fill="white">{index+1}</text>
     </g>)}
-    {media && (label||node.body) && <foreignObject y={node.height+3/zoom} width={node.width} height={35/zoom}>
-      <div className="cs-caption" style={{fontSize:Math.min(13/zoom,node.width/8)}}>{label && <strong>{label}</strong>}{node.body && <span>{node.body}</span>}</div>
+    {media && (label||node.body) && <foreignObject y={node.height+3*captionScale} width={node.width} height={35*captionScale}>
+      <div className="cs-caption" style={{fontSize:Math.min(13*captionScale,node.width/8)}}>{label && <strong>{label}</strong>}{node.body && <span>{node.body}</span>}</div>
     </foreignObject>}
   </g>;
 }
 
 function BoardSlide({board,view,content}:{board:Board;view:CanvasView;content:Content}) {
   const marker=useId().replace(/[^a-zA-Z0-9_-]/g,"");
-  const {size,framed,included}=content;
+  const {size,camera,arrangement,framed,included}=content;
   const lookup=new Map(included.map(n=>[n.id,n]));
   const groups=new Map<string,CanvasNode[]>();
   for(const n of included)if(n.group){
@@ -82,7 +94,8 @@ function BoardSlide({board,view,content}:{board:Board;view:CanvasView;content:Co
         <marker id={marker+"circle"} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5"><circle cx="5" cy="5" r="3.5" fill="#536981"/></marker>
       </defs>
       <rect width="100%" height="100%" fill="#f5f7f9"/>
-      <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
+      <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.zoom})`}>
+        <ArrangementDecorations arrangement={arrangement}/>
         {Array.from(groups,([label,items])=>{
           const box=bounds(items);
           return <g key={label}><rect x={box.x-14} y={box.y-34} width={box.width+28} height={box.height+48} rx="13" fill="none" stroke="#8799a9" strokeDasharray="5 4"/>
@@ -97,17 +110,10 @@ function BoardSlide({board,view,content}:{board:Board;view:CanvasView;content:Co
             markerEnd={edge.symbol==="none"?undefined:"url(#"+marker+edge.symbol+")"}/>
             {edge.label && <text x={x} y={y} textAnchor="middle" paintOrder="stroke" stroke="#f5f7f9" strokeWidth="6" fill="#35465a" fontSize="13">{edge.label}</text>}</g>;
         })}
-        {framed.map(node=><BoardItem key={node.id} node={node} zoom={view.zoom}/>)}
+        {framed.map(node=><BoardItem key={node.id} node={node} zoom={camera.zoom} arranged={Boolean(arrangement)}/>)}
       </g>
     </svg>
   </svg>;
-}
-
-function GalleryCard({row,group,eager}:{row:OrganizerRow;group?:string;eager:boolean}) {
-  return <div className="cs-gallery-card">
-    <div className="cs-tile" data-kind={row.kind}>{row.ref?.module==="media"?<Artwork node={row} eager={eager}/>:<span>{row.kindLabel}</span>}</div>
-    <div className="cs-gallery-caption">{group && <small>{group}</small>}<strong>{row.title}</strong></div>
-  </div>;
 }
 
 function PinNotes({nodes}:{nodes:CanvasNode[]}) {
@@ -133,7 +139,7 @@ export function CanvasPresentation({board,nodes,fallbackSize,close,exportPdf}:Om
     setPins(false);setIndex(Math.min(views.length-1,Math.max(0,n)));
   }
   if(!view||!content)return null;
-  const hasPins=view.mode!=="gallery" && content.framed.some(n=>n.imagePins?.length);
+  const hasPins=content.framed.some(n=>n.imagePins?.length);
   return createPortal(<dialog ref={dialog} className="cs-present" role="dialog" aria-label={"Presenting "+board.title}
     onCancel={e=>{e.preventDefault();close();}} onKeyDown={e=>{
       e.stopPropagation();
@@ -147,9 +153,7 @@ export function CanvasPresentation({board,nodes,fallbackSize,close,exportPdf}:Om
     <header className="cs-head"><div aria-live="polite"><small>{board.title} · {active+1} / {views.length}</small><h2 ref={heading} tabIndex={-1}>{view.name}</h2></div>
       <button onClick={close} aria-label="Exit presentation" autoFocus><IconX size={20}/></button></header>
     <div className="cs-stage" key={view.id}>
-      {view.mode==="gallery"?<div className="cs-gallery">{content.organized.groups.map(group=><section key={group.id}>
-        {group.name && <h3>{group.name}</h3>}<div className="cs-grid">{group.rows.map(row=><GalleryCard key={row.id} row={row} eager={false}/>)}</div>
-      </section>)}{!content.organized.count && <p>No matching items</p>}</div>:<BoardSlide view={view} board={board} content={content}/>}
+      <BoardSlide view={view} board={board} content={content}/>
       {hasPins && pins && <aside className="cs-notes-panel" aria-label="Image annotations"><h2>Image annotations</h2><PinNotes nodes={content.framed}/></aside>}
     </div>
     <footer className="cs-controls"><button onClick={()=>go(active-1)} disabled={!active} aria-label="Previous view"><IconArrowLeft size={20}/></button>
@@ -161,17 +165,8 @@ export function CanvasPresentation({board,nodes,fallbackSize,close,exportPdf}:Om
 
 function PrintedView(props:SlideProps & {index:number}) {
   const {board,view,index}=props;
-  const content=slideContent(props);
+  const content=slideContent(view.mode==="gallery" ? {...props,fallbackSize:legacyPrintFrame} : props);
   const header=<header className="cs-print-head"><small>{board.title} · {index+1} / {board.views.length}</small><h2>{view.name}</h2></header>;
-  if(view.mode==="gallery"){
-    const cards=content.organized.groups.flatMap(group=>group.rows.map(row=>({row,group})));
-    // Give every card an actual slot on paper, including overflow from long or multi-tag galleries.
-    const pages=Math.max(1,Math.ceil(cards.length/12));
-    return Array.from({length:pages},(_,i)=><article className="cs-sheet" key={i}>
-      {header}<div className="cs-print-grid">{cards.slice(i*12,(i+1)*12).map(({row,group})=><GalleryCard key={group.id+"."+row.id} row={row} group={group.name} eager/>)}</div>
-      {!cards.length && <p>No matching items</p>}{pages>1 && <small className="cs-folio">Gallery page {i+1} of {pages}</small>}
-    </article>);
-  }
   return <><article className="cs-sheet">{header}<BoardSlide board={board} view={view} content={content}/></article>
     {content.framed.some(n=>n.imagePins?.length) && <article className="cs-notes-sheet">{header}<h2>Image annotations</h2><PinNotes nodes={content.framed}/></article>}</>;
 }

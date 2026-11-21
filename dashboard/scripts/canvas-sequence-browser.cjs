@@ -43,9 +43,15 @@ async function run(){
     title:"Review "+String(i+1).padStart(2,"0"),body:"Private editor body",color:"butter",group:"",used:false}));
   items[0].x=310;
   const options={groupBy:"item/type",sortBy:"title",filters:[],search:""};
-  const views=[{id:"first",name:"Board opening",x:0,y:0,zoom:1,frameSize:{width:600,height:320}},
-    {id:"second",name:"Sorted gallery",x:0,y:0,zoom:1,mode:"gallery",organizer:options},
-    {id:"third",name:"Detail ending",x:-4010,y:-80,zoom:1,frameSize:{width:570,height:240}}];
+  const views=[{id:"first",name:"Board opening",x:0,y:0,zoom:1,frameSize:{width:600,height:320},
+    positions:[portrait,...items].map(({id,x,y})=>({id,x,y}))},
+    {id:"second",name:"Sorted references",x:0,y:0,zoom:1,mode:"gallery",organizer:options},
+    {id:"third",name:"Detail ending",x:-4010,y:-80,zoom:1,frameSize:{width:570,height:240},
+      organizer:{...options,search:"Review 01"}, positions:[{id:items[0].id,x:4100,y:100}],
+      arrangement:{rowBy:"item/type",columnBy:"",headerStyle:"outline",headerColor:"#375b70",
+        rowTint:"#dceaff",rowOutline:"#346286",headerFont:"serif",headerAlign:"center",organizer:options,
+        bands:[{axis:"row",key:"sticky",axisName:"Review",label:"Focus",x:4020,y:100,width:72,height:45,fontSize:14,
+          region:{x:4020,y:94,width:242,height:130}}]}}];
   const save=await context.request.put(api,{headers,data:{expectedRevision:board.revision,board:{...board,nodes:[portrait,...items],views}}});
   assert(save.ok(),await save.text());
   await page.goto(addr+"&view=third");
@@ -67,6 +73,8 @@ async function run(){
   }).toBe(true);
   const working=(await read()).views.find(v=>v.name==="Working view");
   assert(working.frameSize.width>0 && working.frameSize.height>0 && working.inSequence===false);
+  assert(working.positions.length===14);
+  const saved=await read();
   const camera=()=>page.locator(".react-flow__viewport").evaluate(el=>el.style.transform);
   const before=await camera();
   await btn("Present views").click();
@@ -80,17 +88,38 @@ async function run(){
   assert.equal(pin,"translate(91.25 135)");
   await modal.getByRole("button",{name:"Annotations"}).click();
   await expect(modal.getByText("Check this blue corner",{exact:true})).toBeVisible();
-  await page.keyboard.press("ArrowRight");await expect(modal.getByRole("heading",{name:"Sorted gallery"})).toBeVisible();
-  await expect(modal.locator(".cs-gallery-card")).toHaveCount(14);
+  await page.keyboard.press("ArrowRight");await expect(modal.getByRole("heading",{name:"Sorted references"})).toBeVisible();
+  await expect(modal.locator("[data-slide-node]")).toHaveCount(14);
+  assert((await modal.locator("svg text").allTextContents()).some(label=>label.includes("Sticky note")));
+  const layoutOf=svg=>svg.locator("[data-slide-node]").evaluateAll(nodes=>nodes.map(node=>[node.dataset.slideNode,node.getAttribute("transform")]));
+  const fits=svg=>svg.locator(".cs-board").evaluate(board=>{
+    const frame=board.getBoundingClientRect();
+    return Array.from(board.querySelectorAll("[data-slide-node] > foreignObject:first-of-type")).every(node=>{
+      const item=node.getBoundingClientRect();
+      return item.width>0 && item.height>0 && item.left>=frame.left-1 && item.top>=frame.top-1 && item.right<=frame.right+1 && item.bottom<=frame.bottom+1;
+    });
+  });
+  const sortedLayout=await layoutOf(modal);
+  assert.notEqual(sortedLayout.find(([id])=>id===items[0].id)[1],"translate(310 130)");
+  assert(await fits(modal),"Every item fits in the converted view");
   await page.keyboard.press("End");await expect(modal.getByRole("heading",{name:"Detail ending"})).toBeVisible();
+  assert.deepEqual(await layoutOf(modal),[[items[0].id,"translate(4100 100)"]]);
+  const detailStyle=async node=>[
+    await node.locator("[data-arrangement-band=row]").getAttribute("fill"),
+    await node.locator("[data-arrangement-header=row] > rect").getAttribute("stroke"),
+    await node.locator("[data-arrangement-header=row] text").allTextContents()
+  ];
+  assert.deepEqual(await detailStyle(modal),["#dceaff","#375b70",["Review","Focus"]]);
   await page.keyboard.press("Escape");await expect(modal).toHaveCount(0);
   assert.equal(await camera(),before);
   await expect(btn("Present views")).toBeFocused();
   await page.setViewportSize({width:390,height:844});
   await btn("Present views").click();await modal.getByRole("button",{name:"Next view"}).click();
-  await expect(modal.getByRole("heading",{name:"Sorted gallery"})).toBeVisible();
+  await expect(modal.getByRole("heading",{name:"Sorted references"})).toBeVisible();
+  assert.deepEqual(await layoutOf(modal),sortedLayout);
+  assert(await fits(modal),"Every item fits on mobile");
   assert(await modal.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
-  await page.screenshot({path:path.join(output,"present-gallery-mobile.png")});
+  await page.screenshot({path:path.join(output,"present-arrangement-mobile.png")});
   await modal.getByRole("button",{name:"Exit presentation"}).click();
   // Capture the native print request. CDP's PDF path uses the same print
   // layout but requires the OS printer dialog to be closed.
@@ -107,14 +136,19 @@ async function run(){
   const preview=await pending;
   await expect(preview.getByRole("button",{name:"Print / Save as PDF"})).toBeEnabled({timeout:25000});
   assert.equal(await preview.locator("html").getAttribute("data-requested-print"),"true");
-  assert.deepEqual(await preview.locator("article .cs-print-head h2").allTextContents(),["Board opening","Board opening","Sorted gallery","Sorted gallery","Detail ending"]);
+  assert.deepEqual(await preview.locator("article .cs-print-head h2").allTextContents(),["Board opening","Board opening","Sorted references","Sorted references","Detail ending"]);
+  const sheets=preview.locator(".cs-sheet");
+  assert.deepEqual(await layoutOf(sheets.nth(1)),sortedLayout);
+  assert.deepEqual(await layoutOf(sheets.nth(2)),[[items[0].id,"translate(4100 100)"]]);
+  assert.deepEqual(await detailStyle(sheets.nth(2)),["#dceaff","#375b70",["Review","Focus"]]);
   assert(await preview.locator("img").evaluateAll(images=>images.length===2 && images.every(img=>img.naturalWidth>0)));
   const pdf=await preview.pdf({path:path.join(output,"saved-views.pdf"),preferCSSPageSize:true,printBackground:true});
   assert.equal(pdf.subarray(0,4).toString(),"%PDF");
   const count=pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length;
-  assert.equal(count,5,"PDF has four view pages and one image annotation page");
+  assert.equal(count,5,"PDF has three board views and two image annotation pages");
   await preview.close();await expect(btn("Present views")).toBeVisible();
+  assert.deepEqual(await read(),saved,"Presenting and printing must leave the board and its saved views intact");
   assert.deepEqual(errors,[]);
-  console.log("PASS saved order, board crop, actual image, letterboxed pin, gallery overflow, keyboard/mobile navigation, editor restoration and five-page PDF.");
+  console.log("PASS read-only playback and five-page PDF with ordered views, separate saved positions, legacy board arrangement, mobile framing, photo pins and filters.");
 }
 run().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

@@ -42,14 +42,34 @@ export type CanvasEdge = {
   label: string;
 };
 export type CanvasViewOrganizer = {groupBy: string; sortBy: string; filters: string[]; search: string};
+export type CanvasRect = {x:number; y:number; width:number; height:number};
+export type CanvasPosition = {id:string; x:number; y:number};
+export type CanvasArrangementLabel = {axis:"row"|"column"; key:string; label:string};
+export type CanvasArrangementBand = CanvasArrangementLabel & CanvasRect & {
+  axisName:string; fontSize:number; region:CanvasRect;
+};
+export type CanvasArrangementOptions = {
+  rowBy:string; columnBy:string; headerStyle:"solid"|"outline"|"minimal"; headerColor:string;
+  rowName?:string; columnName?:string; labelOverrides?:CanvasArrangementLabel[];
+  rowTint?:string; columnTint?:string; rowOutline?:string; columnOutline?:string;
+  rowAlternateTint?:string; columnAlternateTint?:string;
+  headerFont?:"sans"|"serif"|"mono"; headerBold?:boolean;
+  headerTextColor?:string; headerAlign?:"left"|"center"|"right";
+};
+export type CanvasArrangement = CanvasArrangementOptions & {
+  organizer:CanvasViewOrganizer; bands:CanvasArrangementBand[];
+};
 export type CanvasView = {
   id: string; name: string; x: number; y: number; zoom: number;
   frameSize?: {width: number; height: number};
   inSequence?: boolean;
   mode?: "board" | "gallery";
   organizer?: CanvasViewOrganizer;
+  arrangement?: CanvasArrangement;
+  positions?: CanvasPosition[];
 };
 export const canvasViewLimits = {count: 100, name: 160, search: 240, position: 1e8, minZoom: .002, maxZoom: 8} as const;
+export const canvasMaxRequestBytes = 3_000_000;
 export const sequenceViews=(views:CanvasView[])=>views.filter(view=>view.inSequence!==false);
 export const canvasTagLimits = {categories:64,tags:128,name:80} as const;
 export type CanvasCategory = {id:string;name:string;tags:{id:string;name:string}[]};
@@ -57,6 +77,8 @@ export type Board = {
   id: string; title: string; folder: string; updatedAt: string; revision: number;
   nodes: CanvasNode[]; edges: CanvasEdge[]; views: CanvasView[];
   categories?: CanvasCategory[];
+  arrangement?: CanvasArrangement;
+  legacyPositions?: CanvasPosition[];
 };
 export type BoardSummary = Pick<Board, "id" | "title" | "folder" | "updatedAt" | "revision"> & {
   viewNames?: Pick<CanvasView,"id"|"name">[];
@@ -148,7 +170,55 @@ function viewOrganizer(value: unknown, categoryIds: Set<string>, tagIds: Set<str
     search: string(input.search === undefined ? "" : input.search, canvasViewLimits.search, "view search").trim()
   };
 }
-export function boardContents(value: unknown): Pick<Board, "title" | "folder" | "nodes" | "edges" | "views" | "categories"> {
+function arrangementRect(value: unknown): CanvasRect {
+  const input = record(value);
+  return {x:number(input.x,-1e8,1e8), y:number(input.y,-1e8,1e8),
+    width:number(input.width,1,2e8), height:number(input.height,1,2e8)};
+}
+function arrangementLabels<T extends CanvasArrangementLabel>(value:unknown, parse:(input:Record<string,unknown>)=>T):T[] {
+  if (!Array.isArray(value) || value.length > 2000) throw new CanvasError("This layout exceeds the lane limit.");
+  const result = value.map(item => parse(record(item)));
+  if (new Set(result.map(item => item.axis + "/" + item.key)).size !== result.length)
+    throw new CanvasError("Each lane needs a unique key within its axis.");
+  return result;
+}
+function arrangementLabel(input:Record<string,unknown>):CanvasArrangementLabel {
+  return {axis:option(input.axis,["row","column"] as const), key:string(input.key,128,"lane key"),
+    label:string(input.label,160,"lane name",true).trim()};
+}
+function arrangementColor(value:unknown) {
+  if (typeof value !== "string" || !/^#[a-f\d]{6}$/i.test(value)) throw new CanvasError("Choose a valid layout color.");
+  return value;
+}
+function canvasArrangement(value:unknown, categoryIds:Set<string>, tags:Set<string>):CanvasArrangement {
+  const input=record(value);
+  const dimension=(value:unknown) => {
+    if(value==="" || value==="item/type") return value;
+    const id=canvasId(value);
+    return categoryIds.has(id) || id==="kind" ? id : "";
+  };
+  const result:CanvasArrangement={
+    rowBy:dimension(input.rowBy), columnBy:dimension(input.columnBy),
+    headerStyle:option(input.headerStyle,["solid","outline","minimal"] as const), headerColor:arrangementColor(input.headerColor),
+    organizer:viewOrganizer(input.organizer,categoryIds,tags),
+    bands:arrangementLabels(input.bands,band=>({...arrangementLabel(band),...arrangementRect(band),
+      axisName:string(band.axisName,80,"axis name"), fontSize:number(band.fontSize,1,10000),region:arrangementRect(band.region)}))
+  };
+  for(const prop of ["rowName","columnName"] as const)
+    if(input[prop]!==undefined) result[prop]=string(input[prop],80,"axis name").trim();
+  for(const prop of ["rowTint","columnTint","rowAlternateTint","columnAlternateTint","rowOutline","columnOutline","headerTextColor"] as const)
+    if(input[prop]!==undefined) result[prop]=arrangementColor(input[prop]);
+  if(input.headerFont!==undefined) result.headerFont=option(input.headerFont,["sans","serif","mono"] as const);
+  if(input.headerBold!==undefined) result.headerBold=option(input.headerBold,[true,false] as const);
+  if(input.headerAlign!==undefined) result.headerAlign=option(input.headerAlign,["left","center","right"] as const);
+  if(input.labelOverrides!==undefined) result.labelOverrides=arrangementLabels(input.labelOverrides,arrangementLabel);
+  return result;
+}
+function canvasPositions(value:unknown, ids:Set<string>) {
+  return entries<CanvasPosition>(value,1000,
+    pos=>({id:canvasId(pos.id),x:number(pos.x,-1e7,1e7),y:number(pos.y,-1e7,1e7)})).filter(pos=>ids.has(pos.id));
+}
+export function boardContents(value: unknown): Pick<Board, "title" | "folder" | "nodes" | "edges" | "views" | "categories" | "arrangement" | "legacyPositions"> {
   const item = record(value);
   const tags=new Set<string>();
   const categories=item.categories===undefined?undefined:entries<CanvasCategory>(item.categories,canvasTagLimits.categories,category=>{
@@ -220,9 +290,13 @@ export function boardContents(value: unknown): Pick<Board, "title" | "folder" | 
       height: number(record(view.frameSize).height, 1, 100000)
     }}),
     ...(view.mode === undefined ? {} : {mode: option(view.mode, ["board", "gallery"] as const)}),
-    ...(view.organizer === undefined ? {} : {organizer: viewOrganizer(view.organizer, categoryIds, tags)})
+    ...(view.organizer === undefined ? {} : {organizer: viewOrganizer(view.organizer, categoryIds, tags)}),
+    ...(view.arrangement === undefined ? {} : {arrangement:canvasArrangement(view.arrangement,categoryIds,tags)}),
+    ...(view.positions === undefined ? {} : {positions:canvasPositions(view.positions,ids)})
   }));
-  return {...boardNames(item), nodes, edges, views,...(categories?{categories}:{})};
+  return {...boardNames(item), nodes, edges, views,...(categories?{categories}:{}),
+    ...(item.arrangement===undefined?{}:{arrangement:canvasArrangement(item.arrangement,categoryIds,tags)}),
+    ...(item.legacyPositions===undefined?{}:{legacyPositions:canvasPositions(item.legacyPositions,ids)})};
 }
 export function boardSummary(board: Board): BoardSummary {
   const {id, title, folder, updatedAt, revision} = board;

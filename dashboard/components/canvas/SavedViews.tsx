@@ -7,9 +7,9 @@ import styles from "./SavedViews.module.css";
 
 type Props = {
   views: CanvasView[];
-  mode: NonNullable<CanvasView["mode"]>;
+  getLayout: () => Pick<CanvasView, "positions" | "arrangement">;
   organizer: CanvasViewOrganizer;
-  changeViews: (update: (views: CanvasView[]) => CanvasView[]) => void;
+  changeViews: (update: (views: CanvasView[]) => CanvasView[]) => boolean;
   currentViewport: () => Viewport | undefined;
   frameSize: () => CanvasView["frameSize"];
   present: () => void;
@@ -18,7 +18,7 @@ type Props = {
   close: () => void;
 };
 
-export function SavedViews({ views, mode, organizer, changeViews, currentViewport, frameSize, present, exportPdf, open, close }: Props) {
+export function SavedViews({ views, getLayout, organizer, changeViews: applyViews, currentViewport, frameSize, present, exportPdf, open, close }: Props) {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState("");
   const [rename, setRename] = useState("");
@@ -30,13 +30,20 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
   const full = views.length >= canvasViewLimits.count;
   const included = sequenceViews(views).length;
 
+  function changeViews(update: Parameters<Props["changeViews"]>[0]) {
+    const saved = applyViews(update);
+    if (!saved) setStatus("This board has reached its save limit. Delete an unused view to make room.");
+    return saved;
+  }
+
   function readFraming() {
     const viewport = currentViewport();
     if (viewport) {
       const { x, y, zoom } = viewport;
       if ([x, y, zoom].every(Number.isFinite) && Math.abs(x) <= canvasViewLimits.position && Math.abs(y) <= canvasViewLimits.position
           && zoom >= canvasViewLimits.minZoom && zoom <= canvasViewLimits.maxZoom) {
-        return {x, y, zoom, mode, frameSize: frameSize(), organizer: {...organizer, filters: [...organizer.filters]}};
+        const { positions, arrangement } = getLayout();
+        return {x, y, zoom, mode: "board" as const, positions, arrangement, frameSize: frameSize(), organizer: {...organizer, filters: [...organizer.filters]}};
       }
     }
     setStatus("Move or zoom the board, then try saving the view again.");
@@ -48,13 +55,13 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
     const framing = readFraming();
     if (!framing) return;
     const view = { id: crypto.randomUUID(), name, ...framing };
-    changeViews(current => current.length < canvasViewLimits.count ? [...current, view] : current);
+    if (!changeViews(current => current.length < canvasViewLimits.count ? [...current, view] : current)) return;
     setNewName("");
     setStatus("Saved “" + name + "”.");
   }
 
   function moveView(view: CanvasView, direction: -1 | 1) {
-    changeViews(current => {
+    if (!changeViews(current => {
       const index = current.findIndex(item => item.id === view.id);
       const destination = index + direction;
       if (index < 0 || destination < 0 || destination >= current.length) return current;
@@ -62,7 +69,7 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
       const [moved] = reordered.splice(index, 1);
       reordered.splice(destination, 0, moved);
       return reordered;
-    });
+    })) return;
     // A move to either end disables that direction's button.
     manageButtons.current.get(view.id)?.focus();
     setStatus("Moved “" + view.name + "” " + (direction < 0 ? "up." : "down."));
@@ -70,8 +77,8 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
 
   function removeView(view: CanvasView, index: number) {
     const neighbor = views[index + 1] ?? views[index - 1];
+    if (!changeViews(current => current.filter(item => item.id !== view.id))) return;
     (neighbor ? manageButtons.current.get(neighbor.id) : createInput.current)?.focus();
-    changeViews(current => current.filter(item => item.id !== view.id));
     setEditingId("");
     setConfirming(false);
     setStatus("Deleted “" + view.name + "”.");
@@ -97,7 +104,7 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
             <div className={styles.row}>
               <button type="button" className={styles.open} aria-label={view.name} onClick={() => open(view)}>
                 <IconBookmark size={17} aria-hidden="true" />
-                <span><strong>{view.name}</strong><small>{view.mode === "gallery" ? "Gallery" : "Board · " + percent + "% zoom"}</small></span>
+                <span><strong>{view.name}</strong><small>{view.mode === "gallery" ? "Arranged board · Fit to items" : (view.arrangement ? "Arranged board" : "Board") + " · " + percent + "% zoom"}</small></span>
               </button>
               <button type="button" className={styles.manage}
                 ref={element => { if (element) manageButtons.current.set(view.id, element); else manageButtons.current.delete(view.id); }}
@@ -116,7 +123,7 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
                 event.preventDefault();
                 const name = rename.trim();
                 if (!name || name === view.name) return;
-                changeViews(current => current.map(item => item.id === view.id ? { ...item, name } : item));
+                if (!changeViews(current => current.map(item => item.id === view.id ? { ...item, name } : item))) return;
                 setRename(name);
                 manageButtons.current.get(view.id)?.focus();
                 setStatus("Renamed view to “" + name + "”.");
@@ -129,6 +136,8 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
                 if (!framing) return;
                 const settings = view.organizer;
                 if (framing.x === view.x && framing.y === view.y && framing.zoom === view.zoom && framing.mode === view.mode
+                    && JSON.stringify(framing.positions) === JSON.stringify(view.positions)
+                    && JSON.stringify(framing.arrangement) === JSON.stringify(view.arrangement)
                     && framing.frameSize?.width === view.frameSize?.width && framing.frameSize?.height === view.frameSize?.height
                     && settings?.groupBy === organizer.groupBy && settings.sortBy === organizer.sortBy
                     && settings.search === organizer.search && settings.filters.length === organizer.filters.length
@@ -136,10 +145,10 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
                   setStatus("“" + view.name + "” already uses this view.");
                   return;
                 }
-                changeViews(current => current.map(item => item.id === view.id ? { ...item, ...framing } : item));
+                if (!changeViews(current => current.map(item => item.id === view.id ? { ...item, ...framing } : item))) return;
                 setStatus("Updated view “" + view.name + "”.");
               }}><IconFocus2 size={16} aria-hidden="true" />Use current framing</button>
-              <small id={detailsId + "-framing"}>Updates the position, zoom and organizer settings for this view.</small>
+              <small id={detailsId + "-framing"}>Captures the current item positions, layout, filters and zoom.</small>
               <div className={styles.order}>
                 <button type="button" disabled={index === 0} onClick={() => moveView(view, -1)}><IconArrowUp size={15} aria-hidden="true" />Move up</button>
                 <button type="button" disabled={index === views.length - 1} onClick={() => moveView(view, 1)}><IconArrowDown size={15} aria-hidden="true" />Move down</button>
@@ -154,7 +163,7 @@ export function SavedViews({ views, mode, organizer, changeViews, currentViewpor
             </div>}
           </li>;
         })}
-      </ul> : <p className={styles.empty}>Save this board position or gallery with its filters, grouping and sort order.</p>}
+      </ul> : <p className={styles.empty}>Save the current layout and framing to revisit it or present it in a sequence.</p>}
       <p className={styles.status} role="status">{status}</p>
     </div>
   </Panel>;
