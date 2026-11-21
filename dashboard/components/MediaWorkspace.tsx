@@ -15,6 +15,7 @@ import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import MediaMetadataEditorSheet from "./media/MediaMetadataEditorSheet";
+import CopyAdPrompt from "./media/CopyAdPrompt";
 import {watchMediaDetails} from "../lib/modules/media/detail-events";
 import {createMediaRepository} from "../lib/modules/media/repository";
 import MediaReviewScheduleEditorSheet from "./media/MediaReviewScheduleEditorSheet";
@@ -1902,6 +1903,7 @@ export default function MediaWorkspace({
             >
               Edit
             </button>
+            <CopyAdPrompt notes={asset.notes} />
           </>
         }
         metadata={

@@ -6,6 +6,7 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { createMediaRepository } from "../../lib/modules/media/repository";
 import type { MediaAsset } from "../../lib/modules/media/types";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
+import CopyAdPrompt from "./CopyAdPrompt";
 import styles from "../resources/ResourceEditorSheet.module.css";
 
 type MediaMetadataEditorSheetProps = {
@@ -265,6 +266,7 @@ export default function MediaMetadataEditorSheet({
                   <span>Asset notes</span>
                   <textarea rows={4} maxLength={20000} value={form.notes} onChange={event=>updateField("notes",event.target.value)}/>
                 </label>
+                <CopyAdPrompt notes={form.notes} />
               </section>
 
               <section className={styles.section}>

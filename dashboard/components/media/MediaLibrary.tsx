@@ -5,6 +5,7 @@ import MediaReviewSheet from "./MediaReviewSheet";
 import MediaBulkEditSheet from "./MediaBulkEditSheet";
 import {applyMediaBulkEdit,type MediaBulkEdit} from "../../lib/modules/media/bulk-edit";
 import MediaDetailsFields from "./MediaDetailsFields";
+import CopyAdPrompt from "./CopyAdPrompt";
 import {MEDIA_PURPOSES,mediaSearchText} from "../../lib/modules/media/organization";
 import { matchesMediaFilters, EMPTY_MEDIA_FILTERS, MEDIA_TYPES, type MediaFilters } from "../../lib/modules/media/filters";
 import SelectField from "../ui/SelectField";
@@ -468,6 +469,7 @@ export default function MediaLibrary({
               >
                 Next
               </Button>
+              <CopyAdPrompt notes={notes} />
               {preview && (
                 <a
                   className="work-button"

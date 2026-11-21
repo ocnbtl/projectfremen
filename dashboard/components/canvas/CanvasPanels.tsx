@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconX } from "@tabler/icons-react";
 import { canvasAppearances, defaultCanvasAppearance, type CanvasAppearance, type CanvasEdge, type CanvasNode } from "../../lib/modules/canvas/model";
 import SelectField from "../ui/SelectField";
+import CopyAdPrompt from "../media/CopyAdPrompt";
 import { colors } from "./board-layout";
 import { FrameFields,type FrameStyle } from "./FrameFields";
 import {displayMediaDetails,linkedMediaId,readCardMedia,writeCardMedia} from "./useCanvasMediaDetails";
@@ -70,6 +71,7 @@ export function CardFields({node,save,close,restoreSize,children}:{node:CanvasNo
       <label>{node.kind==="object"?"Caption":"Text"}<textarea disabled={!loaded||busy} rows={3} value={body} maxLength={id?20000:32000} onChange={e=>setBody(e.target.value)}/></label>
       {base && !base.body && !base.captionEdited && initial.current.body && body===initial.current.body && <label><input type="checkbox" checked={publishCaption} onChange={e=>setPublishCaption(e.target.checked)}/>Save this existing board caption to Media</label>}
       <label>Notes<textarea disabled={!loaded||busy} rows={3} maxLength={20000} value={notes} onChange={e=>setNotes(e.target.value)}/></label>
+      {id && loaded && <CopyAdPrompt notes={notes} />}
       {id && <small>Title, caption and notes are shared with Media.</small>}
       {children}
       <label>Appearance<SelectField portalToBody value={appearance ?? defaultCanvasAppearance(node)} onChange={e=>setAppearance(e.target.value as CanvasAppearance)}>
