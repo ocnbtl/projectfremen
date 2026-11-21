@@ -138,7 +138,30 @@ async function main(){
  await btn("Select multiple").click();for(const c of cards)await c.click({position:{x:18,y:20}});
  await expect(page.getByText("3 selected",{exact:true})).toBeVisible();
  await cards[1].click({position:{x:18,y:20}});await expect(page.getByText("2 selected",{exact:true})).toBeVisible();
- await cards[1].click({position:{x:18,y:20}});await btn("Arrange selection").click();
+ async function boxSelect(first,last,reverse=false){
+   const a=await first.boundingBox(),b=await last.boundingBox();
+   const corners=[[a.x-12,a.y-12],[b.x+b.width+12,b.y+b.height+12]];
+   if(reverse)corners.reverse();
+   await page.mouse.move(...corners[0]);await page.mouse.down();
+   await page.mouse.move(...corners[1],{steps:10});
+   await expect(page.locator(".react-flow__selection")).toBeVisible();await page.mouse.up();
+ }
+ // A new box replaces the tap selection and excludes artwork beyond the rectangle.
+ await boxSelect(cards[0],cards[1]);
+ await expect(cards[0]).toHaveClass(/selected/);await expect(cards[1]).toHaveClass(/selected/);await expect(cards[2]).not.toHaveClass(/selected/);
+ const selectionBox=await page.locator(".react-flow__nodesselection-rect").boundingBox();
+ const mx=selectionBox.x+selectionBox.width/2,my=selectionBox.y+selectionBox.height/2;
+ await page.mouse.move(mx,my);await page.mouse.down();await page.mouse.move(mx+36,my+28,{steps:8});await page.mouse.up();
+ await expect.poll(async()=>(await read())[0].x).toBeGreaterThan(layout[0].x+10);
+ const groupMoved=await read();
+ assert.equal(groupMoved[1].x-groupMoved[0].x,layout[1].x-layout[0].x);assert.equal(groupMoved[1].y-groupMoved[0].y,layout[1].y-layout[0].y);
+ assert.deepEqual([groupMoved[2].x,groupMoved[2].y],[layout[2].x,layout[2].y]);
+ await btn("Undo").click();await expect.poll(async()=>(await read()).map(n=>[n.x,n.y])).toEqual(layout.map(n=>[n.x,n.y]));
+ await boxSelect(cards[0],cards[2],true);await expect(page.getByText("3 selected",{exact:true})).toBeVisible();
+ await btn("Arrange selection").click();await btn("Align top").click();
+ await expect.poll(async()=>(await read()).map(n=>n.y)).toEqual(layout.map(()=>layout[0].y));
+ await btn("Undo").click();await expect.poll(async()=>(await read())[2].y).toBe(layout[2].y);
+ await boxSelect(cards[0],cards[2]);await btn("Arrange selection").click();
  await btn("Space horizontally").click();await expect.poll(async()=>{const [a,b,c]=await read();return b.x-a.x-a.width-(c.x-b.x-b.width);}).toBe(0);
  await btn("Space vertically").click();await expect.poll(async()=>{const [a,b,c]=await read();return b.y-a.y-a.height-(c.y-b.y-b.height);}).toBe(0);
  assert.deepEqual((await read()).map(n=>[n.width,n.height]),layout.map(n=>[n.width,n.height]));
@@ -168,7 +191,17 @@ async function main(){
  await menu.getByRole("menuitemradio",{name:"Outline",exact:true}).tap();
  await expect.poll(async()=>(await read())[0].appearance).toBe("outline");
  await touch.close();
- console.log("PASS live drag guides and snap, tap multi-select, equal gaps on both axes, original sizes and bulk style undo.");
+ // The large-board renderer unmounts distant cards. Their saved bounds must still exclude them.
+ const beforeLarge=(await (await context.request.get(base+"/api/personal/canvas?id="+testId)).json()).board;
+ const distant=Array.from({length:70},(_,i)=>({...layout[0],id:crypto.randomUUID(),kind:"sticky",title:"Distant "+i,x:5000+i*300,y:4200}));
+ const zoomed={...view,x:52,y:92,zoom:.68};
+ const large=await context.request.put(base+"/api/personal/canvas",{headers,data:{expectedRevision:beforeLarge.revision,board:{...beforeLarge,nodes:[...layout,...distant],views:[zoomed]}}});assert(large.ok());
+ await page.reload();await btn("Select multiple").click();
+ await expect(page.locator(".react-flow__node")).toHaveCount(3);
+ await boxSelect(cards[0],cards[1],true);
+ await expect(page.getByText("2 selected",{exact:true})).toBeVisible();
+ await expect(cards[2]).not.toHaveClass(/selected/);
+ console.log("PASS live drag guides and snap, tap and box selection, moving a subset together, alignment, equal gaps on both axes, original sizes and undo.");
  assert.deepEqual(errors,[]);console.log("PASS 40 distinct images, paste/drop/reuse, real Media links and thumbnails, drag, Undo/Redo, notes, typed connections, saved views, group and used state, navigation and mobile controls.");
 }
 main().catch(async e=>{console.error(e);if(page)await page.screenshot({path:path.join(output,"failure.png")}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();server.kill();});

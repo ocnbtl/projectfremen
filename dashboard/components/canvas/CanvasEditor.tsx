@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Background, ReactFlow, getViewportForBounds, MarkerType, SelectionMode, ViewportPortal,
+  Background, ReactFlow, getViewportForBounds, MarkerType, Position, SelectionMode, ViewportPortal,
   type Edge, type NodeChange, type ReactFlowInstance, type Viewport
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -24,8 +24,17 @@ type Props={board:Board;entryView?:string;onChange:(board:Board)=>void;onBack:()
 type Layout=Pick<CanvasNode,"x"|"y"|"width"|"height">;
 const nodeTypes={card:CanvasCard};
 const emptySelection:string[]=[];
-function Action({name,icon,run,active,disabled,label}:{name:string;icon:ReactNode;run:()=>void;active?:boolean;disabled?:boolean;label?:string}){
-  return <button type="button" title={name} aria-label={name} aria-pressed={active} disabled={disabled} onClick={run}>{icon}{label && <span>{label}</span>}</button>;
+// Supply the artwork bounds and its two 10-unit connectors even when the card is offscreen.
+// React Flow otherwise includes unmeasured cards in every drag selection.
+function cardGeometry(width:number,height:number):Pick<FlowCard,"width"|"height"|"measured"|"handles">{
+  const handle={width:10,height:10,y:height/2-5};
+  return {width,height,measured:{width,height},handles:[
+    {...handle,type:"target",position:Position.Left,x:-5},
+    {...handle,type:"source",position:Position.Right,x:width-5}
+  ]};
+}
+function Action({name,icon,run,active,disabled,label,hint}:{name:string;icon:ReactNode;run:()=>void;active?:boolean;disabled?:boolean;label?:string;hint?:string}){
+  return <button type="button" title={hint||name} aria-label={name} aria-description={hint} aria-pressed={active} disabled={disabled} onClick={run}>{icon}{label && <span>{label}</span>}</button>;
 }
 function lastViewport(id:string):Viewport|undefined {
   try {
@@ -66,6 +75,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   const [notice,setNotice]=useState(""),[drop,setDrop]=useState(false);
   const [live,setLive]=useState<Record<string,Partial<Layout>>>({});
   const pointerDrag=useRef(false);
+  const boxSelecting=useRef(false);
   const groupDrag=useRef<{clientX:number;clientY:number;items:CanvasNode[]}|null>(null);
   const dropPoint=useRef<{x:number;y:number}|null>(null);
   const selected=board.nodes.filter(n=>ids.includes(n.id)), one=selected.length===1?selected[0]:undefined;
@@ -141,12 +151,14 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   },[change]);
   const actions=useMemo(()=>({resize:handleResize,edit,appearance,open:(id:string)=>{setReading(id);setPanel("read");},originalLoaded}),[appearance,edit,handleResize,originalLoaded]);
   const baseNodes=useMemo(()=>board.nodes.map((n):FlowCard=>{
-    return {id:n.id,type:"card",position:{x:n.x,y:n.y},width:n.width,height:n.height,
-      selectable:!multiPick,draggable:!hand && (!multiPick || ids.includes(n.id)),data:{item:n,focus,inspectOriginal:board.nodes.length===1 || (panel==="card" && editing===n.id)},
+    return {id:n.id,type:"card",position:{x:n.x,y:n.y},...cardGeometry(n.width,n.height),
+      draggable:!hand && (!multiPick || ids.includes(n.id)),data:{item:n,focus,inspectOriginal:board.nodes.length===1 || (panel==="card" && editing===n.id)},
       selected:ids.includes(n.id),ariaLabel:n.title||n.kind,zIndex:n.kind==="highlight"?0:1};
   }),[board.nodes,ids,focus,panel,editing,multiPick,hand]);
   const flowNodes=useMemo(()=>baseNodes.map(n=>{
-    const p=live[n.id];return p?{...n,position:{x:p.x??n.position.x,y:p.y??n.position.y},width:p.width??n.width,height:p.height??n.height}:n;
+    const p=live[n.id];if(!p)return n;
+    const size=p.width!==undefined || p.height!==undefined ? cardGeometry(p.width??n.data.item.width,p.height??n.data.item.height) : undefined;
+    return {...n,...size,position:{x:p.x??n.position.x,y:p.y??n.position.y}};
   }),[baseNodes,live]);
   const flowEdges=useMemo(()=>board.edges.map((e):Edge=>({
     id:e.id,source:e.source,target:e.target,type:"default",label:e.label,selected:edgeIds.includes(e.id),
@@ -165,7 +177,8 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
   }
   function onNodesChange(changes:NodeChange<FlowCard>[]){
     const selection=changes.filter(c=>c.type==="select");
-    if(selection.length)setIds(old=>{
+    // In Select mode a single tap toggles membership. The marquee supplies its own selection.
+    if(selection.length && (!multiPick || boxSelecting.current))setIds(old=>{
       const s=new Set(old);for(const c of selection){if(c.selected)s.add(c.id);else s.delete(c.id);}return [...s];
     });
     const temporary:Record<string,Partial<Layout>>={},finished=new Map<string,{x:number;y:number}>();
@@ -278,7 +291,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
       <Action name="Saved views" icon={<IconBookmark/>} label="Views" active={panel==="views"} run={()=>show("views")}/>
     </header>
-    <div ref={frame} className={css.stage} data-drop={drop||undefined}
+    <div ref={frame} className={css.stage} data-box-select={multiPick||undefined} data-drop={drop||undefined}
       onDragOver={e=>{if(e.dataTransfer.types.includes("Files")){e.preventDefault();setDrop(true);}}}
       onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDrop(false);}}
       onDrop={e=>{e.preventDefault();setDrop(false);if(!media.busy&&e.dataTransfer.files.length){
@@ -296,11 +309,13 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
           if(panel!=="card"||editing!==n.id)setPanel("");
         }}
         onNodeDragStart={()=>{pointerDrag.current=true;setArranging(false);setPanel("");}}
+        onSelectionStart={()=>{boxSelecting.current=true;choose([]);setPanel("");setConnectFrom("");}}
+        onSelectionEnd={()=>{boxSelecting.current=false;}}
         onSelectionDragStart={()=>{pointerDrag.current=true;setArranging(false);setPanel("");}}
         selectNodesOnDrag={!multiPick}
         onEdgeClick={(_,e)=>{choose([],[e.id]);setPanel("edge");}}
         onConnect={c=>connect(c.source,c.target)} isValidConnection={c=>c.source!==c.target}
-        nodesDraggable={!hand} nodesConnectable={!hand} panOnDrag={hand?true:[1,2]} selectionOnDrag={!hand} selectionMode={SelectionMode.Partial}
+        nodesDraggable={!hand} nodesConnectable={!hand} panOnDrag={hand?true:multiPick?false:[1,2]} selectionOnDrag={!hand} selectionMode={SelectionMode.Partial} paneClickDistance={4}
         multiSelectionKeyCode={["Shift","Meta","Control"]} deleteKeyCode={null} panOnScroll zoomOnScroll={false} zoomOnPinch
         defaultViewport={initialView} fitView={!initialView&&board.nodes.length>0} fitViewOptions={{padding:.23,maxZoom:1}}
         minZoom={.002} maxZoom={3} onlyRenderVisibleElements={board.nodes.length>65} zoomOnDoubleClick={false}
@@ -325,7 +340,7 @@ export default function CanvasEditor({board,entryView,onChange,onBack,saveStatus
       {!board.nodes.length && !panel && <div className={css.empty}><IconNote size={32}/><h3>Start your board</h3><p>Paste an image, drop files, or add a sticky note.</p></div>}
       <div className={css.tools} role="toolbar" aria-label="Canvas tools">
         <Action name="Select cards" icon={<IconPointer/>} active={!hand && !multiPick} run={()=>{if(multiPick)choose([]);setHand(false);setMultiPick(false);}}/>
-        <Action name="Select multiple" label="Select" icon={<IconBoxMultiple/>} active={multiPick} run={()=>{setMultiPick(v=>!v);setHand(false);setPanel("");setConnectFrom("");}}/>
+        <Action name="Select multiple" label="Select" hint="Drag from empty space to select a group, or tap individual items." icon={<IconBoxMultiple/>} active={multiPick} run={()=>{setMultiPick(v=>!v);setHand(false);setPanel("");setConnectFrom("");}}/>
         <Action name="Pan board" icon={<IconHandStop/>} active={hand} run={()=>{setHand(true);setMultiPick(false);}}/>
         <i/>
         <Action name="Add sticky note" icon={<IconNote/>} run={()=>insert("sticky")}/>
