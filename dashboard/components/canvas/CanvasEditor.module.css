@@ -2,10 +2,10 @@
   --board-ink:var(--text-strong,#183248);--board-blue:var(--module-primary-700,#235a9f);
   --board-border:var(--border,#cdd9df);--paper:#fff;
   display:flex;flex-direction:column;min-width:0;color:var(--board-ink);font-family:var(--font-body,Inter,sans-serif);
-  border:1px solid var(--board-border);border-radius:17px;background:var(--paper);overflow:hidden;
+  border:1px solid var(--board-border);border-top:0;border-radius:0 0 17px 17px;background:var(--paper);overflow:hidden;
 }
 .bar{display:flex;align-items:center;gap:8px;padding:10px 16px;min-height:60px}
-.heading{min-width:0;flex:1;display:flex;align-items:baseline;gap:12px}
+.heading{min-width:0;flex:0 1 auto;display:flex;align-items:baseline;gap:12px}
 .heading h2{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(16px,2vw,21px);font-weight:600;letter-spacing:-.035em}
 .heading span{font-size:12px;color:#526779}
 .bar button,.tools button,.navigation button,.selection button,.panel button,.message button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:35px;min-height:35px;padding:6px;border:1px solid transparent;border-radius:9px;cursor:pointer;background:transparent;color:var(--board-ink);font:500 13px/1.25 var(--font-body,Inter,sans-serif);transition:background .16s,color .16s,box-shadow .16s}
@@ -18,7 +18,7 @@
 .editor [hidden]{display:none!important}
 .editor button:hover{transform:none;box-shadow:none}
 .editor input,.editor textarea{margin:0}
-.bar{flex:none}
+.bar{flex:none}.bar .saveBadge{margin-right:auto}
 .editor .stage{flex:1 1 auto}
 .boardSurface{position:absolute;inset:0}
 .arrangement{position:absolute;inset:0 auto auto 0;overflow:visible;pointer-events:none;z-index:-2}
@@ -27,7 +27,7 @@
 .stage[data-drop=true]{outline:3px solid #5991c5;outline-offset:-4px}
 .tools,.navigation,.selection{position:absolute;z-index:6;display:flex;align-items:center;gap:2px;padding:4px;background:#fff;border:1px solid var(--board-border);border-radius:13px;box-shadow:0 3px 12px #18324813}
 .tools{left:14px;top:14px}
-.tools i,.navigation i{display:block;width:1px;height:18px;background:var(--board-border);margin:0 3px}
+.tools i,.navigation i,.selection i{display:block;flex:0 0 8px}
 .navigation{left:16px;bottom:18px}
 .selection{top:14px;right:14px;max-width:calc(100% - 28px);box-sizing:border-box;flex-wrap:wrap;justify-content:flex-end}
 .tools button,.navigation button,.selection button{width:auto}
@@ -112,6 +112,8 @@
 .bookmarks:empty{display:none}.bookmarks>div{justify-content:space-between}.bookmarks>div>button:first-child{justify-content:flex-start;overflow-wrap:anywhere}
 .message{display:flex;align-items:center;gap:10px;position:absolute;bottom:83px;left:50%;transform:translateX(-50%);width:max-content;max-width:92%;padding:7px 12px;border-radius:10px;border:1px solid var(--board-border);background:white;color:#234263;box-shadow:0 2px 8px #18324815;font-size:13px;z-index:9}
 @keyframes panelIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-@media(max-width:780px){.stage{height:calc(100dvh - 190px);min-height:330px}.selection,.panel{top:70px}.panel{max-height:calc(100% - 140px)}.bar{padding:7px 9px}.heading{display:grid;gap:2px}.tools{left:8px;top:8px}.navigation{left:8px;bottom:16px}.tools button,.navigation button,.selection button{min-width:36px;min-height:38px}.history button{min-width:30px}.bar>button[aria-label="Focus mode"] span,.bar>button:last-child span{display:none}}
+@media(max-width:780px){.stage{height:calc(100dvh - 190px);min-height:330px}.selection,.panel{top:70px}.panel{max-height:calc(100% - 140px)}.bar{padding:7px 9px}.heading{display:grid;gap:2px}.tools{left:8px;top:8px}.navigation{left:8px;bottom:16px}.tools button,.navigation button,.selection button{min-width:36px;min-height:38px}.history button{min-width:30px}.bar>button[aria-label="Focus mode"] span,.bar>button[aria-label="Saved views"] span{display:none}}
 @media(max-width:480px){.selection button>span,.tools button[aria-label="Select multiple"]>span{display:none}.editor{border-radius:12px}.stage{min-height:295px}.tools{max-width:calc(100% - 16px);gap:0}.tools button{padding:5px;min-width:32px}.navigation{gap:0}.tools i{margin:0 2px}}
 @media(prefers-reduced-motion:reduce){.editor *,.editor *::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+@media(max-width:600px){.bar{flex-wrap:wrap;gap:3px}.bar .heading{max-width:calc(100% - 135px)}.editor{border-top-left-radius:0;border-top-right-radius:0}}

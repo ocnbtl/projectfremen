@@ -1,4 +1,5 @@
 "use client";
+import ConfirmationSheet from "../operational/ConfirmationSheet";
 import MentionBacklinks from "../writing/MentionBacklinks";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -114,6 +115,7 @@ export default function CanvasEditor({board:sourceBoard,entryView,entryCard,onCh
   useEffect(()=>()=>clearTimeout(arrangeTimer.current),[]);
   const [reading,setReading]=useState("");
   const [initialPin,setInitialPin]=useState<string>();
+  const [confirmation,setConfirmation]=useState<"remove"|"used"|"unused"|null>(null);
   const [gap,setGap]=useState("");
   const [frameDraft,setFrameDraft]=useState<FrameStyle>({});
   const [hand,setHand]=useState(false),[panel,setPanel]=useState(""),[name,setName]=useState("");
@@ -502,6 +504,7 @@ export default function CanvasEditor({board:sourceBoard,entryView,entryCard,onCh
   useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(""),4500);return()=>clearTimeout(t);},[notice]);
   const shortcut=useRef((_:KeyboardEvent)=>{});
   shortcut.current=e=>{
+    if(confirmation)return;
     if(!(e.metaKey||e.ctrlKey)||e.altKey||e.isComposing||e.defaultPrevented||panel||isField(e.target))return;
     const editor=frame.current?.parentElement;
     if(e.target!==document.body && (!(e.target instanceof Element)||!editor?.contains(e.target)||e.target.closest("[role=menu]")))return;
@@ -521,22 +524,28 @@ export default function CanvasEditor({board:sourceBoard,entryView,entryCard,onCh
       if(id){e.preventDefault();togglePicked(id);return;}
     }
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"){e.preventDefault();restore(e.shiftKey);}
-    else if((e.key==="Delete"||e.key==="Backspace") && selectionCount){e.preventDefault();removeSelected();}
+    else if((e.key==="Delete"||e.key==="Backspace") && selectionCount){e.preventDefault();setConfirmation("remove");}
     else if(e.key==="Escape"){setPanel("");setConnectFrom("");choose([]);}
   }}>
+    <ConfirmationSheet open={confirmation!==null} onOpenChange={open=>{if(!open)setConfirmation(null);}}
+      eyebrow={null} tone={confirmation==="remove"?"danger":"default"}
+      title={confirmation==="remove"?"Remove selection from this board?":"Mark "+selected.length+" selected "+(selected.length===1?"card":"cards")+" as "+confirmation+"?"}
+      description={confirmation==="remove"?"Linked objects remain available in your workspace.":undefined}
+      confirmLabel={confirmation==="remove"?"Remove from board":"Mark "+confirmation}
+      onConfirm={()=>{if(confirmation==="remove")removeSelected();else if(confirmation)patchNodes(ids,{used:confirmation==="used"});setConfirmation(null);}}/>
     <header className={css.bar}>
       <Action name="Back to boards" icon={<IconArrowLeft/>} run={onBack} disabled={media.busy}/>
       <div className={css.heading}><h2>{board.title}</h2></div>
+      <Action name="Board mentions" icon={<IconLink/>} active={panel==="mentions"} run={()=>show("mentions")}/>
       <CanvasSaveStatus status={saveStatus} updatedAt={board.updatedAt}/>
       {visibleIds && <Action name="Clear board filter" label="Clear filter" icon={<IconX/>} run={()=>{
         if(board.arrangement)change(b=>({...b,arrangement:{...b.arrangement!,organizer:{...organization,filters:[],search:""}}}));
         setRevealAll(true);
       }}/>}
       <Action name="Organize board" label="Organize" icon={<IconTags/>} active={panel==="organizer"} run={()=>show("organizer")}/>
-      <div className={css.history}><Action name="Undo" icon={<IconArrowBackUp/>} disabled={!previous.current.length} run={()=>restore()}/><Action name="Redo" icon={<IconArrowForwardUp/>} disabled={!next.current.length} run={()=>restore(true)}/></div>
-      <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
-      <Action name="Board mentions" icon={<IconLink/>} active={panel==="mentions"} run={()=>show("mentions")}/>
       <Action name="Saved views" icon={<IconBookmark/>} label="Views" active={panel==="views"} run={()=>show("views")}/>
+      <Action name="Focus mode" label="Focus" icon={<IconFocus2/>} active={focus} run={()=>{setFocus(value=>!value);setMultiPick(false);setPanel("");setConnectFrom("");choose([]);}}/>
+      <div className={css.history}><Action name="Undo" icon={<IconArrowBackUp/>} disabled={!previous.current.length} run={()=>restore()}/><Action name="Redo" icon={<IconArrowForwardUp/>} disabled={!next.current.length} run={()=>restore(true)}/></div>
     </header>
     <div ref={frame} className={css.stage} data-box-select={multiPick||undefined} data-drop={drop||undefined}
       onDragOver={e=>{if(e.dataTransfer.types.includes("Files")){e.preventDefault();setDrop(true);}}}
@@ -661,11 +670,13 @@ export default function CanvasEditor({board:sourceBoard,entryView,entryCard,onCh
         {one && <Action name="Connect to another card" icon={<IconLine/>} run={()=>{setConnectFrom(one.id);setMultiPick(false);setHand(false);}}/>}
         {selected.length>0&&<><Action name="Tag selected items" label="Tags" icon={<IconTags/>} run={()=>openBulkTags(selected.map(n=>n.id))}/>
         <Action name="Selection appearance" label="Style" icon={<IconAdjustments/>} run={()=>{setFrameDraft({});show("appearance");}}/>
+        <i aria-hidden="true"/>
         <Action name="Duplicate selection" hint="Duplicate selection (Ctrl/⌘ D)" icon={<IconCopy/>} run={duplicate}/>
         <Action name={movable.length?"Lock position":"Unlock position"} hint="Toggle position lock (Ctrl/⌘ Shift L)" icon={movable.length?<IconLock/>:<IconLockOpen/>} active={!movable.length} run={lockSelection}/>
         <Action name="Group cards" hint="Group selection (Ctrl/⌘ G) · Ungroup (Ctrl/⌘ Shift G)" icon={<IconFrame/>} run={()=>{show("group");setName(one?.group||"");}}/>
-        <Action name={selected.every(n=>n.used)?"Mark unused":"Mark used"} icon={<IconCheck/>} active={selected.every(n=>n.used)} run={()=>patchNodes(ids,{used:!selected.every(n=>n.used)})}/></>}
-        <Action name="Remove selection from board" disabled={selected.length>0&&!movable.length} icon={<IconTrash/>} run={removeSelected}/>
+        <i aria-hidden="true"/>
+        <Action name={selected.every(n=>n.used)?"Mark unused":"Mark used"} icon={<IconCheck/>} active={selected.every(n=>n.used)} run={()=>setConfirmation(selected.every(n=>n.used)?"unused":"used")}/></>}
+        <Action name="Remove selection from board" disabled={selected.length>0&&!movable.length} icon={<IconTrash/>} run={()=>setConfirmation("remove")}/>
       </div>}
       <div className={css.navigation} role="toolbar" aria-label="Board navigation">
         <Action name="Snap to align" icon={<IconMagnet/>} active={snap} run={()=>{setSnap(v=>!v);setGuides([]);}}/>

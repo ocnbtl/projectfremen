@@ -146,6 +146,42 @@ export function snapResize(original: Rect, start: Layout, proposed: Layout, targ
 export function spaceEvenly<T extends Rect>(nodes: readonly T[], axis: Axis, exactGap?:number): T[] {
   if (nodes.length < (exactGap===undefined?3:2)) return [...nodes];
   const ordered = [...nodes].sort((a, b) => a[axis] - b[axis]);
+  const cross = axis === "x" ? "y" : "x";
+  // Cards sharing a coordinate on this axis often belong to separate rows or columns.
+  if (nodes.length > 2 && ordered.some((n,i) => i > 0 && n[axis] < ordered[i-1][axis] + ordered[i-1][size[axis]])) {
+    const lanes: T[][] = [];
+    let commonEnd = -Infinity;
+    for (const node of [...nodes].sort((a,b) => a[cross] - b[cross])) {
+      const end = node[cross] + node[size[cross]];
+      if (node[cross] >= commonEnd) {
+        lanes.push([]);
+        commonEnd = end;
+      }
+      commonEnd = Math.min(commonEnd, end);
+      lanes[lanes.length-1].push(node);
+    }
+    if (lanes.length > 1) {
+      const gaps: number[] = [];
+      for (const lane of lanes) {
+        lane.sort((a,b) => a[axis] - b[axis]);
+        for (let i=1; i<lane.length; i++) {
+          const gap = lane[i][axis] - lane[i-1][axis] - lane[i-1][size[axis]];
+          if (gap >= 0) gaps.push(gap);
+        }
+      }
+      gaps.sort((a,b) => a-b);
+      const gap = exactGap ?? gaps[Math.floor((gaps.length-1)/2)] ?? overlapGap;
+      const positions = new Map<string,T>();
+      for (const lane of lanes) {
+        let cursor = lane[0][axis];
+        for (const node of lane) {
+          positions.set(node.id, {...node,[axis]:cursor});
+          cursor += node[size[axis]] + gap;
+        }
+      }
+      return nodes.map(node => positions.get(node.id)!);
+    }
+  }
   const last = ordered[ordered.length - 1];
   const extent = last[axis] + last[size[axis]] - ordered[0][axis];
   const free = extent - ordered.reduce((sum, node) => sum + node[size[axis]], 0);

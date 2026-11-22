@@ -81,6 +81,9 @@ async function main(){
  await control.focus();await page.keyboard.press("ArrowDown");await page.keyboard.press("End");await page.keyboard.press("ArrowUp");await page.keyboard.press("Enter");
  await expect.poll(async()=>(await board()).nodes.find(n=>n.id===last.id).appearance).toBe("outline");
  await control.click();await page.getByRole("menuitem",{name:"Edit",exact:true}).click();await page.getByLabel("Caption").fill("Keep the generous margins.");await btn("Apply").click();await btn("Mark used").click();
+ await page.getByRole("dialog").getByRole("button",{name:"Cancel",exact:true}).click();
+ await btn("Mark used").click();await page.getByRole("dialog").getByRole("button",{name:"Mark used",exact:true}).click();
+ await btn("Remove selection from board").click();await page.getByRole("dialog").getByRole("button",{name:"Cancel",exact:true}).click();
  await btn("Group cards").click();await page.getByLabel("Group name").fill("Shortlist");await page.getByRole("dialog",{name:"Group cards"}).getByRole("button",{name:"Group cards"}).click();
  const group=await btn("Select group Shortlist").boundingBox();assert(group);const assigned=(await board()).nodes.find(n=>n.id===last.id);
  await page.mouse.move(group.x+group.width/2,group.y+group.height/2);await page.mouse.down();await page.mouse.move(group.x+group.width/2+40,group.y+group.height/2+20,{steps:6});await page.mouse.up();

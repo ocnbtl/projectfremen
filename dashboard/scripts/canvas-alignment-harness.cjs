@@ -107,10 +107,18 @@ const selected = Object.freeze([last, first, middle]);
 assert.deepEqual(spaceEvenly(selected, "x"), [last, first, { ...middle, x: 65 }]);
 assert.deepEqual(spaceEvenly(selected, "y"), [last, first, { ...middle, y: 152.5 }]);
 assert.deepEqual(spaceEvenly([last, first], "x"), [last, first]);
-const overlapping = [rect("a", 0, 30, 100, 10), rect("b", 5, 20, 40, 10), rect("c", 10, 1, 70, 10)];
+const overlapping = [rect("a", 0, 3, 100, 10), rect("b", 5, 2, 40, 10), rect("c", 10, 1, 70, 10)];
 const spread = spaceEvenly(overlapping, "x");
 assert.deepEqual(spread.map(n => n.x), [0, 124, 188]);
 assert.deepEqual(spread.map(n => [n.y, n.width, n.height]), overlapping.map(n => [n.y, n.width, n.height]));
+for (const axis of ["x","y"]) {
+  const transpose = n => axis==="x"?n:rect(n.id,n.y,n.x,n.height,n.width);
+  const ads = Array.from({length:46},(_,i)=>transpose(rect(String(i),(i%3)*124,Math.floor(i/3)*360,100,200)));
+  assert.deepEqual(spaceEvenly(ads,axis),ads);
+  const moved=spaceEvenly(ads,axis,12);
+  assert.deepEqual(moved.map(n=>n[axis]), ads.map((_,i)=>(i%3)*112));
+  assert.deepEqual(spaceEvenly(moved,axis,12),moved);
+}
 console.log("PASS canvas edge and center guides, zoom tolerance, rigid selections and equal edge spacing.");
 assert.deepEqual(spaceEvenly([last,first],"x",0).map(n=>n.x),[10,-10]);
 const a={...makeNode("text",{x:15,y:30}),strokeColor:"#102030",strokeWidth:3,locked:true,group:"Ads"};
